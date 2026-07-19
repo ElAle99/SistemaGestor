@@ -447,28 +447,39 @@ async function initDB() {
     }
   }
 
-  const shouldSeedDefaultAdmin = readBoolean(
-    process.env.SEED_DEFAULT_ADMIN,
-    process.env.NODE_ENV !== 'production'
-  );
+  const shouldSeedDefaultAdmin = String(process.env.SEED_DEFAULT_ADMIN || '').toLowerCase() === 'true';
 
   if (shouldSeedDefaultAdmin) {
-    const adminUsername = 'allfix';
-    const adminDisplayName = 'Allfix';
-    const adminPasswordHash = '$2b$10$Au6AtlXUMPqj.y.CY/9KlezjYuu7E8AN55viHUFJCQY4su5pvK61a';
+    const adminUsername = String(process.env.ADMIN_USERNAME || '').trim();
+    const adminPassword = String(process.env.ADMIN_PASSWORD || '');
+    const adminDisplayName = String(process.env.ADMIN_NAME || '').trim();
+    const missingAdminEnv = [];
 
-    const adminExists = await pool.query(
-      'SELECT * FROM usuarios WHERE LOWER(username) = LOWER($1) ORDER BY id ASC',
-      [adminUsername]
-    );
-    if (adminExists.rows.length === 0) {
-      await pool.query(
-        'INSERT INTO usuarios (username, password, rol, nombre, activo) VALUES ($1, $2, $3, $4, $5)',
-        [adminUsername, adminPasswordHash, 'Administrador', adminDisplayName, true]
+    if (!adminUsername) missingAdminEnv.push('ADMIN_USERNAME');
+    if (!adminPassword) missingAdminEnv.push('ADMIN_PASSWORD');
+    if (!adminDisplayName) missingAdminEnv.push('ADMIN_NAME');
+
+    if (missingAdminEnv.length > 0) {
+      console.warn(
+        `SEED_DEFAULT_ADMIN=true, pero faltan variables requeridas (${missingAdminEnv.join(', ')}). No se creo el administrador inicial.`
       );
+    } else {
+      const adminExists = await pool.query(
+        'SELECT id FROM usuarios WHERE LOWER(username) = LOWER($1) ORDER BY id ASC',
+        [adminUsername]
+      );
+      if (adminExists.rows.length === 0) {
+        const bcrypt = require('bcrypt');
+        const adminPasswordHash = await bcrypt.hash(adminPassword, 10);
+        await pool.query(
+          'INSERT INTO usuarios (username, password, rol, nombre, activo) VALUES ($1, $2, $3, $4, $5)',
+          [adminUsername, adminPasswordHash, 'Administrador', adminDisplayName, true]
+        );
+        console.log('Usuario administrador inicial creado. Desactiva SEED_DEFAULT_ADMIN despues del primer despliegue.');
+      } else {
+        console.log('Usuario administrador inicial ya existe. No se creo duplicado.');
+      }
     }
-
-    console.log('Usuario administrador por defecto verificado.');
   }
 
   await pool.query('INSERT INTO configuracion (id, nombre) VALUES (1, $1) ON CONFLICT (id) DO NOTHING', ['AllFix Bacalar']);
