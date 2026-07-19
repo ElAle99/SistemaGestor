@@ -738,7 +738,7 @@ async function refreshInitialSetupStatus() {
 
         const data = await response.json();
         APP_STATE.publicUserCreationState = data;
-        setInitialSetupVisible(Boolean(data.canCreateAdmin), data);
+        setInitialSetupVisible(false, data);
     } catch (error) {
         console.warn('No se pudo consultar configuracion inicial:', error);
         setInitialSetupVisible(false, {});
@@ -791,7 +791,7 @@ function setLoginCardMode(mode) {
     const notice = document.querySelector('.login-system-notice');
 
     if (mode === 'login') {
-        const shouldShowSetupShortcut = Boolean(APP_STATE.publicUserCreationState?.canCreateAdmin);
+        const shouldShowSetupShortcut = false;
         loginForm?.classList.remove('hidden');
         setupPanel?.classList.toggle('hidden', !shouldShowSetupShortcut);
         document.getElementById('btn-show-setup-admin')?.classList.toggle('hidden', !shouldShowSetupShortcut);
