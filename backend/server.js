@@ -70,7 +70,6 @@ app.get('/', (req, res) => {
 app.use('/api/setup', require('./routes/setup'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
-app.use('/api/chatbot', require('./routes/chatbot'));
 app.use('/api/clientes', require('./routes/clientes'));
 app.use('/api/ordenes', require('./routes/ordenes'));
 app.use('/api/inventario', require('./routes/inventario'));

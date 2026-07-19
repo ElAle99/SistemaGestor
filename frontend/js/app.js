@@ -434,7 +434,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     initNavigation();
     initLogin();
     await initInitialSetup();
-    initChatbot();
     initNotifications();
     initClientAutocomplete();
     initDeviceAutocomplete();
@@ -843,86 +842,6 @@ function clearAuthMessage(elementId) {
     element.textContent = '';
     element.classList.add('hidden');
     element.classList.remove('is-error', 'is-success');
-}
-
-function initChatbot() {
-    const widget = document.getElementById('chatbot-widget');
-    const panel = document.getElementById('chatbot-panel');
-    const toggle = document.getElementById('chatbot-toggle');
-    const closeButton = document.getElementById('chatbot-close');
-    const form = document.getElementById('chatbot-form');
-    const input = document.getElementById('chatbot-input');
-    const messages = document.getElementById('chatbot-messages');
-    const sendButton = document.getElementById('chatbot-send');
-
-    if (!widget || !panel || !toggle || !form || !input || !messages) return;
-
-    const sessionKey = 'allfix_chatbot_session_id';
-    let sessionId = sessionStorage.getItem(sessionKey);
-    if (!sessionId) {
-        sessionId = `allfix-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-        sessionStorage.setItem(sessionKey, sessionId);
-    }
-
-    const openChat = () => {
-        panel.classList.remove('hidden');
-        toggle.classList.add('hidden');
-        setTimeout(() => input.focus(), 40);
-    };
-
-    const closeChat = () => {
-        panel.classList.add('hidden');
-        toggle.classList.remove('hidden');
-    };
-
-    toggle.addEventListener('click', openChat);
-    closeButton?.addEventListener('click', closeChat);
-
-    form.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const message = input.value.trim();
-        if (!message) return;
-
-        appendChatbotMessage(message, 'user');
-        input.value = '';
-        input.disabled = true;
-        if (sendButton) sendButton.disabled = true;
-        const typingMessage = appendChatbotMessage('Escribiendo...', 'bot typing');
-
-        try {
-            const response = await fetch(`${BASE_API_URL}/chatbot/message`, {
-                method: 'POST',
-                body: JSON.stringify({ message, sessionId })
-            });
-            const data = await readApiResponse(response);
-            typingMessage.remove();
-
-            if (!response.ok) {
-                appendChatbotMessage(data.error || 'No se pudo obtener respuesta del asistente.', 'error');
-                return;
-            }
-
-            appendChatbotMessage(data.reply || 'No obtuve respuesta del asistente.', 'bot');
-        } catch (error) {
-            typingMessage.remove();
-            console.error('Error de chatbot:', error);
-            appendChatbotMessage('No se pudo conectar con el asistente.', 'error');
-        } finally {
-            input.disabled = false;
-            if (sendButton) sendButton.disabled = false;
-            input.focus();
-        }
-    });
-}
-
-function appendChatbotMessage(text, type) {
-    const messages = document.getElementById('chatbot-messages');
-    const bubble = document.createElement('div');
-    bubble.className = `chatbot-message ${type}`;
-    bubble.textContent = text;
-    messages?.appendChild(bubble);
-    if (messages) messages.scrollTop = messages.scrollHeight;
-    return bubble;
 }
 
 async function readApiResponse(response) {
