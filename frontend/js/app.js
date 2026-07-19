@@ -612,7 +612,7 @@ async function initInitialSetup() {
         const nombre = document.getElementById('setup-admin-name')?.value.trim() || '';
         const username = document.getElementById('setup-admin-username')?.value.trim() || '';
         const correo = document.getElementById('setup-admin-email')?.value.trim() || '';
-        const telefono = document.getElementById('setup-admin-phone')?.value.trim() || '';
+        const rol = document.getElementById('setup-admin-role')?.value || 'Recepcionista';
         const password = document.getElementById('setup-admin-password')?.value || '';
         const confirmPassword = document.getElementById('setup-admin-password-confirm')?.value || '';
         const submitButton = document.getElementById('btn-create-setup-admin');
@@ -624,23 +624,23 @@ async function initInitialSetup() {
 
         if (submitButton) {
             submitButton.disabled = true;
-            submitButton.innerText = 'Creando...';
+            submitButton.innerText = 'Registrando...';
         }
 
         try {
-            const response = await fetch(`${BASE_API_URL}/setup/create-admin`, {
+            const response = await fetch(`${BASE_API_URL}/setup/register-user`, {
                 method: 'POST',
-                body: JSON.stringify({ username, password, nombre, correo, telefono })
+                body: JSON.stringify({ username, password, confirmPassword, nombre, correo, rol })
             });
             const data = await response.json().catch(() => ({}));
 
             if (!response.ok) {
-                showSetupAdminMessage(data.error || 'No se pudo crear el administrador.', 'error');
+                showSetupAdminMessage(data.error || 'No se pudo registrar el usuario.', 'error');
                 return;
             }
 
             setupForm.reset();
-            showSetupAdminMessage(data.message || 'Administrador creado correctamente.', 'success');
+            showSetupAdminMessage(data.message || 'Usuario creado correctamente.', 'success');
             setTimeout(() => {
                 setLoginCardMode('login');
                 refreshInitialSetupStatus();
@@ -652,7 +652,7 @@ async function initInitialSetup() {
         } finally {
             if (submitButton) {
                 submitButton.disabled = false;
-                submitButton.innerText = 'Crear administrador';
+                submitButton.innerText = 'Registrar usuario';
             }
         }
     });
@@ -739,13 +739,20 @@ function setInitialSetupVisible(isVisible, state = {}) {
     const showSetupButton = document.getElementById('btn-show-setup-admin');
     const setupForm = document.getElementById('setup-admin-form');
     const setupCopy = document.getElementById('setup-initial-copy');
+    const setupRoleGroup = document.getElementById('setup-admin-role-group');
+    const setupRole = document.getElementById('setup-admin-role');
 
     setupPanel?.classList.toggle('hidden', !isVisible);
 
     if (setupCopy) {
         setupCopy.textContent = state.setupRequired
-            ? 'No se encontro un administrador. Crea el primer acceso seguro para comenzar.'
-            : 'La creacion temporal de administradores esta habilitada. Crea tu nuevo acceso y desactivala despues.';
+            ? 'No se encontro un administrador. El primer registro se creara como Administrador.'
+            : 'La creacion de usuarios desde login esta habilitada. Puedes elegir Administrador, Tecnico o Recepcionista.';
+    }
+
+    if (setupRoleGroup && setupRole) {
+        setupRoleGroup.classList.toggle('hidden', Boolean(state.setupRequired));
+        if (state.setupRequired) setupRole.value = 'Administrador';
     }
 
     if (!isVisible) {

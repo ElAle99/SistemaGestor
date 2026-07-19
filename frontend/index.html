@@ -11,7 +11,7 @@
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Main Stylesheet -->
-    <link rel="stylesheet" href="css/style.css?v=20260719-users-v1">
+    <link rel="stylesheet" href="css/style.css?v=20260719-users-v2">
 </head>
 <body class="light-theme">
 
@@ -57,17 +57,17 @@
                         <i class="fa-solid fa-shield-halved"></i>
                         <div>
                             <strong>Configuración inicial del sistema</strong>
-                            <p id="setup-initial-copy">Crea un acceso administrador seguro para comenzar.</p>
+                            <p id="setup-initial-copy">Registra un usuario para acceder al sistema.</p>
                         </div>
                     </div>
 
                     <button type="button" id="btn-show-setup-admin" class="btn btn-primary-flat btn-block">
-                        Crear administrador
+                        Registrar usuario
                     </button>
 
                     <form id="setup-admin-form" class="setup-admin-form hidden">
                         <div class="form-group">
-                            <label for="setup-admin-name">NOMBRE DEL ADMINISTRADOR</label>
+                            <label for="setup-admin-name">NOMBRE COMPLETO</label>
                             <div class="input-icon-wrapper">
                                 <i class="fa-regular fa-id-card input-icon-gray"></i>
                                 <input type="text" id="setup-admin-name" placeholder="Nombre visible" autocomplete="name">
@@ -90,12 +90,13 @@
                             </div>
                         </div>
 
-                        <div class="form-group">
-                            <label for="setup-admin-phone">NÚMERO DE TELÉFONO</label>
-                            <div class="input-icon-wrapper">
-                                <i class="fa-solid fa-phone input-icon-gray"></i>
-                                <input type="tel" id="setup-admin-phone" placeholder="Ej. 9831234567" autocomplete="tel">
-                            </div>
+                        <div class="form-group" id="setup-admin-role-group">
+                            <label for="setup-admin-role">ROL</label>
+                            <select id="setup-admin-role" class="form-select">
+                                <option value="Administrador">Administrador</option>
+                                <option value="Técnico">Técnico</option>
+                                <option value="Recepcionista">Recepcionista</option>
+                            </select>
                         </div>
 
                         <div class="form-group">
@@ -123,7 +124,7 @@
                         <div id="setup-admin-message" class="setup-admin-message hidden"></div>
 
                         <button type="submit" id="btn-create-setup-admin" class="btn btn-primary-flat btn-block">
-                            Crear administrador
+                            Registrar usuario
                         </button>
                     </form>
                 </div>
@@ -3443,7 +3444,7 @@
     <script src="/vendor/jspdf-autotable/jspdf.plugin.autotable.min.js"></script>
 
     <!-- Main System JavaScript Logic -->
-    <script src="js/app.js?v=20260719-users-v1"></script>
+    <script src="js/app.js?v=20260719-users-v2"></script>
 </body>
 </html>
 
