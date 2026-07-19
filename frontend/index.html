@@ -11,7 +11,7 @@
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Main Stylesheet -->
-    <link rel="stylesheet" href="css/style.css?v=20260719-login-v4">
+    <link rel="stylesheet" href="css/style.css?v=20260719-profile-v5">
 </head>
 <body class="light-theme">
 
@@ -309,12 +309,12 @@
             </nav>
             
             <div class="sidebar-footer">
-                <div class="user-profile-badge">
+                <button type="button" class="user-profile-badge" id="btn-open-profile-modal" title="Mi perfil">
                     <div class="user-avatar" id="sidebar-avatar">A</div>
                     <div class="user-info">
                         <span class="user-name" id="sidebar-username">Allfix (Administrador)</span>
                     </div>
-                </div>
+                </button>
                 <button class="btn-logout" id="btn-logout" title="Cerrar sesión">
                     <i class="fa-solid fa-right-from-bracket"></i>
                 </button>
@@ -330,9 +330,6 @@
                 </div>
                 <div class="topbar-right">
                     <div class="topbar-actions">
-                        <button type="button" class="topbar-profile-btn" id="btn-open-profile-modal" title="Mi perfil">
-                            <i class="fa-regular fa-circle-user"></i>
-                        </button>
                         <div class="notifications-dropdown-trigger" id="notifications-trigger">
                             <i class="fa-regular fa-bell"></i>
                             <span class="notification-badge" id="alert-count">3</span>
@@ -3447,7 +3444,7 @@
     <script src="/vendor/jspdf-autotable/jspdf.plugin.autotable.min.js"></script>
 
     <!-- Main System JavaScript Logic -->
-    <script src="js/app.js?v=20260719-login-v4"></script>
+    <script src="js/app.js?v=20260719-profile-v5"></script>
 </body>
 </html>
 
