@@ -848,6 +848,12 @@ async function readApiResponse(response) {
     const text = await response.text().catch(() => '');
     if (!text) return {};
 
+    if (/^\s*<!doctype html/i.test(text) || /<html[\s>]/i.test(text)) {
+        return {
+            error: 'Error interno del servidor. Intenta de nuevo y revisa que Railway haya terminado de desplegar la ultima version.'
+        };
+    }
+
     try {
         return JSON.parse(text);
     } catch (error) {

@@ -16,12 +16,12 @@ function normalizeUsername(username) {
 }
 
 async function ensureUserProfileColumns(client = pool) {
+  await client.query('ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS correo VARCHAR(120)');
+  await client.query('ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS telefono VARCHAR(30)');
   await client.query(`
-    ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS correo VARCHAR(120);
-    ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS telefono VARCHAR(30);
     CREATE UNIQUE INDEX IF NOT EXISTS usuarios_correo_unique_idx
-      ON usuarios (LOWER(correo))
-      WHERE correo IS NOT NULL AND TRIM(correo) <> '';
+    ON usuarios (LOWER(correo))
+    WHERE correo IS NOT NULL AND TRIM(correo) <> ''
   `);
 }
 

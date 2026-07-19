@@ -20,7 +20,7 @@ async function adminExists(client = pool) {
 
 async function getPublicCreationState(client = pool) {
   const setupRequired = !(await adminExists(client));
-  const userCreationAllowed = await isUserCreationAllowed(client);
+  const userCreationAllowed = setupRequired ? false : await isUserCreationAllowed(client);
   return {
     setupRequired,
     userCreationAllowed,
@@ -51,16 +51,17 @@ router.get('/user-creation-status', setupStatusRateLimit, async (req, res) => {
 });
 
 async function createPublicAdmin(req, res, { allowExistingAdmin = true, requireContact = true } = {}) {
-  const client = await pool.connect();
+  let client;
   let transactionOpen = false;
 
   try {
+    client = await pool.connect();
     await client.query('BEGIN');
     transactionOpen = true;
     await client.query('SELECT pg_advisory_xact_lock($1, $2)', SETUP_LOCK_KEYS);
 
     const setupRequired = !(await adminExists(client));
-    const userCreationAllowed = await isUserCreationAllowed(client);
+    const userCreationAllowed = setupRequired ? false : await isUserCreationAllowed(client);
 
     if (!setupRequired && (!allowExistingAdmin || !userCreationAllowed)) {
       await client.query('ROLLBACK');
@@ -90,7 +91,7 @@ async function createPublicAdmin(req, res, { allowExistingAdmin = true, requireC
     console.error('Error al crear administrador publico:', error);
     return res.status(500).json({ error: 'Error al crear administrador' });
   } finally {
-    client.release();
+    if (client) client.release();
   }
 }
 
@@ -103,16 +104,17 @@ router.post('/create-admin', setupCreateRateLimit, (req, res) => {
 });
 
 router.post('/register-user', setupCreateRateLimit, async (req, res) => {
-  const client = await pool.connect();
+  let client;
   let transactionOpen = false;
 
   try {
+    client = await pool.connect();
     await client.query('BEGIN');
     transactionOpen = true;
     await client.query('SELECT pg_advisory_xact_lock($1, $2)', SETUP_LOCK_KEYS);
 
     const setupRequired = !(await adminExists(client));
-    const userCreationAllowed = await isUserCreationAllowed(client);
+    const userCreationAllowed = setupRequired ? false : await isUserCreationAllowed(client);
 
     if (!setupRequired && !userCreationAllowed) {
       await client.query('ROLLBACK');
@@ -160,7 +162,7 @@ router.post('/register-user', setupCreateRateLimit, async (req, res) => {
     console.error('Error al registrar usuario publico:', error);
     return res.status(500).json({ error: 'Error al registrar usuario' });
   } finally {
-    client.release();
+    if (client) client.release();
   }
 });
 
