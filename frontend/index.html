@@ -11,7 +11,7 @@
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Main Stylesheet -->
-    <link rel="stylesheet" href="css/style.css?v=20260718-garantias-v6">
+    <link rel="stylesheet" href="css/style.css?v=20260719-setup-v1">
 </head>
 <body class="light-theme">
 
@@ -51,6 +51,66 @@
                 
                 <h3 class="login-card-title">INICIO DE SESIÓN</h3>
                 <p class="login-card-subtitle">Panel Operativo e Interno<br>Ingresa tus credenciales autorizadas</p>
+
+                <div id="setup-initial-panel" class="setup-initial-panel hidden">
+                    <div class="setup-initial-heading">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <div>
+                            <strong>Configuración inicial del sistema</strong>
+                            <p>No se encontró un administrador. Crea el primer acceso seguro para comenzar.</p>
+                        </div>
+                    </div>
+
+                    <button type="button" id="btn-show-setup-admin" class="btn btn-primary-flat btn-block">
+                        Crear administrador
+                    </button>
+
+                    <form id="setup-admin-form" class="setup-admin-form hidden">
+                        <div class="form-group">
+                            <label for="setup-admin-name">NOMBRE DEL ADMINISTRADOR</label>
+                            <div class="input-icon-wrapper">
+                                <i class="fa-regular fa-id-card input-icon-gray"></i>
+                                <input type="text" id="setup-admin-name" placeholder="Nombre visible" autocomplete="name">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="setup-admin-username">NOMBRE DE USUARIO</label>
+                            <div class="input-icon-wrapper">
+                                <i class="fa-regular fa-user input-icon-gray"></i>
+                                <input type="text" id="setup-admin-username" placeholder="Usuario administrador" autocomplete="username">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="setup-admin-password">CONTRASEÑA</label>
+                            <div class="input-icon-wrapper setup-password-wrapper">
+                                <i class="fa-solid fa-lock input-icon-gray"></i>
+                                <input type="password" id="setup-admin-password" placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+                                <button type="button" class="setup-password-toggle" data-setup-toggle-password="setup-admin-password" aria-label="Mostrar contraseña">
+                                    <i class="fa-regular fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="setup-admin-password-confirm">CONFIRMAR CONTRASEÑA</label>
+                            <div class="input-icon-wrapper setup-password-wrapper">
+                                <i class="fa-solid fa-lock input-icon-gray"></i>
+                                <input type="password" id="setup-admin-password-confirm" placeholder="Repite la contraseña" autocomplete="new-password">
+                                <button type="button" class="setup-password-toggle" data-setup-toggle-password="setup-admin-password-confirm" aria-label="Mostrar contraseña">
+                                    <i class="fa-regular fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="setup-admin-message" class="setup-admin-message hidden"></div>
+
+                        <button type="submit" id="btn-create-setup-admin" class="btn btn-primary-flat btn-block">
+                            Crear administrador
+                        </button>
+                    </form>
+                </div>
                 
                 <form id="login-form">
                     <div class="form-group">
@@ -3228,7 +3288,7 @@
     <script src="/vendor/jspdf-autotable/jspdf.plugin.autotable.min.js"></script>
 
     <!-- Main System JavaScript Logic -->
-    <script src="js/app.js?v=20260718-garantias-v4"></script>
+    <script src="js/app.js?v=20260719-setup-v1"></script>
 </body>
 </html>
 

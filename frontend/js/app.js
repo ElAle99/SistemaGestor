@@ -433,6 +433,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadEstablishmentConfig();
     initNavigation();
     initLogin();
+    await initInitialSetup();
     initNotifications();
     initClientAutocomplete();
     initDeviceAutocomplete();
@@ -555,6 +556,143 @@ function initLogin() {
         });
     }
     applyRolePermissions();
+}
+
+async function initInitialSetup() {
+    const setupPanel = document.getElementById('setup-initial-panel');
+    const showSetupButton = document.getElementById('btn-show-setup-admin');
+    const setupForm = document.getElementById('setup-admin-form');
+    const setupMessage = document.getElementById('setup-admin-message');
+
+    if (!setupPanel || !showSetupButton || !setupForm || !setupMessage) return;
+
+    showSetupButton.addEventListener('click', () => {
+        showSetupButton.classList.add('hidden');
+        setupForm.classList.remove('hidden');
+        document.getElementById('setup-admin-name')?.focus();
+    });
+
+    document.querySelectorAll('[data-setup-toggle-password]').forEach(button => {
+        button.addEventListener('click', () => {
+            const input = document.getElementById(button.dataset.setupTogglePassword);
+            const icon = button.querySelector('i');
+            if (!input) return;
+
+            const shouldShow = input.type === 'password';
+            input.type = shouldShow ? 'text' : 'password';
+            button.setAttribute('aria-label', shouldShow ? 'Ocultar contrasena' : 'Mostrar contrasena');
+            icon?.classList.toggle('fa-eye', !shouldShow);
+            icon?.classList.toggle('fa-eye-slash', shouldShow);
+        });
+    });
+
+    setupForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const nombre = document.getElementById('setup-admin-name')?.value.trim() || '';
+        const username = document.getElementById('setup-admin-username')?.value.trim() || '';
+        const password = document.getElementById('setup-admin-password')?.value || '';
+        const confirmPassword = document.getElementById('setup-admin-password-confirm')?.value || '';
+        const submitButton = document.getElementById('btn-create-setup-admin');
+
+        if (password !== confirmPassword) {
+            showSetupAdminMessage('Las contrasenas no coinciden.', 'error');
+            return;
+        }
+
+        if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.innerText = 'Creando...';
+        }
+
+        try {
+            const response = await fetch(`${BASE_API_URL}/setup/admin`, {
+                method: 'POST',
+                body: JSON.stringify({ username, password, nombre })
+            });
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                showSetupAdminMessage(data.error || 'No se pudo crear el administrador.', 'error');
+                return;
+            }
+
+            setupForm.reset();
+            showSetupAdminMessage(data.message || 'Administrador creado correctamente.', 'success');
+            setTimeout(() => {
+                setInitialSetupVisible(false);
+                document.getElementById('login-username')?.focus();
+            }, 1400);
+        } catch (error) {
+            console.error('Error durante configuracion inicial:', error);
+            showSetupAdminMessage('No se pudo conectar con el servidor.', 'error');
+        } finally {
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.innerText = 'Crear administrador';
+            }
+        }
+    });
+
+    await refreshInitialSetupStatus();
+}
+
+async function refreshInitialSetupStatus() {
+    try {
+        const response = await fetch(`${BASE_API_URL}/setup/status`, {
+            method: 'GET',
+            cache: 'no-store'
+        });
+
+        if (!response.ok) {
+            setInitialSetupVisible(false);
+            return;
+        }
+
+        const data = await response.json();
+        setInitialSetupVisible(Boolean(data.setupRequired));
+    } catch (error) {
+        console.warn('No se pudo consultar configuracion inicial:', error);
+        setInitialSetupVisible(false);
+    }
+}
+
+function setInitialSetupVisible(isVisible) {
+    const setupPanel = document.getElementById('setup-initial-panel');
+    const loginForm = document.getElementById('login-form');
+    const divider = document.querySelector('.login-divider-text');
+    const notice = document.querySelector('.login-system-notice');
+    const showSetupButton = document.getElementById('btn-show-setup-admin');
+    const setupForm = document.getElementById('setup-admin-form');
+
+    setupPanel?.classList.toggle('hidden', !isVisible);
+    loginForm?.classList.toggle('hidden', isVisible);
+    divider?.classList.toggle('hidden', isVisible);
+    notice?.classList.toggle('hidden', isVisible);
+
+    if (!isVisible) {
+        showSetupButton?.classList.remove('hidden');
+        setupForm?.classList.add('hidden');
+        clearSetupAdminMessage();
+    }
+}
+
+function showSetupAdminMessage(message, type) {
+    const setupMessage = document.getElementById('setup-admin-message');
+    if (!setupMessage) return;
+
+    setupMessage.textContent = message;
+    setupMessage.classList.remove('hidden', 'is-error', 'is-success');
+    setupMessage.classList.add(type === 'success' ? 'is-success' : 'is-error');
+}
+
+function clearSetupAdminMessage() {
+    const setupMessage = document.getElementById('setup-admin-message');
+    if (!setupMessage) return;
+
+    setupMessage.textContent = '';
+    setupMessage.classList.add('hidden');
+    setupMessage.classList.remove('is-error', 'is-success');
 }
 
 function initNavigation() {
