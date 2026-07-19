@@ -11,7 +11,7 @@
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Main Stylesheet -->
-    <link rel="stylesheet" href="css/style.css?v=20260719-setup-v1">
+    <link rel="stylesheet" href="css/style.css?v=20260719-users-v1">
 </head>
 <body class="light-theme">
 
@@ -57,7 +57,7 @@
                         <i class="fa-solid fa-shield-halved"></i>
                         <div>
                             <strong>Configuración inicial del sistema</strong>
-                            <p>No se encontró un administrador. Crea el primer acceso seguro para comenzar.</p>
+                            <p id="setup-initial-copy">Crea un acceso administrador seguro para comenzar.</p>
                         </div>
                     </div>
 
@@ -79,6 +79,22 @@
                             <div class="input-icon-wrapper">
                                 <i class="fa-regular fa-user input-icon-gray"></i>
                                 <input type="text" id="setup-admin-username" placeholder="Usuario administrador" autocomplete="username">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="setup-admin-email">CORREO ELECTRÓNICO</label>
+                            <div class="input-icon-wrapper">
+                                <i class="fa-regular fa-envelope input-icon-gray"></i>
+                                <input type="email" id="setup-admin-email" placeholder="correo@dominio.com" autocomplete="email">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="setup-admin-phone">NÚMERO DE TELÉFONO</label>
+                            <div class="input-icon-wrapper">
+                                <i class="fa-solid fa-phone input-icon-gray"></i>
+                                <input type="tel" id="setup-admin-phone" placeholder="Ej. 9831234567" autocomplete="tel">
                             </div>
                         </div>
 
@@ -134,7 +150,7 @@
                             <input type="checkbox" id="login-remember" checked>
                             Recordarme
                         </label>
-                        <a href="#" class="forgot-password-flat-link" onclick="alert('Contacta al Administrador para restablecer tu contraseña corporativa.')">¿Olvidaste tu contraseña?</a>
+                        <button type="button" class="forgot-password-flat-link" id="btn-show-forgot-password">¿Olvidaste tu contraseña?</button>
                     </div>
                     
                     <!-- Alerta de error real conectada a app.js -->
@@ -144,6 +160,59 @@
                     </div>
 
                     <button type="submit" class="btn btn-primary-flat btn-block">INICIAR SESIÓN</button>
+                </form>
+
+                <form id="forgot-password-form" class="setup-admin-form hidden">
+                    <div class="setup-initial-heading setup-inline-heading">
+                        <i class="fa-regular fa-envelope"></i>
+                        <div>
+                            <strong>Recuperar contraseña</strong>
+                            <p>Escribe tu correo registrado. Si existe una cuenta activa, enviaremos un enlace temporal.</p>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="forgot-password-email">CORREO ELECTRÓNICO</label>
+                        <div class="input-icon-wrapper">
+                            <i class="fa-regular fa-envelope input-icon-gray"></i>
+                            <input type="email" id="forgot-password-email" placeholder="correo@dominio.com" autocomplete="email">
+                        </div>
+                    </div>
+                    <div id="forgot-password-message" class="setup-admin-message hidden"></div>
+                    <button type="submit" class="btn btn-primary-flat btn-block">Enviar enlace</button>
+                    <button type="button" class="btn btn-secondary btn-block" id="btn-cancel-forgot-password">Volver al login</button>
+                </form>
+
+                <form id="reset-password-form" class="setup-admin-form hidden">
+                    <div class="setup-initial-heading setup-inline-heading">
+                        <i class="fa-solid fa-key"></i>
+                        <div>
+                            <strong>Restablecer contraseña</strong>
+                            <p>Ingresa una nueva contraseña segura para tu cuenta.</p>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="reset-password-new">NUEVA CONTRASEÑA</label>
+                        <div class="input-icon-wrapper setup-password-wrapper">
+                            <i class="fa-solid fa-lock input-icon-gray"></i>
+                            <input type="password" id="reset-password-new" placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+                            <button type="button" class="setup-password-toggle" data-setup-toggle-password="reset-password-new" aria-label="Mostrar contraseña">
+                                <i class="fa-regular fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="reset-password-confirm">CONFIRMAR CONTRASEÑA</label>
+                        <div class="input-icon-wrapper setup-password-wrapper">
+                            <i class="fa-solid fa-lock input-icon-gray"></i>
+                            <input type="password" id="reset-password-confirm" placeholder="Repite la contraseña" autocomplete="new-password">
+                            <button type="button" class="setup-password-toggle" data-setup-toggle-password="reset-password-confirm" aria-label="Mostrar contraseña">
+                                <i class="fa-regular fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="reset-password-message" class="setup-admin-message hidden"></div>
+                    <button type="submit" class="btn btn-primary-flat btn-block">Actualizar contraseña</button>
+                    <button type="button" class="btn btn-secondary btn-block" id="btn-cancel-reset-password">Volver al login</button>
                 </form>
                 
                 <!-- Separador e indicador de seguridad interna -->
@@ -257,6 +326,9 @@
                 </div>
                 <div class="topbar-right">
                     <div class="topbar-actions">
+                        <button type="button" class="topbar-profile-btn" id="btn-open-profile-modal" title="Mi perfil">
+                            <i class="fa-regular fa-circle-user"></i>
+                        </button>
                         <div class="notifications-dropdown-trigger" id="notifications-trigger">
                             <i class="fa-regular fa-bell"></i>
                             <span class="notification-badge" id="alert-count">3</span>
@@ -1498,10 +1570,26 @@
                         <!-- Panel de Gestión de Usuarios (Admin Only) -->
                         <div class="card admin-only">
                             <div class="card-header flex-header">
-                                <h3>Personal y Usuarios del Sistema</h3>
+                                <div>
+                                    <h3>Gestión de usuarios</h3>
+                                    <p class="config-help-text">Administra operadores, roles y acceso temporal desde login.</p>
+                                </div>
                                 <button class="btn btn-sm btn-primary" id="btn-add-user-modal">
                                     <i class="fa-solid fa-user-plus"></i> Agregar Usuario
                                 </button>
+                            </div>
+                            <div class="card-body">
+                                <div class="user-creation-setting">
+                                    <div>
+                                        <strong>Permitir creación de usuarios</strong>
+                                        <p>Cuando esté activado, el login puede mostrar creación pública de administrador. Manténlo desactivado normalmente.</p>
+                                        <span id="user-creation-setting-source" class="text-xs text-muted"></span>
+                                    </div>
+                                    <label class="user-switch">
+                                        <input type="checkbox" id="allow-user-creation-switch">
+                                        <span></span>
+                                    </label>
+                                </div>
                             </div>
                             <div class="card-body table-responsive">
                                 <table class="table" id="users-table">
@@ -1509,8 +1597,11 @@
                                         <tr>
                                             <th>ID</th>
                                             <th>Nombre Completo</th>
-                                            <th>Usuario / Correo</th>
+                                            <th>Usuario</th>
+                                            <th>Correo</th>
+                                            <th>Teléfono</th>
                                             <th>Rol asignado</th>
+                                            <th>Estado</th>
                                             <th>Acciones</th>
                                         </tr>
                                     </thead>
@@ -2606,22 +2697,33 @@
     <div id="user-modal" class="modal-overlay hidden">
         <div class="modal-container animate-slide-up">
             <div class="modal-header">
-                <h3>Registrar Nuevo Operador</h3>
+                <h3 id="user-modal-title">Registrar Nuevo Operador</h3>
                 <button class="btn-close-modal" id="btn-close-user-modal"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="modal-body">
                 <form id="user-form">
+                    <input type="hidden" id="user-id">
                     <div class="form-group">
                         <label for="user-nombre">Nombre Completo *</label>
                         <input type="text" id="user-nombre" class="form-control" required placeholder="Ej. Carlos Mendoza">
                     </div>
                     <div class="form-group">
-                        <label for="user-email">Nombre de Usuario o Correo *</label>
-                        <input type="text" id="user-email" class="form-control" required placeholder="Ej. carlosm o carlos@allfix.com">
+                        <label for="user-username">Nombre de Usuario *</label>
+                        <input type="text" id="user-username" class="form-control" required placeholder="Ej. carlosm">
+                    </div>
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label for="user-correo">Correo electrónico</label>
+                            <input type="email" id="user-correo" class="form-control" placeholder="correo@dominio.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="user-telefono">Teléfono</label>
+                            <input type="tel" id="user-telefono" class="form-control" placeholder="9831234567">
+                        </div>
                     </div>
                     <div class="form-group">
-                        <label for="user-password">Contraseña *</label>
-                        <input type="password" id="user-password" class="form-control" required placeholder="Ingresa la contraseña">
+                        <label for="user-password">Contraseña</label>
+                        <input type="password" id="user-password" class="form-control" placeholder="Requerida al crear; opcional al editar">
                     </div>
                     <div class="form-group">
                         <label for="user-rol">Rol de Acceso *</label>
@@ -2631,11 +2733,64 @@
                             <option value="Recepcionista">Recepcionista</option>
                         </select>
                     </div>
+                    <label class="checkbox-container-flat">
+                        <input type="checkbox" id="user-activo" checked>
+                        Usuario activo
+                    </label>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" id="btn-cancel-user">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">Registrar Operador</button>
+                        <button type="submit" class="btn btn-primary" id="btn-save-user">Registrar Operador</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="profile-modal" class="modal-overlay hidden">
+        <div class="modal-container animate-slide-up">
+            <div class="modal-header">
+                <h3>Mi perfil</h3>
+                <button class="btn-close-modal" id="btn-close-profile-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="profile-form">
+                    <div class="form-group">
+                        <label for="profile-nombre">Nombre</label>
+                        <input type="text" id="profile-nombre" class="form-control" required>
+                    </div>
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label for="profile-correo">Correo</label>
+                            <input type="email" id="profile-correo" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="profile-telefono">Teléfono</label>
+                            <input type="tel" id="profile-telefono" class="form-control">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Guardar perfil</button>
+                </form>
+
+                <div class="profile-password-section">
+                    <h4>Cambiar contraseña</h4>
+                    <form id="profile-password-form">
+                        <div class="form-group">
+                            <label for="profile-current-password">Contraseña actual</label>
+                            <input type="password" id="profile-current-password" class="form-control" autocomplete="current-password">
+                        </div>
+                        <div class="form-row-2">
+                            <div class="form-group">
+                                <label for="profile-new-password">Nueva contraseña</label>
+                                <input type="password" id="profile-new-password" class="form-control" autocomplete="new-password">
+                            </div>
+                            <div class="form-group">
+                                <label for="profile-confirm-password">Confirmar contraseña</label>
+                                <input type="password" id="profile-confirm-password" class="form-control" autocomplete="new-password">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-secondary">Actualizar contraseña</button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -3288,7 +3443,7 @@
     <script src="/vendor/jspdf-autotable/jspdf.plugin.autotable.min.js"></script>
 
     <!-- Main System JavaScript Logic -->
-    <script src="js/app.js?v=20260719-setup-v1"></script>
+    <script src="js/app.js?v=20260719-users-v1"></script>
 </body>
 </html>
 

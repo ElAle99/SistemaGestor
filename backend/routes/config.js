@@ -5,6 +5,7 @@ const path = require('path');
 const { pool } = require('../config/db');
 const { authMiddleware, adminOnly } = require('../middleware/auth');
 const { printTicketText, printTicketImage } = require('../services/ticketPrinterService');
+const { createUser, updateUser, publicUser } = require('../services/userService');
 const upload = require('../middleware/upload');
 
 const router = express.Router();
@@ -270,8 +271,12 @@ router.post('/imprimir-ticket', authMiddleware, async (req, res) => {
 // Usuarios
 router.get('/usuarios', authMiddleware, adminOnly, async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, username, rol, nombre, activo, fecha_creacion FROM usuarios ORDER BY fecha_creacion DESC');
-    res.json(result.rows);
+    const result = await pool.query(
+      `SELECT id, username, rol, nombre, correo, telefono, activo, fecha_creacion
+       FROM usuarios
+       ORDER BY fecha_creacion DESC, id DESC`
+    );
+    res.json(result.rows.map(publicUser));
   } catch (error) {
     res.status(500).json({ error: 'Error al obtener usuarios' });
   }
@@ -279,46 +284,33 @@ router.get('/usuarios', authMiddleware, adminOnly, async (req, res) => {
 
 router.post('/usuarios', authMiddleware, adminOnly, async (req, res) => {
   try {
-    const { username, password, rol, nombre } = req.body;
-    const bcrypt = require('bcrypt');
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const result = await pool.query(
-      'INSERT INTO usuarios (username, password, rol, nombre) VALUES ($1, $2, $3, $4) RETURNING id, username, rol, nombre, activo',
-      [username, hashedPassword, rol, nombre]
-    );
-    res.json(result.rows[0]);
+    const user = await createUser(req.body, { requireContact: false });
+    res.status(201).json(user);
   } catch (error) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     res.status(500).json({ error: 'Error al crear usuario' });
   }
 });
 
 router.put('/usuarios/:id', authMiddleware, adminOnly, async (req, res) => {
   try {
-    const { username, password, rol, nombre, activo } = req.body;
-    let query = 'UPDATE usuarios SET username = $1, rol = $2, nombre = $3, activo = $4';
-    const params = [username, rol, nombre, activo];
-    let idx = 5;
-    if (password) {
-      const bcrypt = require('bcrypt');
-      const hashedPassword = await bcrypt.hash(password, 10);
-      query += `, password = $${idx++}`;
-      params.push(hashedPassword);
-    }
-    query += ` WHERE id = $${idx} RETURNING id, username, rol, nombre, activo`;
-    params.push(req.params.id);
-    const result = await pool.query(query, params);
-    res.json(result.rows[0]);
+    const user = await updateUser(req.params.id, req.body);
+    res.json(user);
   } catch (error) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     res.status(500).json({ error: 'Error al actualizar usuario' });
   }
 });
 
 router.delete('/usuarios/:id', authMiddleware, adminOnly, async (req, res) => {
   try {
-    await pool.query('DELETE FROM usuarios WHERE id = $1', [req.params.id]);
-    res.json({ message: 'Usuario eliminado' });
+    if (Number(req.params.id) === Number(req.user.id)) {
+      return res.status(400).json({ error: 'No puedes desactivar tu propio usuario.' });
+    }
+    await pool.query('UPDATE usuarios SET activo = false WHERE id = $1', [req.params.id]);
+    res.json({ message: 'Usuario desactivado' });
   } catch (error) {
-    res.status(500).json({ error: 'Error al eliminar usuario' });
+    res.status(500).json({ error: 'Error al desactivar usuario' });
   }
 });
 

@@ -563,6 +563,8 @@ async function initInitialSetup() {
     const showSetupButton = document.getElementById('btn-show-setup-admin');
     const setupForm = document.getElementById('setup-admin-form');
     const setupMessage = document.getElementById('setup-admin-message');
+    const forgotForm = document.getElementById('forgot-password-form');
+    const resetForm = document.getElementById('reset-password-form');
 
     if (!setupPanel || !showSetupButton || !setupForm || !setupMessage) return;
 
@@ -586,11 +588,31 @@ async function initInitialSetup() {
         });
     });
 
+    document.getElementById('btn-show-forgot-password')?.addEventListener('click', () => {
+        setLoginCardMode('forgot');
+        document.getElementById('forgot-password-email')?.focus();
+    });
+
+    document.getElementById('btn-cancel-forgot-password')?.addEventListener('click', () => {
+        forgotForm?.reset();
+        clearAuthMessage('forgot-password-message');
+        setLoginCardMode('login');
+    });
+
+    document.getElementById('btn-cancel-reset-password')?.addEventListener('click', () => {
+        resetForm?.reset();
+        clearAuthMessage('reset-password-message');
+        window.history.replaceState({}, document.title, window.location.pathname);
+        setLoginCardMode('login');
+    });
+
     setupForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
         const nombre = document.getElementById('setup-admin-name')?.value.trim() || '';
         const username = document.getElementById('setup-admin-username')?.value.trim() || '';
+        const correo = document.getElementById('setup-admin-email')?.value.trim() || '';
+        const telefono = document.getElementById('setup-admin-phone')?.value.trim() || '';
         const password = document.getElementById('setup-admin-password')?.value || '';
         const confirmPassword = document.getElementById('setup-admin-password-confirm')?.value || '';
         const submitButton = document.getElementById('btn-create-setup-admin');
@@ -606,9 +628,9 @@ async function initInitialSetup() {
         }
 
         try {
-            const response = await fetch(`${BASE_API_URL}/setup/admin`, {
+            const response = await fetch(`${BASE_API_URL}/setup/create-admin`, {
                 method: 'POST',
-                body: JSON.stringify({ username, password, nombre })
+                body: JSON.stringify({ username, password, nombre, correo, telefono })
             });
             const data = await response.json().catch(() => ({}));
 
@@ -620,7 +642,8 @@ async function initInitialSetup() {
             setupForm.reset();
             showSetupAdminMessage(data.message || 'Administrador creado correctamente.', 'success');
             setTimeout(() => {
-                setInitialSetupVisible(false);
+                setLoginCardMode('login');
+                refreshInitialSetupStatus();
                 document.getElementById('login-username')?.focus();
             }, 1400);
         } catch (error) {
@@ -634,46 +657,125 @@ async function initInitialSetup() {
         }
     });
 
+    forgotForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const correo = document.getElementById('forgot-password-email')?.value.trim() || '';
+        try {
+            const response = await fetch(`${BASE_API_URL}/auth/forgot-password`, {
+                method: 'POST',
+                body: JSON.stringify({ correo })
+            });
+            const data = await response.json().catch(() => ({}));
+            showAuthMessage('forgot-password-message', data.message || 'Si el correo esta registrado, enviaremos instrucciones.', 'success');
+        } catch (error) {
+            console.error('Error al solicitar recuperacion:', error);
+            showAuthMessage('forgot-password-message', 'No se pudo solicitar la recuperacion.', 'error');
+        }
+    });
+
+    resetForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const token = new URLSearchParams(window.location.search).get('reset_token') || '';
+        const password = document.getElementById('reset-password-new')?.value || '';
+        const confirmPassword = document.getElementById('reset-password-confirm')?.value || '';
+
+        if (password !== confirmPassword) {
+            showAuthMessage('reset-password-message', 'Las contrasenas no coinciden.', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${BASE_API_URL}/auth/reset-password`, {
+                method: 'POST',
+                body: JSON.stringify({ token, password })
+            });
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                showAuthMessage('reset-password-message', data.error || 'El enlace no es valido o expiro.', 'error');
+                return;
+            }
+
+            resetForm.reset();
+            showAuthMessage('reset-password-message', data.message || 'Contrasena actualizada correctamente.', 'success');
+            window.history.replaceState({}, document.title, window.location.pathname);
+            setTimeout(() => setLoginCardMode('login'), 1400);
+        } catch (error) {
+            console.error('Error al restablecer contrasena:', error);
+            showAuthMessage('reset-password-message', 'No se pudo restablecer la contrasena.', 'error');
+        }
+    });
+
     await refreshInitialSetupStatus();
+
+    if (new URLSearchParams(window.location.search).get('reset_token')) {
+        setLoginCardMode('reset');
+        document.getElementById('reset-password-new')?.focus();
+    }
 }
 
 async function refreshInitialSetupStatus() {
     try {
-        const response = await fetch(`${BASE_API_URL}/setup/status`, {
+        const response = await fetch(`${BASE_API_URL}/setup/user-creation-status`, {
             method: 'GET',
             cache: 'no-store'
         });
 
         if (!response.ok) {
-            setInitialSetupVisible(false);
+            setInitialSetupVisible(false, {});
             return;
         }
 
         const data = await response.json();
-        setInitialSetupVisible(Boolean(data.setupRequired));
+        setInitialSetupVisible(Boolean(data.canCreateAdmin), data);
     } catch (error) {
         console.warn('No se pudo consultar configuracion inicial:', error);
-        setInitialSetupVisible(false);
+        setInitialSetupVisible(false, {});
     }
 }
 
-function setInitialSetupVisible(isVisible) {
+function setInitialSetupVisible(isVisible, state = {}) {
     const setupPanel = document.getElementById('setup-initial-panel');
-    const loginForm = document.getElementById('login-form');
-    const divider = document.querySelector('.login-divider-text');
-    const notice = document.querySelector('.login-system-notice');
     const showSetupButton = document.getElementById('btn-show-setup-admin');
     const setupForm = document.getElementById('setup-admin-form');
+    const setupCopy = document.getElementById('setup-initial-copy');
 
     setupPanel?.classList.toggle('hidden', !isVisible);
-    loginForm?.classList.toggle('hidden', isVisible);
-    divider?.classList.toggle('hidden', isVisible);
-    notice?.classList.toggle('hidden', isVisible);
+
+    if (setupCopy) {
+        setupCopy.textContent = state.setupRequired
+            ? 'No se encontro un administrador. Crea el primer acceso seguro para comenzar.'
+            : 'La creacion temporal de administradores esta habilitada. Crea tu nuevo acceso y desactivala despues.';
+    }
 
     if (!isVisible) {
         showSetupButton?.classList.remove('hidden');
         setupForm?.classList.add('hidden');
         clearSetupAdminMessage();
+    }
+}
+
+function setLoginCardMode(mode) {
+    const loginForm = document.getElementById('login-form');
+    const setupPanel = document.getElementById('setup-initial-panel');
+    const forgotForm = document.getElementById('forgot-password-form');
+    const resetForm = document.getElementById('reset-password-form');
+    const divider = document.querySelector('.login-divider-text');
+    const notice = document.querySelector('.login-system-notice');
+
+    if (mode === 'login') {
+        loginForm?.classList.remove('hidden');
+        forgotForm?.classList.add('hidden');
+        resetForm?.classList.add('hidden');
+        divider?.classList.remove('hidden');
+        notice?.classList.remove('hidden');
+    } else if (mode === 'forgot' || mode === 'reset') {
+        loginForm?.classList.add('hidden');
+        setupPanel?.classList.add('hidden');
+        forgotForm?.classList.toggle('hidden', mode !== 'forgot');
+        resetForm?.classList.toggle('hidden', mode !== 'reset');
+        divider?.classList.add('hidden');
+        notice?.classList.add('hidden');
     }
 }
 
@@ -693,6 +795,22 @@ function clearSetupAdminMessage() {
     setupMessage.textContent = '';
     setupMessage.classList.add('hidden');
     setupMessage.classList.remove('is-error', 'is-success');
+}
+
+function showAuthMessage(elementId, message, type) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    element.textContent = message;
+    element.classList.remove('hidden', 'is-error', 'is-success');
+    element.classList.add(type === 'success' ? 'is-success' : 'is-error');
+}
+
+function clearAuthMessage(elementId) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    element.textContent = '';
+    element.classList.add('hidden');
+    element.classList.remove('is-error', 'is-success');
 }
 
 function initNavigation() {
@@ -8554,10 +8672,14 @@ async function exportCurrentReport() {
 // OPERACIONES DE USUARIOS (CRUD REAL)
 // ==========================================
 async function loadUsuarios() {
-    const response = await fetch(`${BASE_API_URL}/configuracion/usuarios`);
+    const response = await fetch(`${BASE_API_URL}/users`);
     if (response.ok) {
-        const users = await response.json();
-        APP_STATE.usuarios = users.map(u => ({ ...u, email: u.username }));
+        APP_STATE.usuarios = await response.json();
+    }
+
+    const settingsResponse = await fetch(`${BASE_API_URL}/users/settings`);
+    if (settingsResponse.ok) {
+        APP_STATE.userSettings = await settingsResponse.json();
     }
 }
 
@@ -8565,22 +8687,93 @@ function renderUsuarios() {
     const tableBody = document.querySelector('#users-table tbody');
     if (!tableBody) return;
     tableBody.innerHTML = '';
+    renderUserCreationSetting();
     
     APP_STATE.usuarios.forEach(u => {
         const tr = document.createElement('tr');
-        const deleteBtn = u.id === 1 
-            ? '<span class="text-xs text-muted">Protegido (Sistema)</span>' 
-            : `<button class="btn btn-xs btn-danger" onclick="deleteUsuario(${u.id})"><i class="fa-solid fa-trash"></i> Eliminar</button>`;
+        const statusAction = u.activo
+            ? `<button class="btn btn-xs btn-outline" onclick="toggleUsuarioStatus(${u.id}, false)"><i class="fa-solid fa-ban"></i> Desactivar</button>`
+            : `<button class="btn btn-xs btn-secondary" onclick="toggleUsuarioStatus(${u.id}, true)"><i class="fa-solid fa-circle-check"></i> Activar</button>`;
             
         tr.innerHTML = `
             <td><code>USR-${String(u.id).padStart(3, '0')}</code></td>
-            <td><strong>${u.nombre}</strong></td>
-            <td>${u.email}</td>
-            <td><span class="badge ${getStatusBadgeClass(u.rol)}">${u.rol}</span></td>
-            <td>${deleteBtn}</td>
+            <td><strong>${escapeHtml(u.nombre || '-')}</strong></td>
+            <td>${escapeHtml(u.username || '-')}</td>
+            <td>${escapeHtml(u.correo || '-')}</td>
+            <td>${escapeHtml(u.telefono || '-')}</td>
+            <td><span class="badge ${getStatusBadgeClass(u.rol)}">${escapeHtml(u.rol || '-')}</span></td>
+            <td><span class="badge ${u.activo ? 'status-entregado' : 'status-cancelado'}">${u.activo ? 'Activo' : 'Inactivo'}</span></td>
+            <td>
+                <div class="user-actions">
+                    <button class="btn btn-xs btn-secondary" onclick="editUsuario(${u.id})"><i class="fa-solid fa-pen"></i> Editar</button>
+                    ${statusAction}
+                </div>
+            </td>
         `;
         tableBody.appendChild(tr);
     });
+}
+
+function renderUserCreationSetting() {
+    const checkbox = document.getElementById('allow-user-creation-switch');
+    const source = document.getElementById('user-creation-setting-source');
+    const settings = APP_STATE.userSettings || {};
+    if (!checkbox) return;
+
+    checkbox.checked = Boolean(settings.allowUserCreation);
+    if (source) {
+        source.innerText = settings.envOverrideActive
+            ? 'Activado temporalmente por ALLOW_USER_CREATION=true en Railway.'
+            : 'Controlado desde PostgreSQL.';
+    }
+}
+
+window.toggleUsuarioStatus = async function(id, activo) {
+    const action = activo ? 'activar' : 'desactivar';
+    if (!confirm(`¿Deseas ${action} este usuario?`)) return;
+    try {
+        const response = await fetch(`${BASE_API_URL}/users/${id}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ activo })
+        });
+        if (response.ok) {
+            alert(`Usuario ${activo ? 'activado' : 'desactivado'} correctamente.`);
+            await loadAllData();
+        } else {
+            const err = await response.json();
+            alert('Error: ' + err.error);
+        }
+    } catch (err) {
+        console.error(err);
+    }
+};
+
+window.editUsuario = function(id) {
+    const user = APP_STATE.usuarios.find(item => Number(item.id) === Number(id));
+    if (!user) return;
+    openUserModal(user);
+};
+
+function openUserModal(user = null) {
+    const userModal = document.getElementById('user-modal');
+    const userForm = document.getElementById('user-form');
+    const title = document.getElementById('user-modal-title');
+    const saveButton = document.getElementById('btn-save-user');
+    if (!userModal || !userForm) return;
+
+    userForm.reset();
+    document.getElementById('user-id').value = user?.id || '';
+    document.getElementById('user-nombre').value = user?.nombre || '';
+    document.getElementById('user-username').value = user?.username || '';
+    document.getElementById('user-correo').value = user?.correo || '';
+    document.getElementById('user-telefono').value = user?.telefono || '';
+    document.getElementById('user-rol').value = user?.rol || 'Recepcionista';
+    document.getElementById('user-activo').checked = user ? Boolean(user.activo) : true;
+    document.getElementById('user-password').required = !user;
+
+    if (title) title.innerText = user ? 'Editar Operador' : 'Registrar Nuevo Operador';
+    if (saveButton) saveButton.innerText = user ? 'Guardar Cambios' : 'Registrar Operador';
+    userModal.classList.remove('hidden');
 }
 
 window.deleteUsuario = async function(id) {
@@ -8607,11 +8800,11 @@ function initUsuarios() {
     const btnClose = document.getElementById('btn-close-user-modal');
     const btnCancel = document.getElementById('btn-cancel-user');
     const userForm = document.getElementById('user-form');
+    const allowSwitch = document.getElementById('allow-user-creation-switch');
     
     if (btnAdd) {
         btnAdd.addEventListener('click', () => {
-            userForm.reset();
-            userModal.classList.remove('hidden');
+            openUserModal();
         });
     }
     if (btnClose) {
@@ -8624,23 +8817,25 @@ function initUsuarios() {
     if (userForm) {
         userForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            const userId = document.getElementById('user-id').value;
             const data = {
                 nombre: document.getElementById('user-nombre').value.trim(),
-                username: document.getElementById('user-email').value.trim(),
-                email: document.getElementById('user-email').value.trim(),
+                username: document.getElementById('user-username').value.trim(),
+                correo: document.getElementById('user-correo').value.trim(),
+                telefono: document.getElementById('user-telefono').value.trim(),
                 password: document.getElementById('user-password').value,
-                rol: document.getElementById('user-rol').value
+                rol: document.getElementById('user-rol').value,
+                activo: document.getElementById('user-activo').checked
             };
             
             try {
-                const response = await fetch(`${BASE_API_URL}/configuracion/usuarios`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                const response = await fetch(`${BASE_API_URL}/users${userId ? `/${userId}` : ''}`, {
+                    method: userId ? 'PUT' : 'POST',
                     body: JSON.stringify(data)
                 });
                 
                 if (response.ok) {
-                    alert('Operador registrado con éxito.');
+                    alert(userId ? 'Usuario actualizado correctamente.' : 'Operador registrado con exito.');
                     userModal.classList.add('hidden');
                     await loadAllData();
                 } else {
@@ -8652,6 +8847,89 @@ function initUsuarios() {
             }
         });
     }
+
+    allowSwitch?.addEventListener('change', async () => {
+        try {
+            const response = await fetch(`${BASE_API_URL}/users/settings`, {
+                method: 'PUT',
+                body: JSON.stringify({ allowUserCreation: allowSwitch.checked })
+            });
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                alert(err.error || 'No se pudo actualizar la configuracion.');
+                allowSwitch.checked = !allowSwitch.checked;
+                return;
+            }
+            await loadUsuarios();
+            renderUsuarios();
+        } catch (error) {
+            console.error('Error al actualizar creacion de usuarios:', error);
+            allowSwitch.checked = !allowSwitch.checked;
+        }
+    });
+
+    initProfileModal();
+}
+
+function initProfileModal() {
+    const modal = document.getElementById('profile-modal');
+    const openButton = document.getElementById('btn-open-profile-modal');
+    const closeButton = document.getElementById('btn-close-profile-modal');
+    const profileForm = document.getElementById('profile-form');
+    const passwordForm = document.getElementById('profile-password-form');
+
+    openButton?.addEventListener('click', () => {
+        const user = APP_STATE.currentUser || {};
+        document.getElementById('profile-nombre').value = user.nombre || '';
+        document.getElementById('profile-correo').value = user.correo || '';
+        document.getElementById('profile-telefono').value = user.telefono || '';
+        modal?.classList.remove('hidden');
+    });
+    closeButton?.addEventListener('click', () => modal?.classList.add('hidden'));
+
+    profileForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const data = {
+            nombre: document.getElementById('profile-nombre').value.trim(),
+            correo: document.getElementById('profile-correo').value.trim(),
+            telefono: document.getElementById('profile-telefono').value.trim()
+        };
+        const response = await fetch(`${BASE_API_URL}/users/me/profile`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            alert(payload.error || 'No se pudo actualizar el perfil.');
+            return;
+        }
+        APP_STATE.currentUser = { ...APP_STATE.currentUser, ...payload };
+        persistSession({ ...getStoredSession(), user: APP_STATE.currentUser, token: getAuthToken() });
+        updateSidebarProfile(APP_STATE.currentUser);
+        alert('Perfil actualizado correctamente.');
+    });
+
+    passwordForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const currentPassword = document.getElementById('profile-current-password').value;
+        const newPassword = document.getElementById('profile-new-password').value;
+        const confirmPassword = document.getElementById('profile-confirm-password').value;
+        if (newPassword !== confirmPassword) {
+            alert('Las contrasenas no coinciden.');
+            return;
+        }
+        const response = await fetch(`${BASE_API_URL}/users/me/password`, {
+            method: 'PUT',
+            body: JSON.stringify({ currentPassword, newPassword })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            alert(payload.error || 'No se pudo actualizar la contrasena.');
+            return;
+        }
+        passwordForm.reset();
+        alert(payload.message || 'Contrasena actualizada correctamente.');
+    });
 }
 
 // ==========================================

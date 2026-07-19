@@ -275,6 +275,22 @@ async function initDB() {
       papel_ticket VARCHAR(10) DEFAULT '80mm',
       auto_imprimir_ticket BOOLEAN DEFAULT true
     );
+
+    CREATE TABLE IF NOT EXISTS configuracion_sistema (
+      clave VARCHAR(100) PRIMARY KEY,
+      valor TEXT NOT NULL,
+      actualizado_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+      fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id SERIAL PRIMARY KEY,
+      usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+      token_hash VARCHAR(128) UNIQUE NOT NULL,
+      expires_at TIMESTAMP NOT NULL,
+      used_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
   `;
 
   for (const query of createTables.split(';')) {
@@ -329,6 +345,8 @@ async function initDB() {
     ALTER TABLE ordenes_servicio ADD COLUMN IF NOT EXISTS estado_pago VARCHAR(20) DEFAULT 'Pendiente';
     ALTER TABLE ordenes_servicio ADD COLUMN IF NOT EXISTS fecha_entrega_real TIMESTAMP;
     ALTER TABLE ordenes_servicio ADD COLUMN IF NOT EXISTS pagado_en TIMESTAMP;
+    ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS correo VARCHAR(120);
+    ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS telefono VARCHAR(30);
     ALTER TABLE ventas ADD COLUMN IF NOT EXISTS monto_recibido NUMERIC(10,2) DEFAULT 0;
     ALTER TABLE ventas ADD COLUMN IF NOT EXISTS cambio NUMERIC(10,2) DEFAULT 0;
     ALTER TABLE ventas ADD COLUMN IF NOT EXISTS subtotal NUMERIC(10,2) DEFAULT 0;
@@ -405,6 +423,14 @@ async function initDB() {
     ALTER TABLE clientes ADD COLUMN IF NOT EXISTS apellido_paterno VARCHAR(100);
     ALTER TABLE clientes ADD COLUMN IF NOT EXISTS apellido_materno VARCHAR(100);
     ALTER TABLE clientes ADD COLUMN IF NOT EXISTS contacto_preferido VARCHAR(30);
+    CREATE UNIQUE INDEX IF NOT EXISTS usuarios_correo_unique_idx
+      ON usuarios (LOWER(correo))
+      WHERE correo IS NOT NULL AND TRIM(correo) <> '';
+    CREATE INDEX IF NOT EXISTS usuarios_telefono_idx
+      ON usuarios (telefono)
+      WHERE telefono IS NOT NULL AND TRIM(telefono) <> '';
+    CREATE INDEX IF NOT EXISTS password_reset_tokens_usuario_idx
+      ON password_reset_tokens(usuario_id, expires_at);
   `);
 
   await pool.query(`
@@ -483,6 +509,12 @@ async function initDB() {
   }
 
   await pool.query('INSERT INTO configuracion (id, nombre) VALUES (1, $1) ON CONFLICT (id) DO NOTHING', ['AllFix Bacalar']);
+  await pool.query(
+    `INSERT INTO configuracion_sistema (clave, valor)
+     VALUES ($1, $2)
+     ON CONFLICT (clave) DO NOTHING`,
+    ['allow_user_creation', 'false']
+  );
 }
 
 module.exports = { pool, initDB };
