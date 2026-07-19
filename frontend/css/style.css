@@ -573,6 +573,10 @@ a:hover {
     background-color: #0052cc;
 }
 
+.login-register-button {
+    margin-top: 10px;
+}
+
 /* Divisores informativos */
 .login-divider-text {
     position: relative;

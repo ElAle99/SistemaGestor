@@ -565,13 +565,23 @@ async function initInitialSetup() {
     const setupMessage = document.getElementById('setup-admin-message');
     const forgotForm = document.getElementById('forgot-password-form');
     const resetForm = document.getElementById('reset-password-form');
+    const openRegisterButton = document.getElementById('btn-open-register-user');
+    const cancelRegisterButton = document.getElementById('btn-cancel-register-user');
 
     if (!setupPanel || !showSetupButton || !setupForm || !setupMessage) return;
 
     showSetupButton.addEventListener('click', () => {
-        showSetupButton.classList.add('hidden');
-        setupForm.classList.remove('hidden');
-        document.getElementById('setup-admin-name')?.focus();
+        showPublicRegisterForm();
+    });
+
+    openRegisterButton?.addEventListener('click', () => {
+        showPublicRegisterForm();
+    });
+
+    cancelRegisterButton?.addEventListener('click', () => {
+        setupForm.reset();
+        clearSetupAdminMessage();
+        setLoginCardMode('login');
     });
 
     document.querySelectorAll('[data-setup-toggle-password]').forEach(button => {
@@ -727,6 +737,7 @@ async function refreshInitialSetupStatus() {
         }
 
         const data = await response.json();
+        APP_STATE.publicUserCreationState = data;
         setInitialSetupVisible(Boolean(data.canCreateAdmin), data);
     } catch (error) {
         console.warn('No se pudo consultar configuracion inicial:', error);
@@ -762,6 +773,15 @@ function setInitialSetupVisible(isVisible, state = {}) {
     }
 }
 
+function showPublicRegisterForm() {
+    const state = APP_STATE.publicUserCreationState || {};
+    setInitialSetupVisible(true, state);
+    setLoginCardMode('register');
+    document.getElementById('btn-show-setup-admin')?.classList.add('hidden');
+    document.getElementById('setup-admin-form')?.classList.remove('hidden');
+    document.getElementById('setup-admin-name')?.focus();
+}
+
 function setLoginCardMode(mode) {
     const loginForm = document.getElementById('login-form');
     const setupPanel = document.getElementById('setup-initial-panel');
@@ -771,14 +791,18 @@ function setLoginCardMode(mode) {
     const notice = document.querySelector('.login-system-notice');
 
     if (mode === 'login') {
+        const shouldShowSetupShortcut = Boolean(APP_STATE.publicUserCreationState?.canCreateAdmin);
         loginForm?.classList.remove('hidden');
+        setupPanel?.classList.toggle('hidden', !shouldShowSetupShortcut);
+        document.getElementById('btn-show-setup-admin')?.classList.toggle('hidden', !shouldShowSetupShortcut);
+        document.getElementById('setup-admin-form')?.classList.add('hidden');
         forgotForm?.classList.add('hidden');
         resetForm?.classList.add('hidden');
         divider?.classList.remove('hidden');
         notice?.classList.remove('hidden');
-    } else if (mode === 'forgot' || mode === 'reset') {
+    } else if (mode === 'forgot' || mode === 'reset' || mode === 'register') {
         loginForm?.classList.add('hidden');
-        setupPanel?.classList.add('hidden');
+        setupPanel?.classList.toggle('hidden', mode !== 'register');
         forgotForm?.classList.toggle('hidden', mode !== 'forgot');
         resetForm?.classList.toggle('hidden', mode !== 'reset');
         divider?.classList.add('hidden');
