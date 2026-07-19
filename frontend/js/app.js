@@ -642,10 +642,10 @@ async function initInitialSetup() {
                 method: 'POST',
                 body: JSON.stringify({ username, password, confirmPassword, nombre, correo, rol })
             });
-            const data = await response.json().catch(() => ({}));
+            const data = await readApiResponse(response);
 
             if (!response.ok) {
-                showSetupAdminMessage(data.error || 'No se pudo registrar el usuario.', 'error');
+                showSetupAdminMessage(data.error || data.message || `No se pudo registrar el usuario. Codigo ${response.status}.`, 'error');
                 return;
             }
 
@@ -842,6 +842,19 @@ function clearAuthMessage(elementId) {
     element.textContent = '';
     element.classList.add('hidden');
     element.classList.remove('is-error', 'is-success');
+}
+
+async function readApiResponse(response) {
+    const text = await response.text().catch(() => '');
+    if (!text) return {};
+
+    try {
+        return JSON.parse(text);
+    } catch (error) {
+        return {
+            error: text.length > 180 ? `${text.slice(0, 180)}...` : text
+        };
+    }
 }
 
 function initNavigation() {

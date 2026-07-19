@@ -15,6 +15,16 @@ function normalizeUsername(username) {
   return String(username || '').trim();
 }
 
+async function ensureUserProfileColumns(client = pool) {
+  await client.query(`
+    ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS correo VARCHAR(120);
+    ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS telefono VARCHAR(30);
+    CREATE UNIQUE INDEX IF NOT EXISTS usuarios_correo_unique_idx
+      ON usuarios (LOWER(correo))
+      WHERE correo IS NOT NULL AND TRIM(correo) <> '';
+  `);
+}
+
 function normalizeUserPayload(data = {}) {
   return {
     nombre: String(data.nombre || '').trim(),
@@ -79,6 +89,10 @@ function validateUserData(data, { requirePassword = true, requireRole = true, re
 }
 
 async function assertUniqueUserFields(data, { excludeUserId = null, client = pool } = {}) {
+  if (data.correo) {
+    await ensureUserProfileColumns(client);
+  }
+
   const checks = [
     {
       value: data.username,
@@ -127,6 +141,8 @@ function publicUser(row) {
 }
 
 async function createUser(data, { client = pool, roleOverride = null, requireContact = true } = {}) {
+  await ensureUserProfileColumns(client);
+
   const userData = normalizeUserPayload({
     ...data,
     rol: roleOverride || data.rol
@@ -159,6 +175,8 @@ async function createUser(data, { client = pool, roleOverride = null, requireCon
 }
 
 async function updateUser(id, data, { client = pool } = {}) {
+  await ensureUserProfileColumns(client);
+
   const userData = normalizeUserPayload(data);
   const errors = validateUserData(userData, { requirePassword: false, requireRole: true, requireContact: false });
   if (errors.length > 0) {
@@ -209,6 +227,7 @@ module.exports = {
   validateUserData,
   assertUniqueUserFields,
   publicUser,
+  ensureUserProfileColumns,
   createUser,
   updateUser
 };
