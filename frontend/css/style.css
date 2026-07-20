@@ -10447,6 +10447,1124 @@ body {
     }
 }
 
+/* ==========================================
+   MOBILE RESPONSIVE SYSTEM OVERRIDES
+   ========================================== */
+@media (max-width: 760px) {
+    :root {
+        --topbar-height: 64px;
+    }
+
+    html,
+    body {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+
+    body {
+        font-size: 13px;
+    }
+
+    .app-layout:not(.hidden) {
+        display: flex;
+        flex-direction: column;
+        min-height: 100dvh;
+        overflow-x: hidden;
+    }
+
+    .sidebar {
+        position: sticky;
+        top: 0;
+        z-index: 170;
+        width: 100%;
+        height: auto;
+        max-height: none;
+        border-right: 0;
+        border-bottom: 1px solid rgba(203, 213, 225, 0.8);
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+    }
+
+    .sidebar-brand {
+        min-height: 62px;
+        padding: 9px 12px;
+        gap: 10px;
+    }
+
+    .sidebar-logo {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+    }
+
+    .brand-name {
+        font-size: 16px;
+    }
+
+    .brand-location {
+        font-size: 10px;
+    }
+
+    .sidebar-menu {
+        display: flex !important;
+        flex-direction: row;
+        gap: 8px;
+        padding: 8px 10px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scroll-snap-type: x proximity;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .sidebar-menu::-webkit-scrollbar {
+        display: none;
+    }
+
+    .menu-group,
+    .menu-item,
+    .submenu-item {
+        flex: 0 0 auto;
+        scroll-snap-align: start;
+    }
+
+    .menu-item,
+    .submenu-item {
+        min-width: max-content;
+        min-height: 38px;
+        padding: 8px 11px;
+        border-radius: 12px;
+        gap: 8px;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    .menu-item i,
+    .submenu-item i {
+        font-size: 14px;
+    }
+
+    .menu-badge {
+        min-width: 18px;
+        height: 18px;
+        font-size: 10px;
+    }
+
+    .submenu {
+        position: absolute;
+        left: 10px;
+        right: 10px;
+        top: 116px;
+        z-index: 175;
+        display: flex;
+        gap: 8px;
+        padding: 8px;
+        overflow-x: auto;
+        border: 1px solid rgba(203, 213, 225, 0.88);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+    }
+
+    .submenu.hidden {
+        display: none !important;
+    }
+
+    .sidebar-footer {
+        margin: 0 10px 10px;
+        padding: 8px;
+        border-radius: 14px;
+        gap: 8px;
+    }
+
+    .user-profile-badge {
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    .user-avatar {
+        width: 34px;
+        height: 34px;
+        font-size: 13px;
+    }
+
+    .user-info,
+    .user-name {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .btn-logout {
+        width: 36px;
+        height: 36px;
+        flex: 0 0 36px;
+    }
+
+    .main-content {
+        width: 100%;
+        min-width: 0;
+        min-height: auto;
+    }
+
+    .topbar {
+        position: static;
+        width: auto;
+        min-height: 58px;
+        margin: 10px;
+        padding: 10px 12px;
+        border-radius: 16px;
+        gap: 10px;
+    }
+
+    .topbar-left,
+    .topbar-right,
+    .topbar-actions {
+        min-width: 0;
+    }
+
+    .view-title {
+        font-size: 18px;
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+    }
+
+    .notifications-dropdown-trigger {
+        width: 38px;
+        height: 38px;
+        flex: 0 0 38px;
+        font-size: 17px;
+    }
+
+    .notifications-drawer {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        width: auto;
+        height: min(76dvh, 620px);
+        max-height: none;
+    }
+
+    .view-container {
+        width: 100%;
+        max-width: 100%;
+        padding: 12px 10px 18px;
+        gap: 14px;
+        overflow-x: hidden;
+    }
+
+    .view-section {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        gap: 14px;
+    }
+
+    .card,
+    .table-card,
+    .orders-table-card,
+    .quote-table-card,
+    .business-indicators-panel,
+    .alerts-card,
+    .calendar-panel,
+    .caja-panel,
+    .client-info-card,
+    .quote-info-card {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        border-radius: 14px;
+    }
+
+    .card-header,
+    .modal-header,
+    .drawer-header {
+        gap: 10px;
+    }
+
+    .dashboard-grid-summary,
+    .indicator-cards-row,
+    .dashboard-cols-2,
+    .financial-summary-grid,
+    .financial-breakdown-grid,
+    .warranty-summary-grid,
+    .client-summary-grid,
+    .client-detail-grid,
+    .quote-detail-layout,
+    .caja-summary-grid,
+    .caja-cortes-summary-grid,
+    .caja-active-meta-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .status-card,
+    .indicator-item,
+    .summary-card,
+    .warranty-summary-card,
+    .client-summary-card,
+    .caja-summary-card {
+        min-width: 0;
+        min-height: auto;
+    }
+
+    .form-row-2,
+    .form-row-3,
+    .inventory-form-row.two,
+    .inventory-form-row.four,
+    .client-form-grid,
+    .calendar-event-row,
+    .quote-action-row,
+    .warranty-toolbar,
+    .inventory-toolbar,
+    .clients-toolbar,
+    .quote-toolbar,
+    .orders-toolbar,
+    .financial-report-toolbar,
+    .caja-operation-form,
+    .caja-filter-row,
+    .pos-layout,
+    .pos-products-panel,
+    .pos-cart-panel {
+        grid-template-columns: 1fr !important;
+        flex-direction: column;
+        align-items: stretch !important;
+    }
+
+    .clients-toolbar,
+    .quote-toolbar,
+    .orders-toolbar,
+    .financial-report-toolbar,
+    .calendar-actions-bar {
+        display: grid !important;
+        gap: 10px;
+        padding: 12px;
+    }
+
+    .search-input-wrapper,
+    .quote-search-wrapper,
+    .orders-search-wrapper,
+    .clients-toolbar .search-input-wrapper,
+    .inventory-search-wrapper,
+    .form-control,
+    .form-select,
+    .btn,
+    .clients-toolbar #btn-add-client-modal,
+    .orders-toolbar .btn-new-order-trigger,
+    .quote-toolbar .btn,
+    .financial-report-toolbar .btn,
+    .financial-report-toolbar .form-select,
+    .financial-report-toolbar .form-control {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .table .btn,
+    .btn-xs,
+    .btn-close-modal,
+    .btn-close-drawer,
+    .setup-password-toggle,
+    .inventory-actions .btn,
+    .user-actions .btn,
+    .notification-action-btn {
+        width: auto;
+    }
+
+    .table-responsive,
+    .orders-table-card,
+    .quote-table-body,
+    .inventory-table-wrapper,
+    .order-parts-table-wrap,
+    .client-history-list,
+    .caja-table-wrap {
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .table,
+    #orders-main-table,
+    #clients-table,
+    #quotes-table,
+    .inventory-table,
+    .order-parts-table {
+        min-width: 680px;
+    }
+
+    .table th,
+    .table td,
+    #orders-main-table th,
+    #orders-main-table td,
+    #clients-table th,
+    #clients-table td,
+    #quotes-table th,
+    #quotes-table td {
+        padding: 11px 12px;
+        font-size: 12px;
+    }
+
+    .modal-overlay {
+        align-items: stretch;
+        justify-content: center;
+        padding: 8px;
+    }
+
+    .modal-container,
+    .modal-large,
+    #client-modal .client-modal-container,
+    #inventory-modal .inventory-product-modal,
+    #event-modal .calendar-event-modal,
+    #quote-modal .quote-detail-modal,
+    #order-modal .modal-container,
+    #order-modal.new-order-modal .new-order-dialog {
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        max-height: calc(100dvh - 16px);
+        border-radius: 16px;
+    }
+
+    .modal-header,
+    .modal-body,
+    .modal-footer,
+    #client-modal .client-modal-header,
+    #client-modal .modal-footer,
+    #inventory-modal .modal-header,
+    #inventory-modal .modal-body,
+    #inventory-modal .modal-footer,
+    #event-modal .modal-header,
+    #event-modal .modal-body,
+    #event-modal .modal-footer,
+    #quote-modal .quote-modal-header,
+    #quote-modal .quote-modal-body,
+    #quote-modal .quote-modal-footer {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+
+    .modal-body {
+        overflow-x: hidden;
+    }
+
+    .modal-footer {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 9px;
+    }
+
+    .modal-footer .btn,
+    #order-modal .modal-footer .btn,
+    #client-modal .modal-footer .btn,
+    #inventory-modal .inventory-product-footer .btn,
+    #event-modal .calendar-event-footer .btn,
+    #quote-modal .quote-modal-footer .btn {
+        width: 100%;
+        min-height: 42px;
+    }
+
+    #order-modal.new-order-modal .new-order-stepper {
+        display: flex;
+        grid-template-columns: none;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 4px;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    #order-modal.new-order-modal .new-order-stepper-item {
+        flex: 0 0 132px;
+        min-width: 132px;
+    }
+
+    #order-modal.new-order-modal .new-order-top-actions {
+        grid-template-columns: 1fr;
+    }
+
+    #order-modal.new-order-modal .new-order-top-actions #btn-save-order:not(.hidden),
+    #order-modal.new-order-modal .new-order-top-actions .btn-close-modal {
+        grid-column: auto;
+        grid-row: auto;
+    }
+
+    #order-modal .checklist-grid,
+    #order-modal .checklist-grid-wide,
+    #order-modal .photo-upload-grid,
+    #order-modal .order-photos-preview-list,
+    #order-modal .evidence-history-grid,
+    .warranty-photo-grid,
+    .quote-detail-photos,
+    .pos-payment-grid,
+    .pos-products-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    #order-modal .signature-canvas-wrapper canvas {
+        max-width: 100%;
+    }
+
+    .fc .fc-toolbar {
+        gap: 8px;
+    }
+
+    .fc .fc-toolbar-title {
+        font-size: 17px;
+        text-align: center;
+    }
+
+    .fc .fc-button {
+        padding: 6px 8px;
+        font-size: 11px;
+    }
+
+    .fc .fc-daygrid-day-frame {
+        min-height: 74px;
+    }
+
+    .calendar-event-card {
+        padding: 4px 5px;
+    }
+
+    .calendar-event-card strong,
+    .calendar-event-card span,
+    .calendar-event-card small {
+        font-size: 9px;
+    }
+}
+
+@media (max-width: 560px) {
+    .login-page {
+        min-height: 100dvh;
+        height: auto;
+        overflow-y: auto;
+    }
+
+    .login-right-panel {
+        padding: 12px;
+        align-items: flex-start;
+    }
+
+    .login-card {
+        max-width: 100%;
+        padding: 24px 22px;
+        border-radius: 18px;
+    }
+
+    .login-card-title {
+        font-size: 21px;
+    }
+
+    .login-options-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .sidebar-brand {
+        min-height: 56px;
+    }
+
+    .sidebar-logo {
+        width: 40px;
+        height: 40px;
+    }
+
+    .sidebar-footer {
+        align-items: center;
+    }
+
+    .view-title {
+        font-size: 17px;
+    }
+
+    .view-container {
+        padding-inline: 8px;
+    }
+
+    .dashboard-grid-summary,
+    .indicator-cards-row,
+    .pos-products-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .modal-header h3,
+    .quote-modal-title h3,
+    .client-modal-title h3 {
+        font-size: 16px;
+        line-height: 1.25;
+    }
+
+    .modal-header p,
+    .quote-modal-title p,
+    .client-modal-title p {
+        font-size: 12px;
+    }
+
+    .table,
+    #orders-main-table,
+    #clients-table,
+    #quotes-table,
+    .inventory-table,
+    .order-parts-table {
+        min-width: 620px;
+    }
+}
+
+/* Mobile UX polish: touch-first behavior without changing desktop layout */
+@media (max-width: 760px) {
+    * {
+        -webkit-tap-highlight-color: rgba(37, 99, 235, 0.12);
+    }
+
+    button,
+    a,
+    input,
+    select,
+    textarea {
+        touch-action: manipulation;
+    }
+
+    input,
+    select,
+    textarea,
+    .form-control,
+    .form-select {
+        min-height: 44px;
+        font-size: 16px !important;
+    }
+
+    textarea.form-control,
+    textarea.auto-grow-textarea {
+        min-height: 96px;
+    }
+
+    .btn {
+        min-height: 44px;
+        padding: 10px 14px;
+        border-radius: 10px;
+    }
+
+    .btn-xs,
+    .btn-sm,
+    .table .btn,
+    .inventory-actions .btn,
+    .user-actions .btn {
+        min-height: 34px;
+        min-width: 34px;
+        padding: 7px 9px;
+    }
+
+    .btn-close-modal,
+    .btn-close-drawer,
+    .setup-password-toggle {
+        min-width: 34px;
+        min-height: 34px;
+    }
+
+    .card-header,
+    .quote-table-header,
+    .caja-table-header,
+    .order-parts-header,
+    .photo-uploader-head,
+    .evidence-history-title,
+    .client-history-header,
+    .drawer-header {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .card-header h3,
+    .quote-table-header h3,
+    .caja-table-header h3,
+    .panel-title {
+        font-size: 15px;
+        line-height: 1.25;
+    }
+
+    .card-header p,
+    .quote-table-header p,
+    .caja-table-header p {
+        font-size: 12px;
+        line-height: 1.4;
+    }
+
+    .table-responsive,
+    .orders-table-card,
+    .quote-table-body,
+    .inventory-table-body,
+    .inventory-table-wrapper,
+    .financial-table-wrap,
+    .warranty-table-scroll,
+    .caja-table-card .card-body,
+    .order-parts-table-wrap {
+        border-radius: 12px;
+        overflow-x: auto !important;
+        overscroll-behavior-x: contain;
+        scrollbar-width: thin;
+    }
+
+    .table-responsive::after,
+    .orders-table-card::after,
+    .quote-table-body::after,
+    .inventory-table-body::after,
+    .financial-table-wrap::after,
+    .warranty-table-scroll::after,
+    .caja-table-card .card-body::after {
+        content: "";
+        display: block;
+        width: 1px;
+        height: 1px;
+    }
+
+    .financial-table,
+    .warranty-table-card .table,
+    .caja-modern-table,
+    #dashboard-orders-table,
+    #inventory-table-refacciones,
+    #inventory-table-accesorios {
+        min-width: 680px;
+    }
+
+    .inventory-table th,
+    .inventory-table td,
+    .financial-table th,
+    .financial-table td,
+    .caja-modern-table th,
+    .caja-modern-table td,
+    .warranty-table-card .table th,
+    .warranty-table-card .table td {
+        padding: 11px 12px;
+        font-size: 12px;
+    }
+
+    .orders-toolbar,
+    .quote-toolbar,
+    .clients-toolbar,
+    .inventory-toolbar,
+    .warranty-toolbar,
+    .financial-report-toolbar {
+        border-radius: 14px;
+        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
+    }
+
+    .search-input-wrapper,
+    .orders-search-wrapper,
+    .quote-search-wrapper,
+    .clients-toolbar .search-input-wrapper,
+    .inventory-search-wrapper,
+    .pos-input-wrapper {
+        min-height: 46px;
+        border-radius: 12px;
+    }
+
+    .search-input-wrapper input,
+    .orders-search-wrapper input,
+    .quote-search-wrapper input,
+    .clients-toolbar .search-input-wrapper input,
+    .inventory-search-wrapper input,
+    .pos-input-wrapper input {
+        min-height: 44px;
+    }
+
+    .status-card,
+    .indicator-item,
+    .summary-card,
+    .warranty-summary-card,
+    .client-summary-card,
+    .caja-summary-card,
+    .pos-product-card,
+    .calendar-item-card,
+    .notification-card {
+        border-radius: 14px;
+    }
+
+    .status-card {
+        display: grid;
+        grid-template-columns: 52px minmax(0, 1fr);
+        gap: 12px;
+        align-items: center;
+        padding: 15px;
+    }
+
+    #view-dashboard .status-card .card-icon {
+        width: 46px;
+        height: 46px;
+        border-radius: 14px;
+    }
+
+    #view-dashboard .status-card .card-value {
+        font-size: 24px;
+    }
+
+    .modal-overlay {
+        min-height: 100dvh;
+        overflow-y: auto;
+    }
+
+    .modal-container,
+    #order-modal.new-order-modal .new-order-dialog,
+    #client-modal .client-modal-container,
+    #inventory-modal .inventory-product-modal,
+    #event-modal .calendar-event-modal,
+    #quote-modal .quote-detail-modal {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .modal-body,
+    #order-modal .modal-body,
+    #order-modal.new-order-modal .modal-body,
+    #client-modal .modal-body,
+    #inventory-modal .modal-body,
+    #event-modal .modal-body,
+    #quote-modal .quote-modal-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .modal-footer,
+    #order-modal .modal-footer,
+    #client-modal .modal-footer,
+    #inventory-modal .modal-footer,
+    #event-modal .modal-footer,
+    #quote-modal .quote-modal-footer {
+        flex: 0 0 auto;
+        background: rgba(255, 255, 255, 0.96);
+        border-top: 1px solid rgba(226, 232, 240, 0.9);
+    }
+
+    #order-modal .modal-tabs {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 5px;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    #order-modal .modal-tab-btn {
+        flex: 0 0 auto;
+        min-width: max-content;
+        min-height: 38px;
+        padding: 8px 12px;
+        border-radius: 10px;
+    }
+
+    #order-modal .order-section-card,
+    #order-modal.new-order-modal .order-section-card,
+    #client-modal .client-modal-main,
+    #client-modal .client-modal-side,
+    #inventory-modal .inventory-product-main,
+    #inventory-modal .inventory-product-side,
+    #quote-modal .quote-info-card,
+    #quote-modal .quote-action-card {
+        border-radius: 14px;
+        padding: 14px;
+    }
+
+    #order-modal .radio-container,
+    #order-modal .checkbox-container,
+    #order-modal.new-order-modal .radio-container,
+    #order-modal.new-order-modal .checkbox-container {
+        min-height: 42px;
+        align-items: center;
+    }
+
+    #order-modal .lock-type-selector,
+    #order-modal .order-contact-selector,
+    #order-modal .order-type-selector,
+    #order-modal.new-order-modal .order-contact-selector,
+    #order-modal.new-order-modal .order-type-selector {
+        grid-template-columns: 1fr !important;
+        gap: 9px;
+    }
+
+    #order-modal .pattern-canvas-wrapper,
+    #order-modal.new-order-modal .pattern-canvas-wrapper {
+        max-width: 100%;
+        overflow: hidden;
+    }
+
+    #pattern-canvas,
+    #order-modal.new-order-modal #pattern-canvas {
+        width: min(100%, 280px) !important;
+        height: min(72vw, 280px) !important;
+    }
+
+    .pos-search-panel,
+    .pos-cart-container,
+    .pos-products-container {
+        border-radius: 14px;
+    }
+
+    .pos-cart-container {
+        position: static;
+        max-height: none;
+    }
+
+    .pos-cart-items {
+        max-height: 320px;
+    }
+
+    .pos-cart-item {
+        grid-template-columns: 42px minmax(0, 1fr);
+        gap: 10px;
+    }
+
+    .pos-cart-line-actions,
+    .pos-item-total {
+        grid-column: 2;
+    }
+
+    .pos-payment-methods,
+    .pos-checkout-actions,
+    .pos-discount-control,
+    .pos-payment-info {
+        grid-template-columns: 1fr !important;
+    }
+
+    #view-calendario > .card,
+    #full-calendar-container {
+        border-radius: 14px;
+        overflow: hidden;
+    }
+
+    .fc .fc-toolbar {
+        align-items: stretch;
+    }
+
+    .fc .fc-toolbar-chunk {
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .fc .fc-button-group {
+        display: flex;
+        width: 100%;
+    }
+
+    .fc .fc-button-group .fc-button {
+        flex: 1 1 auto;
+    }
+
+    .fc .fc-daygrid-day-number {
+        font-size: 11px;
+    }
+
+    .calendar-status-legend {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .calendar-status-legend span {
+        min-width: 0;
+        white-space: normal;
+    }
+
+    .notifications-drawer {
+        border-radius: 16px;
+    }
+
+    .notifications-drawer .notification-card {
+        padding: 12px;
+    }
+
+    .notification-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .notification-action-btn,
+    .notification-action-btn.primary {
+        width: 100%;
+        min-height: 36px;
+    }
+}
+
+@media (max-width: 430px) {
+    body {
+        font-size: 12.5px;
+    }
+
+    .sidebar-brand {
+        padding: 8px 10px;
+    }
+
+    .sidebar-menu {
+        padding-inline: 8px;
+        gap: 6px;
+    }
+
+    .menu-item,
+    .submenu-item {
+        min-height: 36px;
+        padding: 8px 10px;
+        font-size: 11.5px;
+    }
+
+    .sidebar-footer {
+        margin-inline: 8px;
+    }
+
+    .topbar {
+        margin: 8px;
+        padding: 9px 10px;
+        border-radius: 14px;
+    }
+
+    .view-title {
+        font-size: 16px;
+    }
+
+    .view-container {
+        padding: 10px 8px 16px;
+    }
+
+    .card,
+    .table-card,
+    .orders-table-card,
+    .quote-table-card,
+    .business-indicators-panel,
+    .alerts-card {
+        border-radius: 12px;
+    }
+
+    .status-card {
+        grid-template-columns: 44px minmax(0, 1fr);
+        padding: 13px;
+    }
+
+    #view-dashboard .status-card .card-icon {
+        width: 40px;
+        height: 40px;
+    }
+
+    #view-dashboard .status-card .card-value {
+        font-size: 21px;
+    }
+
+    .login-card {
+        padding: 22px 18px;
+    }
+
+    .avatar-circle-outline {
+        font-size: 58px;
+    }
+
+    .login-card-title {
+        font-size: 20px;
+    }
+
+    .table,
+    #orders-main-table,
+    #clients-table,
+    #quotes-table,
+    .inventory-table,
+    .financial-table,
+    .warranty-table-card .table,
+    .caja-modern-table,
+    .order-parts-table {
+        min-width: 600px;
+    }
+
+    .modal-overlay {
+        padding: 6px;
+    }
+
+    .modal-container,
+    .modal-large,
+    #client-modal .client-modal-container,
+    #inventory-modal .inventory-product-modal,
+    #event-modal .calendar-event-modal,
+    #quote-modal .quote-detail-modal,
+    #order-modal .modal-container,
+    #order-modal.new-order-modal .new-order-dialog {
+        max-height: calc(100dvh - 12px);
+        border-radius: 14px;
+    }
+
+    .modal-header,
+    .modal-body,
+    .modal-footer,
+    #client-modal .client-modal-header,
+    #client-modal .modal-footer,
+    #inventory-modal .modal-header,
+    #inventory-modal .modal-body,
+    #inventory-modal .modal-footer,
+    #event-modal .modal-header,
+    #event-modal .modal-body,
+    #event-modal .modal-footer,
+    #quote-modal .quote-modal-header,
+    #quote-modal .quote-modal-body,
+    #quote-modal .quote-modal-footer {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    .pos-products-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 10px;
+    }
+
+    .pos-product-card {
+        padding: 10px;
+    }
+
+    .pos-product-img {
+        height: 86px;
+    }
+
+    .pos-product-name {
+        font-size: 12px;
+    }
+
+    .pos-product-price {
+        font-size: 13px;
+    }
+
+    .calendar-status-legend {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 360px) {
+    .brand-text {
+        min-width: 0;
+    }
+
+    .brand-name,
+    .brand-location {
+        max-width: 148px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .menu-item span,
+    .submenu-item span {
+        max-width: 92px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .pos-products-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .table,
+    #orders-main-table,
+    #clients-table,
+    #quotes-table,
+    .inventory-table,
+    .financial-table,
+    .warranty-table-card .table,
+    .caja-modern-table,
+    .order-parts-table {
+        min-width: 560px;
+    }
+}
+
 /* PRINT MEDIA OVERRIDES */
 @media print {
     @page {
