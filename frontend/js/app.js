@@ -1170,7 +1170,13 @@ function renderNotificationsDrawer() {
     if (!list) return;
 
     if (!APP_STATE.notifications.length) {
-        list.innerHTML = '<div class="text-muted text-center">Sin alertas pendientes.</div>';
+        list.innerHTML = `
+            <div class="notifications-empty-state">
+                <span><i class="fa-regular fa-circle-check"></i></span>
+                <strong>Todo en orden</strong>
+                <p>No hay alertas pendientes por atender.</p>
+            </div>
+        `;
         return;
     }
 
@@ -1180,12 +1186,24 @@ function renderNotificationsDrawer() {
         if (notification.type === 'warning') icon = 'fa-triangle-exclamation';
         if (notification.type === 'success') icon = 'fa-circle-check';
 
+        const actionLabel = getNotificationActionLabel(notification);
+        const secondaryLabel = getNotificationSecondaryActionLabel(notification);
+        const displayTitle = getNotificationDisplayTitle(notification);
+        const displayDesc = getNotificationDisplayDesc(notification);
+
         return `
-            <div class="alert-list-item ${notification.type} ${notification.action ? 'notification-clickable' : ''}" data-notification-index="${index}">
-                <i class="fa-solid ${icon}"></i>
-                <div class="alert-item-content">
-                    <span class="alert-item-title">${notification.title}</span>
-                    <span class="alert-item-desc">${notification.desc}</span>
+            <div class="alert-list-item notification-card ${notification.type} ${notification.action ? 'notification-clickable' : ''}" data-notification-index="${index}">
+                <span class="notification-card-icon"><i class="fa-solid ${icon}"></i></span>
+                <div class="alert-item-content notification-card-content">
+                    <div class="notification-card-head">
+                        <span class="alert-item-title">${escapeHtml(displayTitle)}</span>
+                        <span class="notification-priority">${getNotificationPriorityLabel(notification.type)}</span>
+                    </div>
+                    <span class="alert-item-desc">${escapeHtml(displayDesc)}</span>
+                    <div class="notification-actions">
+                        ${actionLabel ? `<button type="button" class="notification-action-btn primary" data-notification-action="primary">${actionLabel}</button>` : ''}
+                        ${secondaryLabel ? `<button type="button" class="notification-action-btn" data-notification-action="secondary">${secondaryLabel}</button>` : ''}
+                    </div>
                 </div>
             </div>
         `;
@@ -1196,7 +1214,53 @@ function renderNotificationsDrawer() {
             const notification = APP_STATE.notifications[Number(item.dataset.notificationIndex)];
             handleNotificationClick(notification);
         });
+
+        item.querySelectorAll('[data-notification-action]').forEach(button => {
+            button.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const notification = APP_STATE.notifications[Number(item.dataset.notificationIndex)];
+                handleNotificationClick(notification, button.dataset.notificationAction);
+            });
+        });
     });
+}
+
+function getNotificationDisplayTitle(notification = {}) {
+    if (notification.action === 'openQuote') return 'Nueva cotización';
+    return notification.title || 'Notificación';
+}
+
+function getNotificationDisplayDesc(notification = {}) {
+    if (notification.action === 'openQuote') {
+        const quote = APP_STATE.cotizaciones.find(q => q.id === notification.quoteId);
+        if (quote) {
+            const clientName = getQuoteValue(quote, ['cliente_nombre', 'nombre'], 'Cliente');
+            const device = `${getQuoteValue(quote, ['tipo_equipo', 'equipo'], 'Equipo')} ${getQuoteValue(quote, ['marca'])} ${getQuoteValue(quote, ['modelo'])}`.trim();
+            return `${clientName} solicitó cotización para ${device}.`;
+        }
+    }
+    return notification.desc || '';
+}
+
+function getNotificationPriorityLabel(type) {
+    if (type === 'danger') return 'Urgente';
+    if (type === 'warning') return 'Atención';
+    if (type === 'success') return 'Listo';
+    return 'Info';
+}
+
+function getNotificationActionLabel(notification = {}) {
+    if (!notification.action) return '';
+    if (notification.action === 'openQuote') return 'Ver cotización';
+    if (notification.action === 'openInventory') return 'Ver producto';
+    if (notification.action === 'openOrder') return 'Abrir orden';
+    return 'Abrir';
+}
+
+function getNotificationSecondaryActionLabel(notification = {}) {
+    if (notification.secondaryAction === 'addStock') return 'Sumar stock';
+    if (notification.secondaryAction === 'viewOrderTicket') return 'Ver ticket';
+    return '';
 }
 
 function startCotizacionesPolling() {
@@ -1240,11 +1304,28 @@ function stopCotizacionesPolling() {
     APP_STATE.cotizacionesPollId = null;
 }
 
-function handleNotificationClick(notification) {
+function handleNotificationClick(notification, actionType = 'primary') {
     if (!notification || !notification.action) return;
 
     const drawer = document.getElementById('notifications-drawer');
     if (drawer) drawer.classList.add('hidden');
+
+    if (actionType === 'secondary') {
+        if (notification.secondaryAction === 'addStock') {
+            switchView('inventario');
+            const item = APP_STATE.inventario.find(p => p.id === notification.itemId);
+            currentInventorySection = getInventoryCategoryGroup(item?.categoria).toLowerCase();
+            renderInventario();
+            setTimeout(() => editStockItem(notification.itemId), 120);
+            return;
+        }
+
+        if (notification.secondaryAction === 'viewOrderTicket') {
+            switchView('ordenes');
+            setTimeout(() => viewOrderDetails(notification.orderId), 120);
+            return;
+        }
+    }
 
     if (notification.action === 'openQuote') {
         const statusFilter = document.getElementById('quote-status-filter');
@@ -1269,6 +1350,13 @@ function handleNotificationClick(notification) {
         renderInventario();
         setTimeout(() => {
             focusInventoryItem(notification.itemId);
+        }, 80);
+    }
+
+    if (notification.action === 'openOrder') {
+        switchView('ordenes');
+        setTimeout(() => {
+            editOrderDetails(notification.orderId);
         }, 80);
     }
 }
@@ -1591,13 +1679,25 @@ function renderDashboard() {
     APP_STATE.ordenes.forEach(o => {
         if (o.status !== 'Entregado' && o.status !== 'Cancelado') {
             if (o.estimatedDate === todayStr) {
-                addAlertItem('warning', 'Entrega Programada Hoy', `Folio ${o.folio} (${o.brand} ${o.model}) vence hoy.`);
+                addAlertItem('warning', 'Entrega Programada Hoy', `Folio ${o.folio} (${o.brand} ${o.model}) vence hoy.`, {
+                    action: 'openOrder',
+                    orderId: o.id,
+                    secondaryAction: 'viewOrderTicket'
+                });
                 alertsCount++;
             } else if (o.estimatedDate === tomorrowStr) {
-                addAlertItem('info', 'Entrega Mañana', `Folio ${o.folio} (${o.brand} ${o.model}) vence mañana.`);
+                addAlertItem('info', 'Entrega Mañana', `Folio ${o.folio} (${o.brand} ${o.model}) vence mañana.`, {
+                    action: 'openOrder',
+                    orderId: o.id,
+                    secondaryAction: 'viewOrderTicket'
+                });
                 alertsCount++;
             } else if (o.status === 'Retrasado') {
-                addAlertItem('danger', 'Equipo Retrasado', `Folio ${o.folio} marcado como retrasado.`);
+                addAlertItem('danger', 'Equipo Retrasado', `Folio ${o.folio} marcado como retrasado.`, {
+                    action: 'openOrder',
+                    orderId: o.id,
+                    secondaryAction: 'viewOrderTicket'
+                });
                 alertsCount++;
             }
         }
@@ -1611,7 +1711,7 @@ function renderDashboard() {
                 'danger',
                 isOut ? 'Inventario agotado' : 'Inventario bajo',
                 `El producto "${p.nombre}" cuenta con ${p.stock} unidades. Stock mínimo: ${p.stock_minimo}.`,
-                { action: 'openInventory', itemId: p.id }
+                { action: 'openInventory', itemId: p.id, secondaryAction: 'addStock' }
             );
             alertsCount++;
         }
@@ -1683,7 +1783,11 @@ function addAlertItem(type, title, desc, metadata = {}) {
     if (!list) return;
 
     const li = document.createElement('li');
-    li.className = `alert-list-item ${type}`;
+    li.className = `alert-list-item ${type} ${metadata.action ? 'notification-clickable' : ''}`;
+    if (metadata.action) {
+        li.setAttribute('role', 'button');
+        li.tabIndex = 0;
+    }
     
     let icon = 'fa-circle-info';
     if (type === 'danger') icon = 'fa-circle-exclamation';
@@ -1696,6 +1800,16 @@ function addAlertItem(type, title, desc, metadata = {}) {
             <span class="alert-item-desc">${desc}</span>
         </div>
     `;
+    if (metadata.action) {
+        const notification = { type, title, desc, ...metadata };
+        li.addEventListener('click', () => handleNotificationClick(notification));
+        li.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                handleNotificationClick(notification);
+            }
+        });
+    }
     list.appendChild(li);
 }
 
