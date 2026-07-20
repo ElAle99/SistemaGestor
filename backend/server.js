@@ -22,11 +22,15 @@ const localOrigins = [
   'http://127.0.0.1:8090'
 ];
 
+function normalizeOrigin(origin = '') {
+  return String(origin).trim().replace(/\/$/, '');
+}
+
 function parseOrigins(value = '') {
   return String(value)
     .split(',')
-    .map(origin => origin.trim().replace(/\/$/, ''))
-    .filter(Boolean);
+    .map(normalizeOrigin)
+    .filter(origin => origin && origin !== '*');
 }
 
 const configuredOrigins = new Set([
@@ -34,24 +38,58 @@ const configuredOrigins = new Set([
   ...parseOrigins(process.env.ALLOWED_ORIGINS)
 ]);
 const devOrigins = new Set(localOrigins);
+const corsMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
+const corsAllowedHeaders = ['Content-Type', 'Authorization'];
+const corsCredentials = String(process.env.CORS_CREDENTIALS || '').toLowerCase() === 'true';
 
-app.use(cors({
-  credentials: true,
-  origin(origin, callback) {
-    if (!origin) return callback(null, true);
-    const normalizedOrigin = origin.replace(/\/$/, '');
+function getRequestHostOrigin(req) {
+  const forwardedProto = req.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  const forwardedHost = req.get('x-forwarded-host')?.split(',')[0]?.trim();
+  const protocol = forwardedProto || req.protocol;
+  const host = forwardedHost || req.get('host');
+  return host ? normalizeOrigin(`${protocol}://${host}`) : '';
+}
 
-    if (configuredOrigins.has(normalizedOrigin)) {
-      return callback(null, true);
-    }
-
-    if (process.env.NODE_ENV !== 'production' && devOrigins.has(normalizedOrigin)) {
-      return callback(null, true);
-    }
-
-    return callback(new Error('Origen no permitido por CORS'));
+function isSameRequestOrigin(origin, req) {
+  try {
+    const originUrl = new URL(origin);
+    const requestUrl = new URL(getRequestHostOrigin(req));
+    return originUrl.protocol === requestUrl.protocol && originUrl.host === requestUrl.host;
+  } catch (error) {
+    return false;
   }
-}));
+}
+
+const baseCorsOptions = {
+  methods: corsMethods,
+  allowedHeaders: corsAllowedHeaders,
+  credentials: corsCredentials,
+  optionsSuccessStatus: 204
+};
+
+function corsOptionsDelegate(req, callback) {
+  const origin = normalizeOrigin(req.get('origin'));
+
+  if (
+    !origin ||
+    configuredOrigins.has(origin) ||
+    isSameRequestOrigin(origin, req) ||
+    (process.env.NODE_ENV !== 'production' && devOrigins.has(origin))
+  ) {
+    return callback(null, { ...baseCorsOptions, origin: true });
+  }
+
+  return callback(new Error('Origen no permitido por CORS'));
+}
+
+app.use(cors(corsOptionsDelegate));
+app.options('*', cors(corsOptionsDelegate));
+app.use((err, req, res, next) => {
+  if (err.message === 'Origen no permitido por CORS') {
+    return res.status(403).json({ error: err.message });
+  }
+  return next(err);
+});
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use(express.static(frontendPath));
