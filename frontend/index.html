@@ -11,7 +11,7 @@
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Main Stylesheet -->
-    <link rel="stylesheet" href="css/style.css?v=20260719-profile-v6">
+    <link rel="stylesheet" href="css/style.css?v=20260721-users-v2">
 </head>
 <body class="light-theme">
 
@@ -1576,24 +1576,11 @@
                             <div class="card-header flex-header">
                                 <div>
                                     <h3>Gestión de usuarios</h3>
-                                    <p class="config-help-text">Administra operadores, roles y acceso temporal desde login.</p>
+                                    <p class="config-help-text">Administra operadores, roles y accesos al sistema.</p>
                                 </div>
                                 <button class="btn btn-sm btn-primary" id="btn-add-user-modal">
                                     <i class="fa-solid fa-user-plus"></i> Agregar Usuario
                                 </button>
-                            </div>
-                            <div class="card-body">
-                                <div class="user-creation-setting">
-                                    <div>
-                                        <strong>Permitir creación de usuarios</strong>
-                                        <p>Cuando esté activado, el login puede mostrar creación pública de administrador. Manténlo desactivado normalmente.</p>
-                                        <span id="user-creation-setting-source" class="text-xs text-muted"></span>
-                                    </div>
-                                    <label class="user-switch">
-                                        <input type="checkbox" id="allow-user-creation-switch">
-                                        <span></span>
-                                    </label>
-                                </div>
                             </div>
                             <div class="card-body table-responsive">
                                 <table class="table" id="users-table">
@@ -3447,7 +3434,7 @@
     <script src="/vendor/jspdf-autotable/jspdf.plugin.autotable.min.js"></script>
 
     <!-- Main System JavaScript Logic -->
-    <script src="js/app.js?v=20260719-profile-v6"></script>
+    <script src="js/app.js?v=20260721-users-v2"></script>
 </body>
 </html>
 

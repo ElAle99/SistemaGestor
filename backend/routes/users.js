@@ -51,6 +51,7 @@ router.get('/', authMiddleware, adminOnly, async (req, res) => {
     const result = await pool.query(
       `SELECT id, username, rol, nombre, correo, telefono, activo, fecha_creacion
        FROM usuarios
+       WHERE COALESCE(eliminado, false) = false
        ORDER BY fecha_creacion DESC, id DESC`
     );
     res.json(result.rows.map(publicUser));
@@ -187,6 +188,41 @@ router.patch('/:id/status', authMiddleware, adminOnly, async (req, res) => {
   } catch (error) {
     console.error('Error al cambiar estado de usuario:', error);
     return res.status(500).json({ error: 'Error al cambiar estado de usuario' });
+  }
+});
+
+router.delete('/:id', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: 'Usuario no válido.' });
+    }
+    if (id === Number(req.user.id)) {
+      return res.status(400).json({ error: 'No puedes eliminar tu propio usuario.' });
+    }
+
+    // Eliminación lógica: conserva la relación con órdenes, ventas y cortes
+    // históricos, pero revoca el acceso y libera usuario/correo para reutilizarlos.
+    const result = await pool.query(
+      `UPDATE usuarios
+       SET activo = false,
+           eliminado = true,
+           username = CONCAT('eliminado_', id, '_', EXTRACT(EPOCH FROM NOW())::BIGINT),
+           nombre = 'Usuario eliminado',
+           correo = NULL,
+           telefono = NULL
+       WHERE id = $1 AND COALESCE(eliminado, false) = false
+       RETURNING id`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado.' });
+    }
+    return res.json({ message: 'Usuario eliminado correctamente.' });
+  } catch (error) {
+    console.error('Error al eliminar usuario:', error);
+    return res.status(500).json({ error: 'Error al eliminar usuario.' });
   }
 });
 

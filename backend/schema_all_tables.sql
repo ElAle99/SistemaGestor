@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   rol VARCHAR(20) NOT NULL,
   nombre VARCHAR(100) NOT NULL,
   activo BOOLEAN DEFAULT true,
+  eliminado BOOLEAN NOT NULL DEFAULT false,
   fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT usuarios_rol_check CHECK (rol IN ('Administrador', 'TÃ©cnico', 'Recepcionista'))
 );

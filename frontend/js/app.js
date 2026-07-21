@@ -34,6 +34,125 @@ const BASE_API_URL = String(
     window.APP_CONFIG?.API_URL ||
     '/api'
 ).replace(/\/$/, '');
+
+// Centro visual de avisos y confirmaciones. Evita los cuadros nativos del navegador
+// y mantiene la misma experiencia en todos los módulos del sistema.
+const AppUI = (() => {
+    let dialogResolver = null;
+    let previousFocus = null;
+
+    function ensureElements() {
+        if (!document.getElementById('app-toast-region')) {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div id="app-toast-region" class="app-toast-region" aria-live="polite" aria-atomic="true"></div>
+                <div id="app-dialog" class="app-dialog-overlay hidden" role="presentation">
+                    <section class="app-dialog" role="alertdialog" aria-modal="true" aria-labelledby="app-dialog-title" aria-describedby="app-dialog-message">
+                        <div class="app-dialog-icon" id="app-dialog-icon" aria-hidden="true"><i class="fa-solid fa-circle-info"></i></div>
+                        <div class="app-dialog-copy">
+                            <span class="app-dialog-eyebrow" id="app-dialog-eyebrow">Aviso del sistema</span>
+                            <h2 id="app-dialog-title">Confirmar acción</h2>
+                            <p id="app-dialog-message"></p>
+                            <label id="app-dialog-input-wrap" class="app-dialog-input-wrap hidden">
+                                <span id="app-dialog-input-label">Cantidad</span>
+                                <input id="app-dialog-input" class="form-control" type="text" autocomplete="off">
+                            </label>
+                        </div>
+                        <div class="app-dialog-actions">
+                            <button type="button" class="btn btn-secondary" id="app-dialog-cancel">Cancelar</button>
+                            <button type="button" class="btn btn-primary" id="app-dialog-accept">Aceptar</button>
+                        </div>
+                    </section>
+                </div>`);
+
+            document.getElementById('app-dialog-cancel').addEventListener('click', () => closeDialog(false));
+            document.getElementById('app-dialog-accept').addEventListener('click', () => {
+                const inputWrap = document.getElementById('app-dialog-input-wrap');
+                closeDialog(inputWrap.classList.contains('hidden') ? true : document.getElementById('app-dialog-input').value);
+            });
+            document.getElementById('app-dialog').addEventListener('click', event => {
+                if (event.target.id === 'app-dialog' && !document.getElementById('app-dialog-cancel').classList.contains('hidden')) closeDialog(false);
+            });
+            document.getElementById('app-dialog').addEventListener('keydown', event => {
+                if (event.key === 'Escape' && !document.getElementById('app-dialog-cancel').classList.contains('hidden')) closeDialog(false);
+                if (event.key === 'Enter' && event.target.id === 'app-dialog-input') document.getElementById('app-dialog-accept').click();
+            });
+        }
+    }
+
+    function closeDialog(value) {
+        const overlay = document.getElementById('app-dialog');
+        overlay?.classList.add('hidden');
+        document.body.classList.remove('app-dialog-open');
+        const resolve = dialogResolver;
+        dialogResolver = null;
+        resolve?.(value);
+        previousFocus?.focus?.();
+    }
+
+    function toast(message, type = 'success', title = '') {
+        ensureElements();
+        const region = document.getElementById('app-toast-region');
+        const icons = { success: 'fa-circle-check', error: 'fa-circle-exclamation', warning: 'fa-triangle-exclamation', info: 'fa-circle-info' };
+        const labels = { success: '¡Listo!', error: 'Algo salió mal', warning: 'Atención', info: 'Información' };
+        const toastElement = document.createElement('article');
+        toastElement.className = `app-toast app-toast-${type}`;
+        toastElement.innerHTML = `<div class="app-toast-icon"><i class="fa-solid ${icons[type] || icons.info}"></i></div><div class="app-toast-copy"><strong>${escapeHtml(title || labels[type] || labels.info)}</strong><p>${escapeHtml(message)}</p></div><button type="button" aria-label="Cerrar aviso"><i class="fa-solid fa-xmark"></i></button><div class="app-toast-progress"></div>`;
+        const remove = () => { toastElement.classList.add('is-leaving'); setTimeout(() => toastElement.remove(), 220); };
+        toastElement.querySelector('button').addEventListener('click', remove);
+        region.appendChild(toastElement);
+        requestAnimationFrame(() => toastElement.classList.add('is-visible'));
+        setTimeout(remove, type === 'error' ? 6500 : 4500);
+    }
+
+    function dialog(message, options = {}) {
+        ensureElements();
+        if (dialogResolver) closeDialog(false);
+        previousFocus = document.activeElement;
+        const type = options.type || 'info';
+        const overlay = document.getElementById('app-dialog');
+        const icons = { danger: 'fa-trash-can', warning: 'fa-triangle-exclamation', error: 'fa-circle-exclamation', info: 'fa-circle-info', success: 'fa-circle-check', question: 'fa-circle-question' };
+        overlay.dataset.type = type;
+        document.getElementById('app-dialog-icon').innerHTML = `<i class="fa-solid ${icons[type] || icons.info}"></i>`;
+        document.getElementById('app-dialog-eyebrow').textContent = options.eyebrow || (options.confirm ? 'Confirmación requerida' : 'Aviso del sistema');
+        document.getElementById('app-dialog-title').textContent = options.title || (options.confirm ? '¿Deseas continuar?' : 'Información importante');
+        document.getElementById('app-dialog-message').textContent = message;
+        const cancel = document.getElementById('app-dialog-cancel');
+        cancel.classList.toggle('hidden', !options.confirm && !options.input);
+        cancel.textContent = options.cancelText || 'Cancelar';
+        const accept = document.getElementById('app-dialog-accept');
+        accept.textContent = options.acceptText || 'Aceptar';
+        accept.className = `btn ${type === 'danger' ? 'btn-danger' : 'btn-primary'}`;
+        const inputWrap = document.getElementById('app-dialog-input-wrap');
+        inputWrap.classList.toggle('hidden', !options.input);
+        const input = document.getElementById('app-dialog-input');
+        input.value = options.defaultValue || '';
+        input.type = options.inputType || 'text';
+        document.getElementById('app-dialog-input-label').textContent = options.inputLabel || 'Ingresa un valor';
+        overlay.classList.remove('hidden');
+        document.body.classList.add('app-dialog-open');
+        setTimeout(() => (options.input ? input : accept).focus(), 30);
+        return new Promise(resolve => { dialogResolver = resolve; });
+    }
+
+    return {
+        toast,
+        alert: (message, options = {}) => dialog(message, options),
+        confirm: (message, options = {}) => dialog(message, { ...options, confirm: true, type: options.type || 'warning' }),
+        prompt: (message, defaultValue = '', options = {}) => dialog(message, { ...options, input: true, confirm: true, defaultValue })
+    };
+})();
+
+// Compatibilidad para avisos existentes: los éxitos son discretos; los errores
+// importantes requieren que el usuario los reconozca.
+window.alert = function visualAlert(message) {
+    const text = String(message || '');
+    if (/éxito|exito|correctamente|actualizad[oa]|guardad[oa]|registrad[oa]|eliminad[oa]|cread[oa]/i.test(text) && !/error|no se pudo/i.test(text)) {
+        AppUI.toast(text, 'success');
+        return;
+    }
+    const isError = /error|no se pudo|expiró|insuficiente|vacío|bloqueó/i.test(text);
+    AppUI.alert(text, { type: isError ? 'error' : 'info', title: isError ? 'No pudimos completar la acción' : 'Revisa esta información' });
+};
 let currentInventorySection = 'refacciones';
 const ORDER_PHOTO_FIELDS = [
     { key: 'recepcion', label: 'Recepción' },
@@ -300,7 +419,7 @@ function renderEvidenceHistory(order = {}) {
             const orderId = document.getElementById('form-order-id')?.value;
             const evidenceId = button.dataset.evidenceId;
             if (!orderId || !evidenceId) return;
-            if (!confirm('¿Eliminar esta evidencia?')) return;
+            if (!await AppUI.confirm('¿Eliminar esta evidencia? Esta acción no se puede deshacer.', { title: 'Eliminar evidencia', type: 'danger', acceptText: 'Sí, eliminar' })) return;
 
             const response = await fetch(`${BASE_API_URL}/ordenes/${orderId}/evidencias/${evidenceId}`, { method: 'DELETE' });
             if (!response.ok) {
@@ -2101,7 +2220,7 @@ window.deleteClient = async function(id) {
     const confirmation = relatedOrders > 0
         ? `¿Eliminar al cliente "${client.nombre}" y sus ${relatedOrders} orden(es)? Esta acción también devolverá al inventario las refacciones usadas en esas órdenes.`
         : `¿Eliminar al cliente "${client.nombre}"?`;
-    if (!confirm(confirmation)) return;
+    if (!await AppUI.confirm(confirmation, { title: 'Eliminar cliente', type: 'danger', acceptText: 'Sí, eliminar cliente' })) return;
 
     try {
         const response = await fetch(`${BASE_API_URL}/clientes/${id}`, { method: 'DELETE' });
@@ -2749,7 +2868,7 @@ document.getElementById('warranty-date-to')?.addEventListener('change', renderGa
 window.deleteOrder = async function(id) {
     const order = APP_STATE.ordenes.find(o => Number(o.id) === Number(id));
     if (!order) return;
-    if (!confirm(`¿Eliminar la orden ${order.folio}? Si tiene refacciones utilizadas, se devolverán al inventario.`)) return;
+    if (!await AppUI.confirm(`¿Eliminar la orden ${order.folio}? Si tiene refacciones utilizadas, se devolverán al inventario.`, { title: 'Eliminar orden de servicio', type: 'danger', acceptText: 'Sí, eliminar orden' })) return;
 
     try {
         const response = await fetch(`${BASE_API_URL}/ordenes/${id}`, { method: 'DELETE' });
@@ -5987,7 +6106,7 @@ window.openEditInventoryModal = function(id) {
 };
 
 window.deleteInventoryItem = async function(id) {
-    if (confirm('¿Está seguro de eliminar este producto del inventario?')) {
+    if (await AppUI.confirm('¿Está seguro de eliminar este producto del inventario? Esta acción no se puede deshacer.', { title: 'Eliminar producto', type: 'danger', acceptText: 'Sí, eliminar producto' })) {
         try {
             const response = await fetch(`${BASE_API_URL}/inventario/${id}`, {
                 method: 'DELETE'
@@ -6008,7 +6127,7 @@ window.deleteInventoryItem = async function(id) {
 async function editStockItem(id) {
     const item = APP_STATE.inventario.find(p => p.id === id);
     if (!item) return;
-    const add = prompt(`Ingresa la cantidad a SUMAR al stock de "${item.nombre}" (Stock actual: ${item.stock}):`, "5");
+    const add = await AppUI.prompt(`Ingresa la cantidad que deseas sumar al stock de “${item.nombre}”. Stock actual: ${item.stock}.`, '5', { title: 'Agregar existencias', inputLabel: 'Cantidad a sumar', inputType: 'number', acceptText: 'Actualizar stock' });
     const num = parseInt(add, 10);
     if (!isNaN(num) && num > 0) {
         const updatedItem = { ...item, stock: item.stock + num };
@@ -6354,7 +6473,7 @@ async function closeCajaFromModal(event) {
     event.preventDefault();
     const monto_contado = Number(document.getElementById('caja-close-counted')?.value || 0);
     const observaciones = document.getElementById('caja-close-observations')?.value.trim();
-    if (!confirm('¿Cerrar caja? Después del corte no se podrán registrar más movimientos en esta caja.')) return;
+    if (!await AppUI.confirm('Después del corte no se podrán registrar más movimientos en esta caja.', { title: '¿Cerrar caja ahora?', type: 'warning', acceptText: 'Sí, cerrar caja' })) return;
 
     try {
         const response = await fetch(`${BASE_API_URL}/caja/cerrar`, {
@@ -8840,19 +8959,14 @@ async function loadUsuarios() {
     if (response.ok) {
         APP_STATE.usuarios = await response.json();
     }
-
-    const settingsResponse = await fetch(`${BASE_API_URL}/users/settings`);
-    if (settingsResponse.ok) {
-        APP_STATE.userSettings = await settingsResponse.json();
-    }
 }
 
 function renderUsuarios() {
     const tableBody = document.querySelector('#users-table tbody');
     if (!tableBody) return;
     tableBody.innerHTML = '';
-    renderUserCreationSetting();
-    
+    const currentUserId = Number(APP_STATE.currentUser?.id);
+
     APP_STATE.usuarios.forEach(u => {
         const tr = document.createElement('tr');
         const statusAction = u.activo
@@ -8871,6 +8985,7 @@ function renderUsuarios() {
                 <div class="user-actions">
                     <button class="btn btn-xs btn-secondary" onclick="editUsuario(${u.id})"><i class="fa-solid fa-pen"></i> Editar</button>
                     ${statusAction}
+                    ${Number(u.id) !== currentUserId ? `<button class="btn btn-xs btn-danger" onclick="deleteUsuario(${u.id})"><i class="fa-solid fa-trash-can"></i> Eliminar</button>` : ''}
                 </div>
             </td>
         `;
@@ -8878,23 +8993,9 @@ function renderUsuarios() {
     });
 }
 
-function renderUserCreationSetting() {
-    const checkbox = document.getElementById('allow-user-creation-switch');
-    const source = document.getElementById('user-creation-setting-source');
-    const settings = APP_STATE.userSettings || {};
-    if (!checkbox) return;
-
-    checkbox.checked = Boolean(settings.allowUserCreation);
-    if (source) {
-        source.innerText = settings.envOverrideActive
-            ? 'Activado temporalmente por ALLOW_USER_CREATION=true en Railway.'
-            : 'Controlado desde PostgreSQL.';
-    }
-}
-
 window.toggleUsuarioStatus = async function(id, activo) {
     const action = activo ? 'activar' : 'desactivar';
-    if (!confirm(`¿Deseas ${action} este usuario?`)) return;
+    if (!await AppUI.confirm(`¿Deseas ${action} este usuario?`, { title: `${activo ? 'Activar' : 'Desactivar'} operador`, acceptText: `Sí, ${action}` })) return;
     try {
         const response = await fetch(`${BASE_API_URL}/users/${id}/status`, {
             method: 'PATCH',
@@ -8941,9 +9042,9 @@ function openUserModal(user = null) {
 }
 
 window.deleteUsuario = async function(id) {
-    if (!confirm('¿Está seguro de eliminar este operador?')) return;
+    if (!await AppUI.confirm('¿Está seguro de eliminar este operador? Esta acción no se puede deshacer.', { title: 'Eliminar operador', type: 'danger', acceptText: 'Sí, eliminar operador' })) return;
     try {
-        const response = await fetch(`${BASE_API_URL}/configuracion/usuarios/${id}`, {
+        const response = await fetch(`${BASE_API_URL}/users/${id}`, {
             method: 'DELETE'
         });
         if (response.ok) {
@@ -8964,7 +9065,6 @@ function initUsuarios() {
     const btnClose = document.getElementById('btn-close-user-modal');
     const btnCancel = document.getElementById('btn-cancel-user');
     const userForm = document.getElementById('user-form');
-    const allowSwitch = document.getElementById('allow-user-creation-switch');
     
     if (btnAdd) {
         btnAdd.addEventListener('click', () => {
@@ -9011,26 +9111,6 @@ function initUsuarios() {
             }
         });
     }
-
-    allowSwitch?.addEventListener('change', async () => {
-        try {
-            const response = await fetch(`${BASE_API_URL}/users/settings`, {
-                method: 'PUT',
-                body: JSON.stringify({ allowUserCreation: allowSwitch.checked })
-            });
-            if (!response.ok) {
-                const err = await response.json().catch(() => ({}));
-                alert(err.error || 'No se pudo actualizar la configuracion.');
-                allowSwitch.checked = !allowSwitch.checked;
-                return;
-            }
-            await loadUsuarios();
-            renderUsuarios();
-        } catch (error) {
-            console.error('Error al actualizar creacion de usuarios:', error);
-            allowSwitch.checked = !allowSwitch.checked;
-        }
-    });
 
     initProfileModal();
 }
@@ -9798,7 +9878,7 @@ function initCotizaciones() {
 
     document.getElementById('btn-delete-quote').addEventListener('click', async () => {
         const id = document.getElementById('quote-detail-id').value;
-        if (confirm('¿Está seguro de eliminar esta cotización?')) {
+        if (await AppUI.confirm('¿Está seguro de eliminar esta cotización? Esta acción no se puede deshacer.', { title: 'Eliminar cotización', type: 'danger', acceptText: 'Sí, eliminar cotización' })) {
             try {
                 const response = await fetch(`${BASE_API_URL}/cotizaciones/${id}`, {
                     method: 'DELETE'
@@ -9819,7 +9899,7 @@ function initCotizaciones() {
 
     document.getElementById('btn-convert-quote').addEventListener('click', async () => {
         const id = document.getElementById('quote-detail-id').value;
-        if (confirm('¿Desea convertir esta cotización en una Orden de Servicio activa? Se creará el cliente y la orden automáticamente.')) {
+        if (await AppUI.confirm('Se creará el cliente y una Orden de Servicio activa automáticamente.', { title: '¿Convertir esta cotización?', type: 'question', acceptText: 'Sí, crear orden' })) {
             try {
                 const response = await fetch(`${BASE_API_URL}/cotizaciones/${id}/convertir`, {
                     method: 'POST'
@@ -10124,7 +10204,7 @@ function initCalendarioEvents() {
 
     document.getElementById('btn-delete-event').addEventListener('click', async () => {
         const id = document.getElementById('event-id').value;
-        if (confirm('¿Está seguro de eliminar este evento?')) {
+        if (await AppUI.confirm('¿Está seguro de eliminar este evento? Esta acción no se puede deshacer.', { title: 'Eliminar evento', type: 'danger', acceptText: 'Sí, eliminar evento' })) {
             try {
                 const response = await fetch(`${BASE_API_URL}/eventos/${id}`, {
                     method: 'DELETE'
