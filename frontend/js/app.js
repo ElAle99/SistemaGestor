@@ -569,6 +569,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initUsuarios();
     initEstablishmentConfigForm();
     initPrinterConfigForm();
+    initConfigExperience();
     initCotizaciones();
     initCalendarioEvents();
     checkSession();
@@ -9558,10 +9559,12 @@ function initEstablishmentConfigForm() {
         if (logoInput) logoInput.value = '';
         setBusinessLogoPreview(DEFAULT_BUSINESS_LOGO, 'Se usará el logo base al guardar');
         applyBusinessBranding();
+        markConfigFormDirty(form);
     });
     
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        setConfigFormSaving(form, true);
         try {
             const logoUrl = await uploadBusinessLogoIfNeeded();
             await saveEstablishmentConfig({
@@ -9579,9 +9582,13 @@ function initEstablishmentConfigForm() {
             });
             if (logoInput) logoInput.value = '';
             setBusinessLogoPreview();
+            markConfigFormSaved(form);
             alert('Configuración del establecimiento guardada con éxito.');
         } catch (err) {
+            markConfigFormError(form, err.message || 'No se pudieron guardar los cambios.');
             alert(err.message || 'No se pudo guardar la configuración del establecimiento.');
+        } finally {
+            setConfigFormSaving(form, false);
         }
     });
 }
@@ -9699,6 +9706,7 @@ function initPrinterConfigForm() {
         if (ticketLogoInput) ticketLogoInput.value = '';
         setTicketLogoPreview(DEFAULT_TICKET_LOGO, 'Se usará el logo base al guardar');
         applyTicketLogoSource();
+        markConfigFormDirty(form);
     });
 
     printerInput?.addEventListener('change', () => {
@@ -9733,6 +9741,7 @@ function initPrinterConfigForm() {
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        setConfigFormSaving(form, true);
 
         try {
             const ticketLogoUrl = await uploadTicketLogoIfNeeded();
@@ -9745,10 +9754,94 @@ function initPrinterConfigForm() {
             if (ticketLogoInput) ticketLogoInput.value = '';
             setTicketLogoPreview();
             if (status) status.innerText = 'Configuración de impresión guardada.';
+            markConfigFormSaved(form);
             alert('Configuración de impresión guardada con éxito.');
         } catch (err) {
+            markConfigFormError(form, err.message || 'No se pudieron guardar los cambios.');
             alert(err.message || 'No se pudo guardar la configuración de impresión.');
+        } finally {
+            setConfigFormSaving(form, false);
         }
+    });
+}
+
+function getConfigFormStatus(form) {
+    return form?.querySelector('.config-save-status');
+}
+
+function markConfigFormDirty(form) {
+    if (!form || form.dataset.saving === 'true') return;
+    form.dataset.dirty = 'true';
+    const status = getConfigFormStatus(form);
+    if (!status) return;
+    status.className = 'config-save-status is-pending';
+    status.innerHTML = '<i class="fa-solid fa-circle"></i> Hay cambios pendientes por guardar';
+}
+
+function markConfigFormSaved(form) {
+    if (!form) return;
+    form.dataset.dirty = 'false';
+    const status = getConfigFormStatus(form);
+    if (!status) return;
+    status.className = 'config-save-status is-saved';
+    status.innerHTML = '<i class="fa-solid fa-circle-check"></i> Cambios guardados correctamente';
+}
+
+function markConfigFormError(form, message) {
+    const status = getConfigFormStatus(form);
+    if (!status) return;
+    status.className = 'config-save-status is-error';
+    status.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> ${escapeHtml(message)}`;
+}
+
+function setConfigFormSaving(form, saving) {
+    if (!form) return;
+    form.dataset.saving = String(saving);
+    const button = form.querySelector('button[type="submit"]');
+    if (!button) return;
+    if (saving) {
+        button.dataset.originalHtml = button.innerHTML;
+        button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
+        button.disabled = true;
+    } else {
+        button.innerHTML = button.dataset.originalHtml || button.innerHTML;
+        button.disabled = false;
+    }
+}
+
+function initConfigExperience() {
+    const view = document.getElementById('view-configuracion');
+    if (!view) return;
+
+    const navItems = [...view.querySelectorAll('.config-nav-item[href^="#"]')];
+    const sections = navItems.map(item => document.querySelector(item.getAttribute('href'))).filter(Boolean);
+
+    navItems.forEach(item => {
+        item.addEventListener('click', event => {
+            event.preventDefault();
+            const target = document.querySelector(item.getAttribute('href'));
+            if (!target) return;
+            navItems.forEach(link => link.classList.toggle('active', link === item));
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+
+    if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver(entries => {
+            const visible = entries.filter(entry => entry.isIntersecting)
+                .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+            if (!visible) return;
+            navItems.forEach(item => {
+                item.classList.toggle('active', item.getAttribute('href') === `#${visible.target.id}`);
+            });
+        }, { rootMargin: '-18% 0px -62% 0px', threshold: [0, .2, .5] });
+        sections.forEach(section => observer.observe(section));
+    }
+
+    view.querySelectorAll('#config-general-form, #config-printer-form').forEach(form => {
+        form.dataset.dirty = 'false';
+        form.addEventListener('input', () => markConfigFormDirty(form));
+        form.addEventListener('change', () => markConfigFormDirty(form));
     });
 }
 
