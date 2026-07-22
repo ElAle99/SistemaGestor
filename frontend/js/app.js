@@ -5576,11 +5576,12 @@ async function printReceipt(size, options = {}) {
             throw new Error('No hay un ticket listo para imprimir.');
         }
 
-        if (typeof html2canvas !== 'function') {
-            throw new Error('No se pudo cargar el generador de imagen del ticket. Recarga el sistema e intenta de nuevo.');
-        }
-
-        await sendReceiptPreviewToPrinter(receiptElement, detectedPaper);
+        // El backend alojado no puede acceder a las impresoras USB del usuario.
+        // El dialogo del navegador imprime en el equipo que abrio la aplicacion.
+        setReceiptPrintSize(detectedPaper);
+        if (document.fonts?.ready) await document.fonts.ready;
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        window.print();
         return true;
     } catch (err) {
         console.error('Error de impresion:', err);
@@ -5699,7 +5700,7 @@ function showSaleSuccessModal(sale, options = {}) {
     if (title) title.textContent = `${saleKind.label} confirmado`;
     if (message) {
         message.textContent = printed
-            ? 'El cobro se registró y el ticket se envió a imprimir con el mismo diseño de la previsualización.'
+            ? 'El cobro se registró y se abrió el diálogo de impresión del equipo.'
             : directMode
                 ? 'El cobro se registró. Revisa la impresora o imprime manualmente el ticket.'
                 : 'El cobro se registró. Puedes imprimir el ticket ahora o revisarlo antes.';
@@ -5714,7 +5715,14 @@ function showSaleSuccessModal(sale, options = {}) {
 
 async function handleCompletedSale(completedVenta) {
     saleSuccessModal?.classList.add('hidden');
-    viewVentaDetails(completedVenta);
+    await viewVentaDetails(completedVenta);
+
+    if (ESTABLISHMENT_CONFIG.autoPrintTicket !== false) {
+        const printed = await printReceipt(null, { silent: false });
+        showSaleSuccessModal(completedVenta, { printed });
+    } else {
+        showSaleSuccessModal(completedVenta, { printed: false });
+    }
 }
 
 window.printReceipt = printReceipt;
@@ -9514,7 +9522,7 @@ function syncConfigForms() {
     if (addressInput) addressInput.value = ESTABLISHMENT_CONFIG.address;
     if (termsTextarea) termsTextarea.value = ESTABLISHMENT_CONFIG.terms;
     if (printerInput) populatePrinterOptions([], ESTABLISHMENT_CONFIG.ticketPrinter || '');
-    if (paperDetected) paperDetected.textContent = getDetectedPaperLabel();
+    if (paperDetected) paperDetected.value = normalizeTicketPaper(ESTABLISHMENT_CONFIG.ticketPaper);
     if (printModeSelect) printModeSelect.value = ESTABLISHMENT_CONFIG.autoPrintTicket !== false ? 'direct' : 'ask';
     setBusinessLogoPreview();
     setTicketLogoPreview();
@@ -9644,7 +9652,9 @@ function getDetectedPaperLabel() {
 
 function refreshDetectedPaperLabel() {
     const paperDetected = document.getElementById('cfg-ticket-paper-detected');
-    if (paperDetected) paperDetected.textContent = getDetectedPaperLabel();
+    if (!paperDetected) return;
+    if (paperDetected.tagName === 'SELECT') paperDetected.value = detectConfiguredTicketPaper();
+    else paperDetected.textContent = getDetectedPaperLabel();
 }
 
 function populatePrinterOptions(printers = [], selectedPrinter = ESTABLISHMENT_CONFIG.ticketPrinter || '') {
@@ -9659,7 +9669,7 @@ function populatePrinterOptions(printers = [], selectedPrinter = ESTABLISHMENT_C
     }
 
     printerSelect.innerHTML = [
-        '<option value="">Impresora predeterminada del sistema</option>',
+        '<option value="">Seleccionar en el dialogo del navegador</option>',
         ...uniqueNames
             .map(printer => `<option value="${escapeHtml(printer)}">${escapeHtml(printer)}</option>`)
     ].join('');
@@ -9682,7 +9692,7 @@ function initPrinterConfigForm() {
     const removeTicketLogoButton = document.getElementById('btn-remove-ticket-logo');
 
     populatePrinterOptions([], ESTABLISHMENT_CONFIG.ticketPrinter || '');
-    if (paperDetected) paperDetected.textContent = getDetectedPaperLabel();
+    if (paperDetected) paperDetected.value = normalizeTicketPaper(ESTABLISHMENT_CONFIG.ticketPaper);
     if (printModeSelect) printModeSelect.value = ESTABLISHMENT_CONFIG.autoPrintTicket !== false ? 'direct' : 'ask';
     setTicketLogoPreview();
 
@@ -9715,6 +9725,11 @@ function initPrinterConfigForm() {
         refreshDetectedPaperLabel();
     });
 
+    paperDetected?.addEventListener('change', () => {
+        ESTABLISHMENT_CONFIG.ticketPaper = normalizeTicketPaper(paperDetected.value);
+        markConfigFormDirty(form);
+    });
+
     async function refreshAvailablePrinters(showStatus = false) {
         if (showStatus && status) status.innerText = 'Buscando impresoras disponibles...';
 
@@ -9736,8 +9751,11 @@ function initPrinterConfigForm() {
         }
     }
 
-    detectButton?.addEventListener('click', () => refreshAvailablePrinters(true));
-    refreshAvailablePrinters(false);
+    detectButton?.addEventListener('click', async () => {
+        if (status) status.innerText = 'Selecciona la impresora instalada en esta computadora desde el dialogo del navegador.';
+        ESTABLISHMENT_CONFIG.ticketPaper = normalizeTicketPaper(paperDetected?.value || ESTABLISHMENT_CONFIG.ticketPaper);
+        await printReceipt(ESTABLISHMENT_CONFIG.ticketPaper, { silent: false });
+    });
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -9747,7 +9765,7 @@ function initPrinterConfigForm() {
             const ticketLogoUrl = await uploadTicketLogoIfNeeded();
             await saveEstablishmentConfig({
                 ticketPrinter: printerInput.value.trim(),
-                ticketPaper: detectConfiguredTicketPaper(),
+                ticketPaper: normalizeTicketPaper(paperDetected?.value || ESTABLISHMENT_CONFIG.ticketPaper),
                 autoPrintTicket: (printModeSelect?.value || 'direct') === 'direct',
                 ticketLogoUrl
             });

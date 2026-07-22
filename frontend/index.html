@@ -1585,14 +1585,17 @@
                                     </div>
                                     <div class="form-row-2">
                                         <div class="form-group">
-                                            <label for="cfg-ticket-printer">Impresora preferida</label>
+                                            <label for="cfg-ticket-printer">Destino de impresión</label>
                                             <select id="cfg-ticket-printer" class="form-select">
-                                                <option value="">Impresora predeterminada del sistema</option>
+                                                <option value="">Seleccionar en el diálogo del navegador</option>
                                             </select>
                                         </div>
                                         <div class="form-group">
-                                            <label>Tamaño detectado</label>
-                                            <div class="form-control" id="cfg-ticket-paper-detected">Se detecta desde la impresora seleccionada</div>
+                                            <label for="cfg-ticket-paper-detected">Tamaño del papel</label>
+                                            <select class="form-select" id="cfg-ticket-paper-detected">
+                                                <option value="80mm">80 mm</option>
+                                                <option value="58mm">58 mm</option>
+                                            </select>
                                         </div>
                                     </div>
                                     <div class="form-row-2">
@@ -1605,15 +1608,15 @@
                                         </div>
                                         <div class="form-group">
                                             <button type="button" class="btn btn-secondary" id="btn-detect-printers">
-                                                <i class="fa-solid fa-magnifying-glass"></i> Detectar impresoras
+                                                <i class="fa-solid fa-print"></i> Probar impresión
                                             </button>
                                         </div>
                                     </div>
                                     <p class="config-help-text" id="printer-config-status">
-                                        Puedes abrir la impresión al terminar el cobro o mostrar una confirmación para decidir en cada venta.
+                                        La impresora se elige en el diálogo del navegador y debe estar instalada en esta computadora.
                                     </p>
                                     <div class="config-form-footer">
-                                        <span class="config-save-status"><i class="fa-solid fa-circle-info"></i> La impresora debe estar instalada en este equipo.</span>
+                                        <span class="config-save-status"><i class="fa-solid fa-circle-info"></i> Compatible con el sistema alojado en Railway.</span>
                                         <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Guardar impresión</button>
                                     </div>
                                 </form>
