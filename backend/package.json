@@ -23,6 +23,7 @@
     "nodemailer": "^9.0.3",
     "pg": "^8.11.3",
     "qrcode": "^1.5.4",
+    "qz-tray": "^2.2.6",
     "recharts": "^3.9.2"
   },
   "devDependencies": {

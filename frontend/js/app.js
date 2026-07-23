@@ -5065,6 +5065,7 @@ const saleSuccessPrintButton = document.getElementById('btn-sale-success-print')
 const saleSuccessPreviewButton = document.getElementById('btn-sale-success-preview');
 const saleSuccessCloseButton = document.getElementById('btn-sale-success-close');
 let AVAILABLE_TICKET_PRINTERS = [];
+let QZ_CONNECT_PROMISE = null;
 const THERMAL_PRINT_DOTS = {
     '80mm': 576,
     '58mm': 360
@@ -5580,7 +5581,7 @@ async function printReceipt(size, options = {}) {
             throw new Error('No se pudo cargar el generador de imagen del ticket. Recarga el sistema e intenta de nuevo.');
         }
 
-        await sendReceiptPreviewToPrinter(receiptElement, detectedPaper);
+        await sendReceiptToConfiguredPrinter(receiptElement, detectedPaper);
         return true;
     } catch (err) {
         console.error('Error de impresion:', err);
@@ -5721,6 +5722,134 @@ async function handleCompletedSale(completedVenta) {
         showSaleSuccessModal(completedVenta, { printed });
     } else {
         showSaleSuccessModal(completedVenta, { printed: false });
+    }
+}
+
+function isQzTrayLoaded() {
+    return typeof qz !== 'undefined' && qz?.websocket && qz?.printers && qz?.configs;
+}
+
+async function connectQzTray() {
+    if (!isQzTrayLoaded()) {
+        const error = new Error('No se cargó el conector de QZ Tray.');
+        error.code = 'QZ_LIBRARY_UNAVAILABLE';
+        throw error;
+    }
+
+    if (qz.websocket.isActive()) return true;
+    if (QZ_CONNECT_PROMISE) return QZ_CONNECT_PROMISE;
+
+    QZ_CONNECT_PROMISE = qz.websocket.connect({ retries: 1, delay: 0 })
+        .then(() => true)
+        .catch(error => {
+            const qzError = new Error('QZ Tray no está instalado, no está abierto o no autorizó la conexión con este dominio.');
+            qzError.code = 'QZ_CONNECTION_UNAVAILABLE';
+            qzError.cause = error;
+            throw qzError;
+        })
+        .finally(() => {
+            QZ_CONNECT_PROMISE = null;
+        });
+
+    return QZ_CONNECT_PROMISE;
+}
+
+async function getQzPrinters() {
+    await connectQzTray();
+
+    let defaultPrinter = '';
+    try {
+        defaultPrinter = await qz.printers.getDefault();
+    } catch (err) {
+        console.warn('QZ Tray no informó la impresora predeterminada:', err);
+    }
+
+    try {
+        const details = await qz.printers.details();
+        if (Array.isArray(details) && details.length) {
+            return details
+                .map(printer => normalizePrinterInfo({
+                    name: printer.name,
+                    isDefault: printer.name === defaultPrinter || printer.default,
+                    paperMm: null,
+                    ticketPaper: null
+                }))
+                .filter(printer => printer.name);
+        }
+    } catch (err) {
+        console.warn('QZ Tray no pudo obtener detalles de impresoras:', err);
+    }
+
+    const printerNames = await qz.printers.find();
+    return (printerNames || [])
+        .map(name => normalizePrinterInfo({
+            name,
+            isDefault: name === defaultPrinter,
+            paperMm: null,
+            ticketPaper: null
+        }))
+        .filter(printer => printer.name);
+}
+
+async function sendReceiptToQzTray(receiptElement, paper) {
+    await connectQzTray();
+
+    const detectedPaper = normalizeTicketPaper(paper);
+    const capture = await captureReceiptPreviewImage(receiptElement, detectedPaper);
+    const printerName = ESTABLISHMENT_CONFIG.ticketPrinter || await qz.printers.getDefault();
+    if (!printerName) {
+        throw new Error('Selecciona una impresora en Configuración antes de imprimir.');
+    }
+
+    const widthMm = detectedPaper === '58mm' ? 58 : 80;
+    const heightMm = Math.max(30, Math.ceil((capture.pixelHeight / THERMAL_PRINT_DPI) * 25.4));
+    const config = qz.configs.create(printerName, {
+        copies: 1,
+        colorType: 'grayscale',
+        jobName: 'AllFix Ticket',
+        margins: 0,
+        orientation: 'portrait',
+        rasterize: true,
+        scaleContent: true,
+        size: { width: widthMm, height: heightMm },
+        units: 'mm'
+    });
+
+    await qz.print(config, [{
+        type: 'pixel',
+        format: 'image',
+        flavor: 'base64',
+        data: capture.imageData.replace(/^data:image\/[a-z0-9.+-]+;base64,/i, '')
+    }]);
+}
+
+async function sendReceiptToConfiguredPrinter(receiptElement, paper) {
+    try {
+        await sendReceiptToQzTray(receiptElement, paper);
+        return;
+    } catch (qzError) {
+        const connectionUnavailable = [
+            'QZ_LIBRARY_UNAVAILABLE',
+            'QZ_CONNECTION_UNAVAILABLE'
+        ].includes(qzError?.code);
+
+        if (!connectionUnavailable) throw qzError;
+        console.warn('QZ Tray no está disponible; se intentará la impresión directa del servidor local.', qzError);
+
+        try {
+            await sendReceiptPreviewToPrinter(receiptElement, paper);
+            return;
+        } catch (backendError) {
+            const backendUnavailable = /solo esta disponible en Windows/i.test(backendError?.message || '');
+            if (!backendUnavailable) throw backendError;
+
+            const error = new Error(
+                'Para imprimir directamente desde el sistema en línea, instala y abre QZ Tray en esta computadora. '
+                + 'Después entra a Configuración > Impresora, pulsa “Detectar impresoras” y autoriza este dominio.'
+            );
+            error.code = 'QZ_REQUIRED';
+            throw error;
+        }
     }
 }
 
@@ -9602,6 +9731,13 @@ function initEstablishmentConfigForm() {
 
 async function detectAvailablePrinters() {
     try {
+        const qzPrinters = await getQzPrinters();
+        if (qzPrinters.length) return qzPrinters;
+    } catch (err) {
+        console.warn('QZ Tray no está disponible en esta computadora:', err);
+    }
+
+    try {
         const response = await fetch(`${BASE_API_URL}/configuracion/impresoras`);
         if (response.ok) {
             const printers = await response.json();
@@ -9668,7 +9804,7 @@ function populatePrinterOptions(printers = [], selectedPrinter = ESTABLISHMENT_C
     }
 
     printerSelect.innerHTML = [
-        '<option value="">Seleccionar en el dialogo del navegador</option>',
+        '<option value="">Selecciona una impresora detectada</option>',
         ...uniqueNames
             .map(printer => `<option value="${escapeHtml(printer)}">${escapeHtml(printer)}</option>`)
     ].join('');
@@ -9750,11 +9886,7 @@ function initPrinterConfigForm() {
         }
     }
 
-    detectButton?.addEventListener('click', async () => {
-        if (status) status.innerText = 'Selecciona la impresora instalada en esta computadora desde el dialogo del navegador.';
-        ESTABLISHMENT_CONFIG.ticketPaper = normalizeTicketPaper(paperDetected?.value || ESTABLISHMENT_CONFIG.ticketPaper);
-        await printReceipt(ESTABLISHMENT_CONFIG.ticketPaper, { silent: false });
-    });
+    detectButton?.addEventListener('click', () => refreshAvailablePrinters(true));
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();

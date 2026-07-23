@@ -1587,7 +1587,7 @@
                                         <div class="form-group">
                                             <label for="cfg-ticket-printer">Destino de impresión</label>
                                             <select id="cfg-ticket-printer" class="form-select">
-                                                <option value="">Seleccionar en el diálogo del navegador</option>
+                                                <option value="">Detectar impresora con QZ Tray</option>
                                             </select>
                                         </div>
                                         <div class="form-group">
@@ -1608,15 +1608,16 @@
                                         </div>
                                         <div class="form-group">
                                             <button type="button" class="btn btn-secondary" id="btn-detect-printers">
-                                                <i class="fa-solid fa-print"></i> Probar impresión
+                                                <i class="fa-solid fa-magnifying-glass"></i> Detectar impresoras
                                             </button>
                                         </div>
                                     </div>
                                     <p class="config-help-text" id="printer-config-status">
-                                        La impresora se elige en el diálogo del navegador y debe estar instalada en esta computadora.
+                                        QZ Tray debe estar instalado y abierto en esta computadora para imprimir directamente desde el dominio.
+                                        <a href="https://qz.io/download/" target="_blank" rel="noopener noreferrer">Descargar QZ Tray</a>
                                     </p>
                                     <div class="config-form-footer">
-                                        <span class="config-save-status"><i class="fa-solid fa-circle-info"></i> Compatible con el sistema alojado en Railway.</span>
+                                        <span class="config-save-status"><i class="fa-solid fa-circle-info"></i> Impresión local mediante QZ Tray.</span>
                                         <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Guardar impresión</button>
                                     </div>
                                 </form>
@@ -3485,13 +3486,14 @@
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/locales/es.global.min.js"></script>
     <script src="/vendor/jsbarcode/JsBarcode.all.min.js"></script>
     <script src="/vendor/html2canvas/html2canvas.min.js"></script>
+    <script src="/vendor/qz-tray/qz-tray.js"></script>
     <script src="/vendor/dayjs/dayjs.min.js"></script>
     <script src="/vendor/dayjs/locale/es.js"></script>
     <script src="/vendor/jspdf/jspdf.umd.min.js"></script>
     <script src="/vendor/jspdf-autotable/jspdf.plugin.autotable.min.js"></script>
 
     <!-- Main System JavaScript Logic -->
-    <script src="js/app.js?v=20260721-users-v2"></script>
+    <script src="js/app.js?v=20260723-qz-tray"></script>
 </body>
 </html>
 

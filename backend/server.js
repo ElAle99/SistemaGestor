@@ -95,6 +95,7 @@ app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use(express.static(frontendPath));
 app.use('/vendor/jsbarcode', express.static(path.join(__dirname, 'node_modules', 'jsbarcode', 'dist')));
 app.use('/vendor/html2canvas', express.static(path.join(__dirname, 'node_modules', 'html2canvas', 'dist')));
+app.use('/vendor/qz-tray', express.static(path.join(__dirname, 'node_modules', 'qz-tray')));
 app.use('/vendor/jspdf', express.static(path.join(__dirname, 'node_modules', 'jspdf', 'dist')));
 app.use('/vendor/jspdf-autotable', express.static(path.join(__dirname, 'node_modules', 'jspdf-autotable', 'dist')));
 app.use('/vendor/dayjs', express.static(path.join(__dirname, 'node_modules', 'dayjs')));
