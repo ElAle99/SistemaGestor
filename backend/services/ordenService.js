@@ -885,6 +885,9 @@ async function createOrden(data) {
   const apellidoPaterno = normalizeTextValue(data.clientLastNamePaternal || data.apellido_paterno);
   const apellidoMaterno = normalizeTextValue(data.clientLastNameMaternal || data.apellido_materno);
   const telefonoCliente = normalizeTextValue(data.clientPhone || data.telefono);
+  const telefonoAlternativo1 = normalizeTextValue(data.clientPhoneAlt1 || data.telefono_alt1 || data.telefono_alternativo_1);
+  const telefonoAlternativo2 = normalizeTextValue(data.clientPhoneAlt2 || data.telefono_alt2 || data.telefono_alternativo_2);
+  const telefonoAlternativo3 = normalizeTextValue(data.clientPhoneAlt3 || data.telefono_alt3 || data.telefono_alternativo_3);
   const contactoPreferido = normalizeTextValue(data.clientPreferredContact || data.contacto_preferido);
   const nombreParaCliente = nombresCliente || nombreCliente;
   let clienteId = data.clientId ? parseInt(data.clientId, 10) : null;
@@ -898,13 +901,21 @@ async function createOrden(data) {
     });
     if (duplicate?.type === 'strong') {
       clienteId = duplicate.cliente.id;
+      await pool.query(
+        `UPDATE clientes SET
+          telefono_alternativo_1 = COALESCE($1, telefono_alternativo_1),
+          telefono_alternativo_2 = COALESCE($2, telefono_alternativo_2),
+          telefono_alternativo_3 = COALESCE($3, telefono_alternativo_3)
+         WHERE id = $4`,
+        [telefonoAlternativo1, telefonoAlternativo2, telefonoAlternativo3, clienteId]
+      );
     }
 
     if (!clienteId) {
       const createdClient = await pool.query(
-        `INSERT INTO clientes (nombre, apellido_paterno, apellido_materno, telefono_principal, correo, direccion, contacto_preferido, notas)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-        [nombreParaCliente, apellidoPaterno, apellidoMaterno, telefonoCliente, data.clientEmail || data.email || null, data.clientAddress || data.direccion || null, contactoPreferido, data.clientRemarks || data.observaciones || null]
+        `INSERT INTO clientes (nombre, apellido_paterno, apellido_materno, telefono_principal, telefono_alternativo_1, telefono_alternativo_2, telefono_alternativo_3, correo, direccion, contacto_preferido, notas)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+        [nombreParaCliente, apellidoPaterno, apellidoMaterno, telefonoCliente, telefonoAlternativo1, telefonoAlternativo2, telefonoAlternativo3, data.clientEmail || data.email || null, data.clientAddress || data.direccion || null, contactoPreferido, data.clientRemarks || data.observaciones || null]
       );
       clienteId = createdClient.rows[0].id;
     }
@@ -915,12 +926,15 @@ async function createOrden(data) {
         apellido_paterno = COALESCE($2, apellido_paterno),
         apellido_materno = COALESCE($3, apellido_materno),
         telefono_principal = COALESCE($4, telefono_principal),
-        correo = COALESCE($5, correo),
-        direccion = COALESCE($6, direccion),
-        contacto_preferido = COALESCE($7, contacto_preferido),
-        notas = COALESCE($8, notas)
-       WHERE id = $9`,
-      [nombreParaCliente, apellidoPaterno, apellidoMaterno, telefonoCliente, data.clientEmail || data.email || null, data.clientAddress || data.direccion || null, contactoPreferido, data.clientRemarks || data.observaciones || null, clienteId]
+        telefono_alternativo_1 = COALESCE($5, telefono_alternativo_1),
+        telefono_alternativo_2 = COALESCE($6, telefono_alternativo_2),
+        telefono_alternativo_3 = COALESCE($7, telefono_alternativo_3),
+        correo = COALESCE($8, correo),
+        direccion = COALESCE($9, direccion),
+        contacto_preferido = COALESCE($10, contacto_preferido),
+        notas = COALESCE($11, notas)
+       WHERE id = $12`,
+      [nombreParaCliente, apellidoPaterno, apellidoMaterno, telefonoCliente, telefonoAlternativo1, telefonoAlternativo2, telefonoAlternativo3, data.clientEmail || data.email || null, data.clientAddress || data.direccion || null, contactoPreferido, data.clientRemarks || data.observaciones || null, clienteId]
     );
   }
 
@@ -1062,6 +1076,9 @@ async function updateOrden(id, data) {
   const apellidoPaterno = normalizeTextValue(data.clientLastNamePaternal || data.apellido_paterno);
   const apellidoMaterno = normalizeTextValue(data.clientLastNameMaternal || data.apellido_materno);
   const telefonoCliente = normalizeTextValue(data.clientPhone || data.telefono);
+  const telefonoAlternativo1 = normalizeTextValue(data.clientPhoneAlt1 || data.telefono_alt1 || data.telefono_alternativo_1);
+  const telefonoAlternativo2 = normalizeTextValue(data.clientPhoneAlt2 || data.telefono_alt2 || data.telefono_alternativo_2);
+  const telefonoAlternativo3 = normalizeTextValue(data.clientPhoneAlt3 || data.telefono_alt3 || data.telefono_alternativo_3);
   const contactoPreferido = normalizeTextValue(data.clientPreferredContact || data.contacto_preferido);
   const emailCliente = data.clientEmail || data.email || null;
   const direccionCliente = data.clientAddress || data.direccion || null;
@@ -1072,11 +1089,11 @@ async function updateOrden(id, data) {
     if (!Number.isNaN(parsedClientId)) clienteId = parsedClientId;
   }
 
-  if (nombreCliente || apellidoPaterno || apellidoMaterno || telefonoCliente || contactoPreferido || emailCliente || direccionCliente || observacionesCliente) {
+  if (nombreCliente || apellidoPaterno || apellidoMaterno || telefonoCliente || telefonoAlternativo1 || telefonoAlternativo2 || telefonoAlternativo3 || contactoPreferido || emailCliente || direccionCliente || observacionesCliente) {
     if (clienteId) {
       await pool.query(
-        `UPDATE clientes SET nombre = COALESCE($1, nombre), apellido_paterno = COALESCE($2, apellido_paterno), apellido_materno = COALESCE($3, apellido_materno), telefono_principal = COALESCE($4, telefono_principal), correo = COALESCE($5, correo), direccion = COALESCE($6, direccion), contacto_preferido = COALESCE($7, contacto_preferido), notas = COALESCE($8, notas) WHERE id = $9`,
-        [nombresCliente, apellidoPaterno, apellidoMaterno, telefonoCliente, emailCliente, direccionCliente, contactoPreferido, observacionesCliente, clienteId]
+        `UPDATE clientes SET nombre = COALESCE($1, nombre), apellido_paterno = COALESCE($2, apellido_paterno), apellido_materno = COALESCE($3, apellido_materno), telefono_principal = COALESCE($4, telefono_principal), telefono_alternativo_1 = COALESCE($5, telefono_alternativo_1), telefono_alternativo_2 = COALESCE($6, telefono_alternativo_2), telefono_alternativo_3 = COALESCE($7, telefono_alternativo_3), correo = COALESCE($8, correo), direccion = COALESCE($9, direccion), contacto_preferido = COALESCE($10, contacto_preferido), notas = COALESCE($11, notas) WHERE id = $12`,
+        [nombresCliente, apellidoPaterno, apellidoMaterno, telefonoCliente, telefonoAlternativo1, telefonoAlternativo2, telefonoAlternativo3, emailCliente, direccionCliente, contactoPreferido, observacionesCliente, clienteId]
       );
     } else if (telefonoCliente) {
       const duplicate = await findDuplicateCliente({
@@ -1089,15 +1106,15 @@ async function updateOrden(id, data) {
         clienteId = duplicate.cliente.id;
       } else {
         const createdClient = await pool.query(
-          `INSERT INTO clientes (nombre, apellido_paterno, apellido_materno, telefono_principal, correo, direccion, contacto_preferido, notas) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-          [nombresCliente || 'Cliente sin nombre', apellidoPaterno, apellidoMaterno, telefonoCliente, emailCliente, direccionCliente, contactoPreferido, observacionesCliente]
+          `INSERT INTO clientes (nombre, apellido_paterno, apellido_materno, telefono_principal, telefono_alternativo_1, telefono_alternativo_2, telefono_alternativo_3, correo, direccion, contacto_preferido, notas) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+          [nombresCliente || 'Cliente sin nombre', apellidoPaterno, apellidoMaterno, telefonoCliente, telefonoAlternativo1, telefonoAlternativo2, telefonoAlternativo3, emailCliente, direccionCliente, contactoPreferido, observacionesCliente]
         );
         clienteId = createdClient.rows[0].id;
       }
     } else {
       const createdClient = await pool.query(
-        `INSERT INTO clientes (nombre, apellido_paterno, apellido_materno, telefono_principal, correo, direccion, contacto_preferido, notas) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-        [nombresCliente || 'Cliente sin nombre', apellidoPaterno, apellidoMaterno, null, emailCliente, direccionCliente, contactoPreferido, observacionesCliente]
+        `INSERT INTO clientes (nombre, apellido_paterno, apellido_materno, telefono_principal, telefono_alternativo_1, telefono_alternativo_2, telefono_alternativo_3, correo, direccion, contacto_preferido, notas) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+        [nombresCliente || 'Cliente sin nombre', apellidoPaterno, apellidoMaterno, null, telefonoAlternativo1, telefonoAlternativo2, telefonoAlternativo3, emailCliente, direccionCliente, contactoPreferido, observacionesCliente]
       );
       clienteId = createdClient.rows[0].id;
     }

@@ -5576,12 +5576,11 @@ async function printReceipt(size, options = {}) {
             throw new Error('No hay un ticket listo para imprimir.');
         }
 
-        // El backend alojado no puede acceder a las impresoras USB del usuario.
-        // El dialogo del navegador imprime en el equipo que abrio la aplicacion.
-        setReceiptPrintSize(detectedPaper);
-        if (document.fonts?.ready) await document.fonts.ready;
-        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        window.print();
+        if (typeof html2canvas !== 'function') {
+            throw new Error('No se pudo cargar el generador de imagen del ticket. Recarga el sistema e intenta de nuevo.');
+        }
+
+        await sendReceiptPreviewToPrinter(receiptElement, detectedPaper);
         return true;
     } catch (err) {
         console.error('Error de impresion:', err);
@@ -5700,7 +5699,7 @@ function showSaleSuccessModal(sale, options = {}) {
     if (title) title.textContent = `${saleKind.label} confirmado`;
     if (message) {
         message.textContent = printed
-            ? 'El cobro se registró y se abrió el diálogo de impresión del equipo.'
+            ? 'El cobro se registró y el ticket se envió directamente a la impresora.'
             : directMode
                 ? 'El cobro se registró. Revisa la impresora o imprime manualmente el ticket.'
                 : 'El cobro se registró. Puedes imprimir el ticket ahora o revisarlo antes.';
