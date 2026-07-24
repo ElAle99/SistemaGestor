@@ -1469,6 +1469,820 @@ a:hover {
     background: #f8fbff;
 }
 
+/* Orden de servicio con apariencia de recibo térmico clásico. */
+#ticket-recepcion-container.ticket-service-receipt {
+    width: 72mm;
+    padding: 5mm 4mm 6mm;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #111111;
+}
+
+#ticket-recepcion-container .ticket-main-header {
+    padding: 4mm 0 4mm;
+    text-align: center;
+}
+
+#ticket-recepcion-container .ticket-main-header h2 {
+    margin: 0 0 3mm;
+    font-size: 21px;
+    line-height: 1;
+    font-weight: 900;
+    letter-spacing: .2px;
+}
+
+#ticket-recepcion-container .ticket-whatsapp {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2mm;
+    margin: 0 0 2.5mm !important;
+    font-size: 17px !important;
+    line-height: 1 !important;
+    font-weight: 700;
+}
+
+#ticket-recepcion-container .ticket-whatsapp i {
+    display: inline-block !important;
+    font-size: 19px;
+}
+
+#ticket-recepcion-container .ticket-business-info {
+    margin: 0 auto 3mm !important;
+    font-size: 10px !important;
+    line-height: 1.35;
+    font-weight: 500;
+}
+
+#ticket-recepcion-container .ticket-social-icons {
+    gap: 10mm;
+    margin: 0 0 1.5mm;
+}
+
+#ticket-recepcion-container .ticket-social-icons i {
+    font-size: 21px;
+}
+
+#ticket-recepcion-container .ticket-social-handle {
+    margin: 0 !important;
+    font-size: 13px !important;
+    line-height: 1;
+    font-weight: 700;
+}
+
+#ticket-recepcion-container .ticket-meta-block {
+    padding: 3mm 0;
+}
+
+#ticket-recepcion-container .ticket-label-pill {
+    margin: 0 0 2mm;
+    font-size: 16px;
+    line-height: 1;
+    text-transform: none;
+}
+
+#ticket-recepcion-container .ticket-folio-barcode-frame {
+    min-height: 12mm;
+    margin: 0 auto;
+}
+
+#ticket-recepcion-container .ticket-folio-number {
+    margin: 1mm 0 2.5mm;
+    font-size: 14px;
+    letter-spacing: .5px;
+}
+
+#ticket-recepcion-container .ticket-reception-date {
+    padding-top: 2mm;
+}
+
+#ticket-recepcion-container .ticket-section-data {
+    min-height: 0;
+    padding: 3mm 0;
+}
+
+#ticket-recepcion-container .ticket-section-data h4 {
+    display: block;
+    margin: 0 0 2mm;
+    padding: 0;
+    font-size: 13px;
+    line-height: 1;
+    font-weight: 900;
+    text-align: left;
+    text-transform: none;
+}
+
+#ticket-recepcion-container .ticket-section-data h4 i {
+    display: none !important;
+}
+
+#ticket-recepcion-container .ticket-section-data p {
+    margin: 0 0 1.2mm;
+    font-size: 10px;
+    line-height: 1.28;
+}
+
+#ticket-recepcion-container .ticket-section-data p:last-child {
+    margin-bottom: 0;
+}
+
+#ticket-recepcion-container .ticket-section-data p strong {
+    display: inline;
+    min-width: 0;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-main-header {
+    padding: 18px 0 16px !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-main-header h2 {
+    margin-bottom: 16px !important;
+    font-size: 34px !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-whatsapp {
+    gap: 10px !important;
+    margin-bottom: 12px !important;
+    font-size: 28px !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-whatsapp i {
+    display: inline-block !important;
+    font-size: 32px !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-business-info {
+    margin-bottom: 15px !important;
+    font-size: 18px !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-social-icons {
+    gap: 48px !important;
+    margin-bottom: 8px !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-social-icons i {
+    font-size: 35px !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-social-handle {
+    font-size: 24px !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-section-data {
+    min-height: 0 !important;
+    padding: 14px 0 !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-section-data h4 {
+    margin-bottom: 9px !important;
+    font-size: 23px !important;
+    text-align: left !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-section-data h4 i {
+    display: none !important;
+}
+
+/* Prioridad final del ticket de venta para vista previa, QZ Tray e impresión normal. */
+#ticket-venta-container.ticket-sale-receipt {
+    padding: 5mm 4mm 6mm !important;
+    color: #000000 !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+}
+
+#ticket-venta-container .ticket-main-header h2 {
+    display: block !important;
+    margin: 0 0 3mm !important;
+    color: #000000 !important;
+    font-size: 21px !important;
+    font-weight: 900 !important;
+}
+
+#ticket-venta-container .ticket-sale-phone {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 2mm;
+    margin: 0 0 2mm !important;
+    color: #000000 !important;
+    font-size: 17px !important;
+    font-weight: 900 !important;
+}
+
+#ticket-venta-container .ticket-sale-phone i {
+    display: inline-block !important;
+    color: #000000 !important;
+    font-size: 19px !important;
+}
+
+#ticket-venta-container .ticket-business-info {
+    display: block !important;
+    margin: 0 auto 2.5mm !important;
+    color: #000000 !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    white-space: pre-line;
+}
+
+#ticket-venta-container .ticket-social-info,
+#ticket-venta-container .ticket-social-row,
+#ticket-venta-container .ticket-social-value {
+    color: #000000 !important;
+    font-weight: 900 !important;
+}
+
+#ticket-venta-container .ticket-meta-block,
+#ticket-venta-container .ticket-section-data {
+    padding: 3mm 0 !important;
+    border-bottom: 2px solid #000000 !important;
+}
+
+#ticket-venta-container .ticket-label-pill,
+#ticket-venta-container .ticket-section-data h4 {
+    color: #000000 !important;
+    background: #ffffff !important;
+    font-size: 12px !important;
+    font-weight: 900 !important;
+}
+
+#ticket-venta-container #ticket-venta-items-table,
+#ticket-venta-container #ticket-venta-items-table th,
+#ticket-venta-container #ticket-venta-items-table td,
+#ticket-venta-container #ticket-venta-items-table small {
+    color: #000000 !important;
+    background: #ffffff !important;
+    font-weight: 700 !important;
+}
+
+#ticket-venta-container #ticket-venta-items-table th,
+#ticket-venta-container .ticket-sale-group-row td {
+    font-weight: 900 !important;
+}
+
+#ticket-venta-container .ticket-payment-summary p,
+#ticket-venta-container .ticket-payment-summary p strong,
+#ticket-venta-container .ticket-payment-summary p span {
+    color: #000000 !important;
+    font-weight: 900 !important;
+}
+
+#ticket-venta-container .ticket-payment-summary p:nth-child(4) {
+    margin-top: 2mm !important;
+    padding-top: 2mm !important;
+    border-top: 2px solid #000000 !important;
+    font-size: 14px !important;
+}
+
+.receipt-capture-stage #ticket-venta-container,
+.receipt-capture-stage #ticket-venta-container *,
+html.receipt-print-58mm #ticket-venta-container,
+html.receipt-print-58mm #ticket-venta-container * {
+    color: #000000 !important;
+    border-color: #000000 !important;
+    opacity: 1 !important;
+}
+
+/* Alto contraste para impresión térmica directa y desde el navegador. */
+.receipt-capture-stage #ticket-recepcion-container,
+.receipt-capture-stage #ticket-recepcion-container * {
+    color: #000000 !important;
+    border-color: #000000 !important;
+    opacity: 1 !important;
+    text-rendering: geometricPrecision;
+}
+
+.receipt-capture-stage #ticket-recepcion-container .ticket-main-header h2,
+.receipt-capture-stage #ticket-recepcion-container .ticket-whatsapp,
+.receipt-capture-stage #ticket-recepcion-container .ticket-social-handle,
+.receipt-capture-stage #ticket-recepcion-container .ticket-label-pill,
+.receipt-capture-stage #ticket-recepcion-container .ticket-folio-number,
+.receipt-capture-stage #ticket-recepcion-container .ticket-section-data h4,
+.receipt-capture-stage #ticket-recepcion-container .ticket-section-data p strong,
+.receipt-capture-stage #ticket-recepcion-container .ticket-outstanding {
+    font-weight: 900 !important;
+}
+
+.receipt-capture-stage #ticket-recepcion-container .ticket-business-info,
+.receipt-capture-stage #ticket-recepcion-container .ticket-section-data p,
+.receipt-capture-stage #ticket-recepcion-container .ticket-date,
+.receipt-capture-stage #ticket-recepcion-container .ticket-legal-text,
+.receipt-capture-stage #ticket-recepcion-container .ticket-order-footer {
+    font-weight: 700 !important;
+}
+
+.receipt-capture-stage #ticket-recepcion-container .ticket-main-header,
+.receipt-capture-stage #ticket-recepcion-container .ticket-meta-block,
+.receipt-capture-stage #ticket-recepcion-container .ticket-section-data,
+.receipt-capture-stage #ticket-recepcion-container .ticket-reception-date {
+    border-bottom-width: 2px !important;
+}
+
+.receipt-capture-stage #ticket-recepcion-container .ticket-folio-barcode {
+    filter: contrast(200%);
+    shape-rendering: crispEdges;
+}
+
+@media print {
+    #ticket-recepcion-container,
+    #ticket-recepcion-container * {
+        color: #000000 !important;
+        border-color: #000000 !important;
+        opacity: 1 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    #ticket-recepcion-container .ticket-main-header h2,
+    #ticket-recepcion-container .ticket-whatsapp,
+    #ticket-recepcion-container .ticket-social-handle,
+    #ticket-recepcion-container .ticket-label-pill,
+    #ticket-recepcion-container .ticket-folio-number,
+    #ticket-recepcion-container .ticket-section-data h4,
+    #ticket-recepcion-container .ticket-section-data p strong {
+        font-weight: 900 !important;
+    }
+
+    #ticket-recepcion-container .ticket-business-info,
+    #ticket-recepcion-container .ticket-section-data p,
+    #ticket-recepcion-container .ticket-date,
+    #ticket-recepcion-container .ticket-legal-text {
+        font-weight: 700 !important;
+    }
+}
+
+/* Ticket de venta: encabezado dinámico y salida térmica fuerte. */
+#ticket-venta-container.ticket-sale-receipt {
+    padding: 5mm 4mm 6mm;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #000000;
+}
+
+#ticket-venta-container .ticket-main-header {
+    padding: 3mm 0 4mm;
+}
+
+#ticket-venta-container .ticket-main-header h2 {
+    display: block;
+    margin: 0 0 3mm;
+    font-size: 21px;
+    line-height: 1;
+    font-weight: 900;
+}
+
+#ticket-venta-container .ticket-sale-phone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2mm;
+    margin: 0 0 2mm !important;
+    font-size: 17px !important;
+    line-height: 1 !important;
+    font-weight: 900;
+}
+
+#ticket-venta-container .ticket-sale-phone i {
+    display: inline-block !important;
+    font-size: 19px;
+}
+
+#ticket-venta-container .ticket-business-info {
+    margin: 0 auto 2.5mm !important;
+    color: #000000;
+    font-size: 10px !important;
+    line-height: 1.35;
+    font-weight: 700;
+    white-space: pre-line;
+}
+
+#ticket-venta-container .ticket-social-info {
+    margin: 0 auto !important;
+    color: #000000;
+    font-size: 9.5px !important;
+    font-weight: 900;
+}
+
+#ticket-venta-container .ticket-social-row,
+#ticket-venta-container .ticket-social-value {
+    color: #000000;
+    font-weight: 900;
+}
+
+#ticket-venta-container .ticket-meta-block,
+#ticket-venta-container .ticket-section-data {
+    padding: 3mm 0;
+    border-bottom: 2px solid #000000 !important;
+}
+
+#ticket-venta-container .ticket-label-pill,
+#ticket-venta-container .ticket-section-data h4 {
+    color: #000000;
+    background: #ffffff;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+#ticket-venta-container .ticket-folio-number {
+    font-size: 17px;
+    font-weight: 900;
+}
+
+#ticket-venta-container #ticket-venta-items-table,
+#ticket-venta-container #ticket-venta-items-table th,
+#ticket-venta-container #ticket-venta-items-table td,
+#ticket-venta-container #ticket-venta-items-table small {
+    color: #000000;
+    background: #ffffff;
+    font-size: 9px;
+    line-height: 1.25;
+    font-weight: 700;
+}
+
+#ticket-venta-container #ticket-venta-items-table th,
+#ticket-venta-container .ticket-sale-group-row td {
+    font-weight: 900;
+}
+
+#ticket-venta-container #ticket-venta-items-table th,
+#ticket-venta-container #ticket-venta-items-table td {
+    padding: 1.5mm .5mm;
+    border-bottom: 1px solid #000000 !important;
+}
+
+#ticket-venta-container .ticket-payment-summary p {
+    color: #000000;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+#ticket-venta-container .ticket-payment-summary p strong,
+#ticket-venta-container .ticket-payment-summary p span {
+    color: #000000;
+    font-weight: 900;
+}
+
+#ticket-venta-container .ticket-payment-summary p:nth-child(4) {
+    margin-top: 2mm !important;
+    padding-top: 2mm;
+    border-top: 2px solid #000000;
+    font-size: 14px !important;
+}
+
+#ticket-venta-container .ticket-commitment,
+#ticket-venta-container .ticket-thanks {
+    color: #000000;
+    font-weight: 900;
+}
+
+.receipt-capture-stage #ticket-venta-container,
+.receipt-capture-stage #ticket-venta-container * {
+    color: #000000 !important;
+    border-color: #000000 !important;
+    opacity: 1 !important;
+}
+
+.receipt-capture-stage #ticket-venta-container .ticket-main-header h2,
+.receipt-capture-stage #ticket-venta-container .ticket-sale-phone,
+.receipt-capture-stage #ticket-venta-container .ticket-social-value,
+.receipt-capture-stage #ticket-venta-container .ticket-label-pill,
+.receipt-capture-stage #ticket-venta-container .ticket-folio-number,
+.receipt-capture-stage #ticket-venta-container .ticket-section-data h4,
+.receipt-capture-stage #ticket-venta-container #ticket-venta-items-table th,
+.receipt-capture-stage #ticket-venta-container .ticket-payment-summary strong,
+.receipt-capture-stage #ticket-venta-container .ticket-payment-summary span {
+    font-weight: 900 !important;
+}
+
+@media print {
+    #ticket-venta-container,
+    #ticket-venta-container * {
+        color: #000000 !important;
+        border-color: #000000 !important;
+        opacity: 1 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    #ticket-venta-container .ticket-main-header h2,
+    #ticket-venta-container .ticket-sale-phone,
+    #ticket-venta-container .ticket-social-value,
+    #ticket-venta-container .ticket-label-pill,
+    #ticket-venta-container .ticket-folio-number,
+    #ticket-venta-container .ticket-section-data h4,
+    #ticket-venta-container #ticket-venta-items-table th,
+    #ticket-venta-container .ticket-payment-summary strong,
+    #ticket-venta-container .ticket-payment-summary span {
+        font-weight: 900 !important;
+    }
+}
+
+/* Orden de servicio: composición inspirada en el comprobante impreso de Allfix. */
+#ticket-recepcion-container.ticket-service-receipt {
+    width: 72mm;
+    padding: 3.5mm 4mm 4mm;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 9.5px;
+    line-height: 1.25;
+}
+
+#ticket-recepcion-container .ticket-main-header {
+    margin: 0;
+    padding: 2px 0 7px;
+    border-bottom: 1px dashed #000000 !important;
+}
+
+#ticket-recepcion-container .ticket-social-icons {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8mm;
+    margin: 5px 0 3px;
+}
+
+#ticket-recepcion-container .ticket-social-icons i {
+    font-size: 18px;
+}
+
+#ticket-recepcion-container .ticket-social-handle,
+#ticket-recepcion-container .ticket-whatsapp {
+    margin: 2px 0 !important;
+    font-size: 9px !important;
+    font-weight: 700;
+}
+
+#ticket-recepcion-container .ticket-whatsapp {
+    margin-top: 5px !important;
+}
+
+#ticket-recepcion-container .ticket-main-header h2 {
+    display: block !important;
+    margin: 0;
+    font-size: 17px;
+    letter-spacing: 1px;
+}
+
+#ticket-recepcion-container .ticket-business-info {
+    display: block !important;
+    margin-top: 5px !important;
+    font-size: 9px !important;
+    line-height: 1.3;
+    font-weight: 500;
+    white-space: pre-line;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-business-info,
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-social-handle,
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-whatsapp {
+    display: block !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 18px !important;
+    line-height: 1.2 !important;
+    text-align: center !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-social-icons {
+    gap: 42px !important;
+    margin: 10px 0 6px !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-social-icons i {
+    font-size: 34px !important;
+}
+
+#ticket-recepcion-container .ticket-meta-block {
+    padding: 5px 0 6px;
+    border-bottom: 1px dashed #000000 !important;
+}
+
+#ticket-recepcion-container .ticket-label-pill {
+    margin: 0 0 1px;
+    font-size: 14px;
+    line-height: 1.05;
+}
+
+#ticket-recepcion-container .ticket-folio-caption {
+    display: block;
+    font-size: 13px;
+    line-height: 1;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+#ticket-recepcion-container .ticket-folio-barcode-frame {
+    width: 55mm;
+    min-height: 11mm;
+    margin: 2px auto 0;
+    padding: 0;
+}
+
+#ticket-recepcion-container .ticket-folio-barcode {
+    width: 55mm;
+}
+
+#ticket-recepcion-container .ticket-folio-number {
+    margin: 0 0 5px;
+    font-size: 13px;
+}
+
+#ticket-recepcion-container .ticket-reception-date {
+    width: 100%;
+    padding-top: 4px;
+    border-top: 1px dashed #000000;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+#ticket-recepcion-container .ticket-reception-date strong {
+    display: block;
+    font-size: 10px;
+}
+
+#ticket-recepcion-container .ticket-reception-date .ticket-date {
+    font-size: 9.5px;
+    font-weight: 500;
+    text-transform: none;
+}
+
+#ticket-recepcion-container .ticket-section-data {
+    position: relative;
+    padding: 6px 0 6px 10mm;
+    min-height: 10mm;
+    border-bottom: 1px dashed #000000 !important;
+}
+
+#ticket-recepcion-container .ticket-section-data h4 {
+    position: static;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    width: 100%;
+    margin: 0 0 3px;
+    padding: 0;
+    font-size: 10px;
+    text-align: left;
+}
+
+#ticket-recepcion-container .ticket-section-data h4 i {
+    position: absolute;
+    left: 0;
+    top: 7px;
+    display: grid !important;
+    place-items: center;
+    width: 8mm;
+    height: 8mm;
+    font-size: 22px;
+}
+
+#ticket-recepcion-container .ticket-section-data h4 span {
+    display: inline;
+}
+
+#ticket-recepcion-container .ticket-section-data p {
+    margin: 0 0 2px;
+    font-size: 9px;
+    line-height: 1.25;
+}
+
+#ticket-recepcion-container .ticket-section-data p > i {
+    display: none !important;
+}
+
+#ticket-recepcion-container .ticket-section-data p strong {
+    display: inline-block;
+    min-width: 21mm;
+}
+
+#ticket-recepcion-container .ticket-money-section p {
+    display: flex !important;
+    justify-content: space-between;
+}
+
+#ticket-recepcion-container .ticket-money-section p strong {
+    min-width: 0;
+}
+
+#ticket-recepcion-container .ticket-cost-total {
+    margin-top: 3px !important;
+    padding-top: 3px;
+    border-top: 1px dashed #000000;
+    font-weight: 900;
+}
+
+#ticket-recepcion-container .ticket-outstanding {
+    margin: 3px 0 0 !important;
+    padding: 3px 0 0;
+    border: 0;
+    border-top: 1px solid #000000;
+    font-size: 10px !important;
+}
+
+#ticket-recepcion-container .ticket-outstanding span {
+    font-size: 10px;
+}
+
+#ticket-recepcion-container .ticket-commitment-date p,
+#ticket-recepcion-container .ticket-order-observations p {
+    display: block !important;
+}
+
+#ticket-recepcion-container .ticket-commitment-date p {
+    font-size: 10px;
+    font-weight: 700;
+}
+
+#ticket-recepcion-container .ticket-legal-text {
+    margin: 6px 0 0;
+    padding: 5px 0;
+    border: 0;
+    border-bottom: 1px dashed #000000;
+    font-size: 7.5px;
+    text-align: center;
+}
+
+#ticket-recepcion-container .ticket-signature-section {
+    padding-top: 11px;
+}
+
+#ticket-recepcion-container .ticket-order-footer {
+    padding-top: 6px;
+    text-align: center;
+}
+
+#ticket-recepcion-container .ticket-order-footer strong,
+#ticket-recepcion-container .ticket-order-footer span {
+    display: block;
+}
+
+#ticket-recepcion-container .ticket-order-footer strong {
+    font-size: 10px;
+    font-style: italic;
+}
+
+#ticket-recepcion-container .ticket-order-footer span {
+    margin-top: 2px;
+    font-size: 8px;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-section-data {
+    padding-left: 58px !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-section-data h4 {
+    text-align: left !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-section-data h4 i {
+    display: grid !important;
+    width: 48px !important;
+    height: 48px !important;
+    font-size: 38px !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-order-footer {
+    font-family: Consolas, "Courier New", monospace !important;
+    font-size: 16px !important;
+}
+
+.printer-status-panel,
+.printer-config-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.printer-status-panel {
+    justify-content: space-between;
+    padding: 12px 14px;
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 10px;
+    background: #f8fafc;
+}
+
+.qz-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 0.84rem;
+}
+
+.qz-status-connected {
+    color: #166534;
+    background: #dcfce7;
+}
+
+.qz-status-connecting {
+    color: #854d0e;
+    background: #fef9c3;
+}
+
+.qz-status-disconnected,
+.qz-status-unavailable {
+    color: #991b1b;
+    background: #fee2e2;
+}
+
 .ticket-logo-preview-box {
     width: 100%;
     height: 104px;
@@ -12045,4 +12859,287 @@ body {
     html.receipt-print-58mm #ticket-venta-items-table small {
         font-size: 6.8px !important;
     }
+}
+
+/* Prioridad definitiva del ticket de venta para 58 mm, 80 mm y QZ Tray. */
+#ticket-venta-container.ticket-sale-receipt {
+    padding: 5mm 4mm 6mm !important;
+    color: #000000 !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+}
+
+#ticket-venta-container .ticket-main-header h2 {
+    display: block !important;
+    margin: 0 0 3mm !important;
+    color: #000000 !important;
+    font-size: 21px !important;
+    font-weight: 900 !important;
+}
+
+#ticket-venta-container .ticket-sale-phone {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 2mm;
+    margin: 0 0 2mm !important;
+    color: #000000 !important;
+    font-size: 17px !important;
+    font-weight: 900 !important;
+}
+
+#ticket-venta-container .ticket-sale-phone i {
+    display: inline-block !important;
+    color: #000000 !important;
+    font-size: 19px !important;
+}
+
+#ticket-venta-container .ticket-business-info {
+    display: block !important;
+    margin: 0 auto 2.5mm !important;
+    color: #000000 !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    white-space: pre-line;
+}
+
+#ticket-venta-container .ticket-social-info,
+#ticket-venta-container .ticket-social-row,
+#ticket-venta-container .ticket-social-value {
+    color: #000000 !important;
+    font-weight: 900 !important;
+}
+
+#ticket-venta-container .ticket-meta-block,
+#ticket-venta-container .ticket-section-data {
+    padding: 3mm 0 !important;
+    border-bottom: 2px solid #000000 !important;
+}
+
+#ticket-venta-container .ticket-label-pill,
+#ticket-venta-container .ticket-section-data h4,
+#ticket-venta-container #ticket-venta-items-table th,
+#ticket-venta-container .ticket-sale-group-row td,
+#ticket-venta-container .ticket-payment-summary p,
+#ticket-venta-container .ticket-payment-summary strong,
+#ticket-venta-container .ticket-payment-summary span {
+    color: #000000 !important;
+    font-weight: 900 !important;
+}
+
+#ticket-venta-container .ticket-payment-summary p:nth-child(4) {
+    margin-top: 2mm !important;
+    padding-top: 2mm !important;
+    border-top: 2px solid #000000 !important;
+    font-size: 14px !important;
+}
+
+.receipt-capture-stage #ticket-venta-container,
+.receipt-capture-stage #ticket-venta-container *,
+html.receipt-print-58mm #ticket-venta-container,
+html.receipt-print-58mm #ticket-venta-container * {
+    color: #000000 !important;
+    border-color: #000000 !important;
+    opacity: 1 !important;
+}
+
+/* Orden de servicio: misma fuerza y claridad que el ticket de venta. */
+#ticket-recepcion-container.ticket-service-receipt,
+#ticket-recepcion-container.ticket-service-receipt * {
+    color: #000000 !important;
+    border-color: #000000 !important;
+    opacity: 1 !important;
+}
+
+#ticket-recepcion-container .ticket-main-header h2,
+#ticket-recepcion-container .ticket-whatsapp,
+#ticket-recepcion-container .ticket-social-handle,
+#ticket-recepcion-container .ticket-label-pill,
+#ticket-recepcion-container .ticket-folio-number,
+#ticket-recepcion-container .ticket-reception-date strong,
+#ticket-recepcion-container .ticket-section-data h4,
+#ticket-recepcion-container .ticket-section-data p strong,
+#ticket-recepcion-container .ticket-cost-total,
+#ticket-recepcion-container .ticket-cost-total span,
+#ticket-recepcion-container .ticket-outstanding,
+#ticket-recepcion-container .ticket-outstanding span,
+#ticket-recepcion-container .ticket-commitment-date p,
+#ticket-recepcion-container .ticket-order-footer strong {
+    font-weight: 900 !important;
+}
+
+#ticket-recepcion-container .ticket-business-info,
+#ticket-recepcion-container .ticket-reception-date .ticket-date,
+#ticket-recepcion-container .ticket-section-data p,
+#ticket-recepcion-container .ticket-section-data p span,
+#ticket-recepcion-container .ticket-legal-text,
+#ticket-recepcion-container .ticket-signature-section,
+#ticket-recepcion-container .ticket-order-footer span {
+    font-weight: 700 !important;
+}
+
+#ticket-recepcion-container .ticket-main-header,
+#ticket-recepcion-container .ticket-meta-block,
+#ticket-recepcion-container .ticket-section-data,
+#ticket-recepcion-container .ticket-reception-date {
+    border-bottom: 2px solid #000000 !important;
+}
+
+#ticket-recepcion-container .ticket-cost-total {
+    margin-top: 2mm !important;
+    padding-top: 2mm !important;
+    border-top: 2px solid #000000 !important;
+    font-size: 12px !important;
+}
+
+#ticket-recepcion-container .ticket-outstanding {
+    margin-top: 2mm !important;
+    padding: 2mm !important;
+    border: 2px solid #000000 !important;
+    font-size: 13px !important;
+}
+
+#ticket-recepcion-container .ticket-folio-barcode {
+    filter: contrast(200%);
+    shape-rendering: crispEdges;
+}
+
+.receipt-capture-stage #ticket-recepcion-container,
+.receipt-capture-stage #ticket-recepcion-container *,
+html.receipt-print-58mm #ticket-recepcion-container,
+html.receipt-print-58mm #ticket-recepcion-container * {
+    color: #000000 !important;
+    border-color: #000000 !important;
+    opacity: 1 !important;
+    text-shadow: none !important;
+}
+
+@media print {
+    #ticket-recepcion-container,
+    #ticket-recepcion-container * {
+        color: #000000 !important;
+        border-color: #000000 !important;
+        opacity: 1 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}
+
+/* Ajuste final del ticket de recepción: jerarquía simple como recibo impreso. */
+#ticket-recepcion-container.ticket-service-receipt {
+    padding: 5mm 4mm 6mm;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+#ticket-recepcion-container .ticket-main-header {
+    padding: 4mm 0;
+}
+
+#ticket-recepcion-container .ticket-main-header h2 {
+    margin: 0 0 3mm;
+    font-size: 21px;
+}
+
+#ticket-recepcion-container .ticket-whatsapp {
+    display: flex;
+    justify-content: center;
+    gap: 2mm;
+    margin: 0 0 2.5mm !important;
+    font-size: 17px !important;
+}
+
+#ticket-recepcion-container .ticket-whatsapp i {
+    display: inline-block !important;
+    font-size: 19px;
+}
+
+#ticket-recepcion-container .ticket-business-info {
+    margin: 0 auto 3mm !important;
+    font-size: 10px !important;
+}
+
+#ticket-recepcion-container .ticket-social-icons {
+    gap: 10mm;
+    margin: 0 0 1.5mm;
+}
+
+#ticket-recepcion-container .ticket-social-icons i {
+    font-size: 21px;
+}
+
+#ticket-recepcion-container .ticket-social-handle {
+    margin: 0 !important;
+    font-size: 13px !important;
+}
+
+#ticket-recepcion-container .ticket-meta-block,
+#ticket-recepcion-container .ticket-section-data {
+    padding: 3mm 0;
+}
+
+#ticket-recepcion-container .ticket-label-pill {
+    margin-bottom: 2mm;
+    font-size: 16px;
+    text-transform: none;
+}
+
+#ticket-recepcion-container .ticket-folio-number {
+    margin: 1mm 0 2.5mm;
+    font-size: 14px;
+}
+
+#ticket-recepcion-container .ticket-section-data {
+    min-height: 0;
+}
+
+#ticket-recepcion-container .ticket-section-data h4 {
+    display: block;
+    margin: 0 0 2mm;
+    padding: 0;
+    font-size: 13px;
+    text-align: left;
+    text-transform: none;
+}
+
+#ticket-recepcion-container .ticket-section-data h4 i {
+    display: none !important;
+}
+
+#ticket-recepcion-container .ticket-section-data p {
+    margin: 0 0 1.2mm;
+    font-size: 10px;
+}
+
+#ticket-recepcion-container .ticket-section-data p strong {
+    display: inline;
+    min-width: 0;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-main-header h2 {
+    margin-bottom: 16px !important;
+    font-size: 34px !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-whatsapp {
+    gap: 10px !important;
+    margin-bottom: 12px !important;
+    font-size: 28px !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-whatsapp i {
+    display: inline-block !important;
+    font-size: 32px !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-section-data {
+    min-height: 0 !important;
+    padding: 14px 0 !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-section-data h4 {
+    margin-bottom: 9px !important;
+    font-size: 23px !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-section-data h4 i {
+    display: none !important;
 }

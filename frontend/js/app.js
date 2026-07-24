@@ -5656,6 +5656,22 @@ function normalizeReceiptCanvasForThermalPrint(sourceCanvas, targetWidthPx) {
     context.imageSmoothingEnabled = false;
     context.drawImage(sourceCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
 
+    // Las impresoras térmicas pierden contraste con grises y bordes suavizados.
+    // Convertir el ticket a blanco/negro puro mantiene letras y códigos definidos.
+    const imageData = context.getImageData(0, 0, outputCanvas.width, outputCanvas.height);
+    const pixels = imageData.data;
+    for (let index = 0; index < pixels.length; index += 4) {
+        const luminance = (pixels[index] * 0.299)
+            + (pixels[index + 1] * 0.587)
+            + (pixels[index + 2] * 0.114);
+        const thermalColor = luminance < 215 ? 0 : 255;
+        pixels[index] = thermalColor;
+        pixels[index + 1] = thermalColor;
+        pixels[index + 2] = thermalColor;
+        pixels[index + 3] = 255;
+    }
+    context.putImageData(imageData, 0, 0);
+
     return outputCanvas;
 }
 
@@ -5875,15 +5891,15 @@ async function viewOrderDetails(id) {
 
     // Inyectar Datos del Establecimiento dinámicos
     document.getElementById('ticket-rec-business-name').innerText = ESTABLISHMENT_CONFIG.name.toUpperCase();
-    document.getElementById('ticket-rec-business-info').innerText = `${ESTABLISHMENT_CONFIG.address} | Tel: ${ESTABLISHMENT_CONFIG.phone}`;
-    applyTicketContactInfo();
+    document.getElementById('ticket-rec-business-info').innerText = ESTABLISHMENT_CONFIG.address;
+    applyOrderTicketHeaderContactInfo();
     document.getElementById('ticket-rec-legal-text').innerHTML = `<strong>IMPORTANTE:</strong> ${ESTABLISHMENT_CONFIG.terms}`;
     document.getElementById('thermal-business-name').innerText = ESTABLISHMENT_CONFIG.name.toUpperCase();
 
     // Rellenar previsualización de ticket
     document.getElementById('ticket-val-folio').innerText = o.folio;
     renderFolioBarcodes(o.folio);
-    document.getElementById('ticket-val-date').innerText = `Fecha: ${o.dateIn} 09:00`;
+    document.getElementById('ticket-val-date').innerText = `${o.dateIn} 09:00`;
     setReceiptFieldText('ticket-val-client-name', o.clientName);
     setReceiptFieldText('ticket-val-client-phone', o.clientPhone);
     setReceiptFieldText('ticket-val-client-email', o.clientEmail);
@@ -5891,6 +5907,10 @@ async function viewOrderDetails(id) {
     const deviceLabel = o.deviceDescription || [o.deviceType, o.brand, o.model].filter(Boolean).join(' ');
     const deviceColor = hasReceiptValue(o.color) ? o.color : '';
     const deviceLabelWithColor = deviceColor ? `${deviceLabel} (${deviceColor})` : deviceLabel;
+    setReceiptFieldText('ticket-val-device-type', o.deviceType);
+    setReceiptFieldText('ticket-val-device-brand', o.brand);
+    setReceiptFieldText('ticket-val-device-model', o.model);
+    setReceiptFieldText('ticket-val-device-serial', o.serial || o.imei || o.imei2);
     setReceiptFieldText('ticket-val-device', deviceLabelWithColor);
     
     // Accesorios listados
@@ -5916,9 +5936,18 @@ async function viewOrderDetails(id) {
     const hasCostEstimate = o.pendiente_presupuesto || costEst > 0;
     const hasAdvance = adv > 0;
     const hasPending = o.pendiente_presupuesto || costEst > 0 || adv > 0;
+    setReceiptFieldText('ticket-val-labor', Number(o.mano_obra || 0) > 0 ? `$${Number(o.mano_obra).toFixed(2)}` : '', { zeroIsEmpty: true });
+    setReceiptFieldText('ticket-val-parts', Number(o.total_refacciones || o.costo_refaccion || 0) > 0 ? `$${Number(o.total_refacciones || o.costo_refaccion).toFixed(2)}` : '', { zeroIsEmpty: true });
     setReceiptFieldText('ticket-val-cost-est', o.pendiente_presupuesto ? 'Pendiente de presupuesto' : (hasCostEstimate ? `$${costEst.toFixed(2)}` : ''));
     setReceiptFieldText('ticket-val-advance', hasAdvance ? `$${adv.toFixed(2)}` : '', { zeroIsEmpty: true });
     setReceiptFieldText('ticket-val-pending', o.pendiente_presupuesto ? 'Por definir' : (hasPending ? `$${pending.toFixed(2)}` : ''), { zeroIsEmpty: true });
+    setReceiptFieldText('ticket-val-commitment-date', o.estimatedDate || 'Por confirmar');
+    const ticketOrderObservations = hasReceiptValue(o.publicRemarks)
+        ? o.publicRemarks
+        : (hasReceiptValue(o.inspeccion_obs)
+            ? o.inspeccion_obs
+            : 'Se notificará al cliente cualquier detalle adicional encontrado.');
+    setReceiptFieldText('ticket-val-order-observations', ticketOrderObservations);
 
     // Firma
     const sigImg = document.getElementById('ticket-val-signature-img');
@@ -7121,8 +7150,7 @@ window.viewVentaDetails = function(venta, options = {}) {
     const productItems = sale.items.filter(item => !(item.tipo_item === 'reparacion' || item.tipo === 'reparacion' || item.type === 'repair'));
 
     // Inyectar Datos del Establecimiento dinámicos
-    document.getElementById('ticket-venta-business-name').innerText = ESTABLISHMENT_CONFIG.name.toUpperCase();
-    document.getElementById('ticket-venta-business-info').innerText = `${ESTABLISHMENT_CONFIG.address} | Tel: ${ESTABLISHMENT_CONFIG.phone}`;
+    applySaleTicketHeaderInfo();
     applyTicketContactInfo();
     document.getElementById('ticket-venta-type-label').innerText = saleKind.label;
     document.getElementById('ticket-venta-items-title').innerText = saleKind.itemsTitle;
@@ -9319,26 +9347,19 @@ function initProfileModal() {
 const ESTABLISHMENT_CONFIG = {
     name: 'AllFix Bacalar',
     phone: '983 123 4567',
-    whatsapp: '983 190 96 56',
+    whatsapp: '983 190 9656',
     redes_sociales: JSON.stringify({
         facebook: 'Allfix bacalar reparación de celulares',
         tiktok: '@allfixbacalar',
         instagram: '@allfixbacalar'
     }),
-    address: 'Avenida Costera N° 45, Bacalar, Q. Roo',
+    address: 'Av. 19 Libramiento entre Calle 26\nBacalar, Q. Roo',
     terms: 'IMPORTANTE: Una vez que su equipo esté listo y haya sido notificado, contará con un plazo máximo de 30 días para recogerlo. Después de ese plazo el establecimiento podrá disponer del equipo conforme a sus políticas internas.',
     logoUrl: '',
     ticketLogoUrl: '',
     ticketPrinter: '',
     ticketPaper: '80mm',
     autoPrintTicket: true
-};
-
-const TICKET_SOCIAL_CONTACTS = {
-    whatsapp: '983 190 96 56',
-    facebook: 'Allfix Bacalar',
-    tiktok: '@allfixbacalar',
-    instagram: '@allfixbacalar'
 };
 
 const DEFAULT_BUSINESS_LOGO = 'img/logoallfixv2.png';
@@ -9376,6 +9397,7 @@ function applyBusinessBranding() {
     applyBusinessLogoSource(logoUrl);
     applyTicketLogoSource();
     applyBusinessName();
+    applySaleTicketHeaderInfo();
     applyTicketContactInfo();
 }
 
@@ -9453,24 +9475,54 @@ function getTicketContactLine() {
 }
 
 function getTicketContactItems() {
-    return [
-        { icon: 'fa-brands fa-whatsapp', label: 'WhatsApp', value: TICKET_SOCIAL_CONTACTS.whatsapp },
-        { icon: 'fa-brands fa-facebook', label: 'Facebook', value: TICKET_SOCIAL_CONTACTS.facebook },
-        { icon: 'fa-brands fa-tiktok', label: 'TikTok', value: TICKET_SOCIAL_CONTACTS.tiktok },
-        { icon: 'fa-brands fa-instagram', label: 'Instagram', value: TICKET_SOCIAL_CONTACTS.instagram }
-    ].filter(item => item.value);
+    const socials = parseSocialProfiles();
+    const items = [
+        {
+            icon: 'fa-brands fa-whatsapp',
+            label: 'WhatsApp',
+            value: ESTABLISHMENT_CONFIG.whatsapp || ESTABLISHMENT_CONFIG.phone
+        },
+        { icon: 'fa-brands fa-facebook', label: 'Facebook', value: socials.facebook },
+        { icon: 'fa-brands fa-tiktok', label: 'TikTok', value: socials.tiktok },
+        { icon: 'fa-brands fa-instagram', label: 'Instagram', value: socials.instagram }
+    ];
+
+    if (socials.raw) {
+        items.push({ icon: 'fa-solid fa-at', label: 'Redes sociales', value: socials.raw });
+    }
+
+    return items
+        .map(item => ({ ...item, value: String(item.value || '').trim() }))
+        .filter(item => item.value);
+}
+
+function applySaleTicketHeaderInfo() {
+    const businessName = document.getElementById('ticket-venta-business-name');
+    const businessPhone = document.getElementById('ticket-venta-business-phone');
+    const businessAddress = document.getElementById('ticket-venta-business-info');
+
+    if (businessName) businessName.textContent = ESTABLISHMENT_CONFIG.name.toUpperCase();
+    if (businessPhone) {
+        businessPhone.textContent = String(
+            ESTABLISHMENT_CONFIG.whatsapp || ESTABLISHMENT_CONFIG.phone || ''
+        ).trim();
+    }
+    if (businessAddress) businessAddress.textContent = ESTABLISHMENT_CONFIG.address;
 }
 
 function applyTicketContactInfo() {
     const items = getTicketContactItems();
     document.querySelectorAll('.ticket-social-info').forEach(element => {
-        element.innerHTML = items.map(item => `
+        const visibleItems = element.id === 'ticket-venta-social-info'
+            ? items.filter(item => item.label !== 'WhatsApp')
+            : items;
+        element.innerHTML = visibleItems.map(item => `
             <span class="ticket-social-row">
                 <i class="${item.icon}" aria-hidden="true"></i>
                 <span class="ticket-social-value" aria-label="${escapeHtml(item.label)}">${escapeHtml(item.value)}</span>
             </span>
         `).join('');
-        element.classList.toggle('hidden', items.length === 0);
+        element.classList.toggle('hidden', visibleItems.length === 0);
     });
 }
 
@@ -9763,6 +9815,22 @@ async function detectAvailablePrinters() {
     }
 
     return [];
+}
+
+function applyOrderTicketHeaderContactInfo() {
+    const socials = parseSocialProfiles();
+    const socialHandle = socials.instagram || socials.tiktok || socials.facebook || socials.raw || '@allfixbacalar';
+    const handleElement = document.getElementById('ticket-rec-social-handle');
+    const whatsappElement = document.getElementById('ticket-rec-whatsapp');
+
+    if (handleElement) {
+        handleElement.textContent = String(socialHandle).trim();
+    }
+    if (whatsappElement) {
+        whatsappElement.textContent = String(
+            ESTABLISHMENT_CONFIG.whatsapp || ESTABLISHMENT_CONFIG.phone || '983 190 9656'
+        ).trim();
+    }
 }
 
 function normalizePrinterInfo(printer) {

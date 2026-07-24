@@ -3093,9 +3093,12 @@
                 <div class="ticket-preview-box ticket-sale-receipt hidden" id="ticket-venta-container">
                     <div class="ticket-tear-edge"></div>
                     <div class="ticket-main-header">
-                        <img src="img/logoallfix-ticket.png" alt="Logo para ticket" class="ticket-logo thermal-ticket-logo" onerror="this.style.display='none'">
                         <h2 id="ticket-venta-business-name">ALLFIX BACALAR</h2>
-                        <p id="ticket-venta-business-info">Avenida Costera N° 45, Bacalar | Tel: 983 123 4567</p>
+                        <p class="ticket-sale-phone">
+                            <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>
+                            <span id="ticket-venta-business-phone">983 190 9656</span>
+                        </p>
+                        <p class="ticket-business-info" id="ticket-venta-business-info">Av. 19 Libramiento entre Calle 26<br>Bacalar, Q. Roo</p>
                         <p class="ticket-social-info" id="ticket-venta-social-info"></p>
                     </div>
 
@@ -3194,54 +3197,75 @@
                 <div class="ticket-preview-box ticket-service-receipt" id="ticket-recepcion-container">
                     <div class="ticket-tear-edge"></div>
                     <div class="ticket-main-header">
-                        <img src="img/logoallfix-ticket.png" alt="Logo para ticket" class="ticket-logo thermal-ticket-logo" onerror="this.style.display='none'">
                         <h2 id="ticket-rec-business-name">ALLFIX BACALAR</h2>
-                        <p class="ticket-service-line">Servicio técnico profesional de celulares, tablets y laptops</p>
-                        <p class="ticket-business-info" id="ticket-rec-business-info">Avenida Costera N° 45, Bacalar | Tel: 983 123 4567</p>
-                        <p class="ticket-social-info" id="ticket-rec-social-info"></p>
+                        <p class="ticket-whatsapp">
+                            <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>
+                            <span id="ticket-rec-whatsapp">983 190 9656</span>
+                        </p>
+                        <p class="ticket-business-info" id="ticket-rec-business-info">Av. 19 Libramiento entre Calle 26<br>Bacalar, Q. Roo</p>
+                        <div class="ticket-social-icons" aria-label="Redes sociales">
+                            <i class="fa-brands fa-facebook" aria-hidden="true"></i>
+                            <i class="fa-brands fa-instagram" aria-hidden="true"></i>
+                            <i class="fa-brands fa-tiktok" aria-hidden="true"></i>
+                        </div>
+                        <p class="ticket-social-handle" id="ticket-rec-social-handle">@allfixbacalar</p>
                     </div>
-
-                    <div class="ticket-divider"></div>
 
                     <div class="ticket-meta-block">
                         <div class="ticket-folio-block">
-                            <span class="ticket-label-pill">Folio de servicio</span>
-                            <span class="ticket-folio-number" id="ticket-val-folio">AFB-2026-0001</span>
-                            <span class="ticket-date" id="ticket-val-date">Fecha: 22/06/2026 09:15</span>
-                        </div>
-                        <div class="ticket-qr-block">
+                            <span class="ticket-label-pill">Folio</span>
                             <div class="ticket-folio-barcode-frame" aria-label="Código de barras del folio">
                                 <svg id="ticket-folio-barcode" class="ticket-folio-barcode"></svg>
                             </div>
-                            <span class="qr-label">Escanea para cobrar</span>
+                            <span class="ticket-folio-number" id="ticket-val-folio">AFB-2026-0001</span>
+                            <div class="ticket-reception-date">
+                                <strong>Fecha de recepción</strong>
+                                <span class="ticket-date" id="ticket-val-date">22/06/2026 09:15</span>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="ticket-section-data">
-                        <h4>Datos del cliente</h4>
+                    <div class="ticket-section-data ticket-icon-section">
+                        <h4><i class="fa-solid fa-user"></i><span>Cliente</span></h4>
                         <p><i class="fa-solid fa-user"></i><strong>Nombre:</strong> <span id="ticket-val-client-name">Juan Perez</span></p>
                         <p><i class="fa-solid fa-phone"></i><strong>Teléfono:</strong> <span id="ticket-val-client-phone">9831234567</span></p>
                         <p><i class="fa-solid fa-envelope"></i><strong>Correo:</strong> <span id="ticket-val-client-email">juan@gmail.com</span></p>
                     </div>
 
-                    <div class="ticket-section-data">
-                        <h4>Datos del equipo</h4>
-                        <p><i class="fa-solid fa-mobile-screen"></i><strong>Equipo:</strong> <span id="ticket-val-device">Celular Xiaomi Poco X3 Pro (Azul)</span></p>
+                    <div class="ticket-section-data ticket-icon-section">
+                        <h4><i class="fa-solid fa-laptop"></i><span>Equipo</span></h4>
+                        <p><i class="fa-solid fa-mobile-screen"></i><strong>Tipo:</strong> <span id="ticket-val-device-type">Celular</span></p>
+                        <p><i class="fa-solid fa-tag"></i><strong>Marca:</strong> <span id="ticket-val-device-brand">Xiaomi</span></p>
+                        <p><i class="fa-solid fa-mobile"></i><strong>Modelo:</strong> <span id="ticket-val-device-model">Poco X3 Pro</span></p>
+                        <p><i class="fa-solid fa-barcode"></i><strong>Serie / IMEI:</strong> <span id="ticket-val-device-serial">Sin registro</span></p>
+                        <p class="ticket-device-summary"><i class="fa-solid fa-circle-info"></i><strong>Descripción:</strong> <span id="ticket-val-device">Celular Xiaomi Poco X3 Pro (Azul)</span></p>
                         <p><i class="fa-solid fa-box-open"></i><strong>Accesorios:</strong> <span id="ticket-val-accessories">SIM, Memoria, Funda</span></p>
                     </div>
 
-                    <div class="ticket-section-data">
-                        <h4>Detalle técnico</h4>
+                    <div class="ticket-section-data ticket-icon-section">
+                        <h4><i class="fa-solid fa-screwdriver-wrench"></i><span>Servicio solicitado</span></h4>
                         <p><i class="fa-solid fa-screwdriver-wrench"></i><strong>Falla reportada:</strong> <span id="ticket-val-falla">No enciende después de mojarse</span></p>
                         <p><i class="fa-solid fa-gear"></i><strong>Servicio a realizar:</strong> <span id="ticket-val-desc">Requiere limpieza ultrasónica en placa.</span></p>
                         <p><i class="fa-solid fa-eye"></i><strong>Observaciones:</strong> <span id="ticket-val-inspection">Pantalla rota en esquina inferior.</span></p>
                     </div>
 
-                    <div class="ticket-section-data ticket-money-section">
-                        <h4>Información económica</h4>
-                        <p><i class="fa-solid fa-circle-dollar-to-slot"></i><strong>Costo estimado:</strong> <span id="ticket-val-cost-est">$1,200.00</span></p>
-                        <p><i class="fa-solid fa-wallet"></i><strong>Anticipo dejado:</strong> <span id="ticket-val-advance">$300.00</span></p>
-                        <p class="ticket-outstanding"><strong>Pagar al entregar:</strong> <span id="ticket-val-pending">$900.00</span></p>
+                    <div class="ticket-section-data ticket-money-section ticket-icon-section">
+                        <h4><i class="fa-solid fa-circle-dollar-to-slot"></i><span>Costos</span></h4>
+                        <p><strong>Mano de obra:</strong> <span id="ticket-val-labor">$0.00</span></p>
+                        <p><strong>Refacciones:</strong> <span id="ticket-val-parts">$0.00</span></p>
+                        <p class="ticket-cost-total"><strong>Total estimado:</strong> <span id="ticket-val-cost-est">$1,200.00</span></p>
+                        <p><strong>Anticipo recibido:</strong> <span id="ticket-val-advance">$300.00</span></p>
+                        <p class="ticket-outstanding"><strong>Saldo pendiente:</strong> <span id="ticket-val-pending">$900.00</span></p>
+                    </div>
+
+                    <div class="ticket-section-data ticket-icon-section ticket-commitment-date">
+                        <h4><i class="fa-solid fa-calendar-days"></i><span>Fecha compromiso</span></h4>
+                        <p><span id="ticket-val-commitment-date">Por confirmar</span></p>
+                    </div>
+
+                    <div class="ticket-section-data ticket-icon-section ticket-order-observations">
+                        <h4><i class="fa-regular fa-comment-dots"></i><span>Observaciones</span></h4>
+                        <p><span id="ticket-val-order-observations">Se notificará al cliente cualquier detalle adicional encontrado.</span></p>
                     </div>
 
                     <div class="ticket-legal-text" id="ticket-rec-legal-text">
@@ -3253,6 +3277,10 @@
                         <p>Firma de conformidad del cliente</p>
                     </div>
 
+                    <div class="ticket-order-footer">
+                        <strong>Gracias por confiar en Allfix Bacalar</strong>
+                        <span>Conserve este comprobante para dar seguimiento a su orden</span>
+                    </div>
                     <div class="ticket-tear-edge ticket-tear-edge-bottom"></div>
                 </div>
 
