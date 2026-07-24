@@ -5068,7 +5068,7 @@ let AVAILABLE_TICKET_PRINTERS = [];
 let QZ_CONNECT_PROMISE = null;
 const THERMAL_PRINT_DOTS = {
     '80mm': 576,
-    '58mm': 360
+    '58mm': 384
 };
 const THERMAL_PRINT_DPI = 203;
 const THERMAL_CAPTURE_SCALE = 5;
@@ -5653,7 +5653,8 @@ function normalizeReceiptCanvasForThermalPrint(sourceCanvas, targetWidthPx) {
     const context = outputCanvas.getContext('2d', { alpha: false });
     context.fillStyle = '#ffffff';
     context.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
-    context.imageSmoothingEnabled = false;
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
     context.drawImage(sourceCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
 
     // Las impresoras térmicas pierden contraste con grises y bordes suavizados.
@@ -5664,7 +5665,7 @@ function normalizeReceiptCanvasForThermalPrint(sourceCanvas, targetWidthPx) {
         const luminance = (pixels[index] * 0.299)
             + (pixels[index + 1] * 0.587)
             + (pixels[index + 2] * 0.114);
-        const thermalColor = luminance < 215 ? 0 : 255;
+        const thermalColor = luminance < 235 ? 0 : 255;
         pixels[index] = thermalColor;
         pixels[index + 1] = thermalColor;
         pixels[index + 2] = thermalColor;
@@ -5893,6 +5894,7 @@ async function viewOrderDetails(id) {
     document.getElementById('ticket-rec-business-name').innerText = ESTABLISHMENT_CONFIG.name.toUpperCase();
     document.getElementById('ticket-rec-business-info').innerText = ESTABLISHMENT_CONFIG.address;
     applyOrderTicketHeaderContactInfo();
+    applyTicketContactInfo();
     document.getElementById('ticket-rec-legal-text').innerHTML = `<strong>IMPORTANTE:</strong> ${ESTABLISHMENT_CONFIG.terms}`;
     document.getElementById('thermal-business-name').innerText = ESTABLISHMENT_CONFIG.name.toUpperCase();
 
@@ -9513,7 +9515,9 @@ function applySaleTicketHeaderInfo() {
 function applyTicketContactInfo() {
     const items = getTicketContactItems();
     document.querySelectorAll('.ticket-social-info').forEach(element => {
-        const visibleItems = element.id === 'ticket-venta-social-info'
+        const headerHasDedicatedWhatsapp = element.id === 'ticket-venta-social-info'
+            || element.id === 'ticket-rec-social-info';
+        const visibleItems = headerHasDedicatedWhatsapp
             ? items.filter(item => item.label !== 'WhatsApp')
             : items;
         element.innerHTML = visibleItems.map(item => `
@@ -9818,14 +9822,8 @@ async function detectAvailablePrinters() {
 }
 
 function applyOrderTicketHeaderContactInfo() {
-    const socials = parseSocialProfiles();
-    const socialHandle = socials.instagram || socials.tiktok || socials.facebook || socials.raw || '@allfixbacalar';
-    const handleElement = document.getElementById('ticket-rec-social-handle');
     const whatsappElement = document.getElementById('ticket-rec-whatsapp');
 
-    if (handleElement) {
-        handleElement.textContent = String(socialHandle).trim();
-    }
     if (whatsappElement) {
         whatsappElement.textContent = String(
             ESTABLISHMENT_CONFIG.whatsapp || ESTABLISHMENT_CONFIG.phone || '983 190 9656'

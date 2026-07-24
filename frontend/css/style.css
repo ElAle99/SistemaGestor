@@ -1595,19 +1595,36 @@ a:hover {
 }
 
 .receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-main-header h2 {
-    margin-bottom: 16px !important;
+    margin-bottom: 4px !important;
     font-size: 34px !important;
+    line-height: 1 !important;
 }
 
 .receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-whatsapp {
     gap: 10px !important;
-    margin-bottom: 12px !important;
+    margin-bottom: 3px !important;
     font-size: 28px !important;
+    line-height: 1 !important;
 }
 
 .receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-whatsapp i {
     display: inline-block !important;
     font-size: 32px !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-business-info {
+    margin: 0 auto 3px !important;
+    font-size: 17px !important;
+    line-height: 1.08 !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-social-info,
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-social-row {
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+    font-size: 16px !important;
+    line-height: 1.05 !important;
 }
 
 .receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-business-info {
@@ -13024,6 +13041,48 @@ html.receipt-print-58mm #ticket-recepcion-container * {
     }
 }
 
+/* Encabezados compactos: sin renglones vacíos ni separaciones innecesarias. */
+#ticket-venta-container .ticket-main-header {
+    margin: 0 !important;
+    padding: 1.5mm 0 2mm !important;
+}
+
+#ticket-venta-container .ticket-main-header h2 {
+    margin: 0 0 .8mm !important;
+    line-height: 1 !important;
+}
+
+#ticket-venta-container .ticket-sale-phone,
+#ticket-venta-container .ticket-business-info,
+#ticket-venta-container .ticket-social-info,
+#ticket-venta-container .ticket-social-row {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    line-height: 1.12 !important;
+}
+
+#ticket-venta-container .ticket-sale-phone {
+    margin-bottom: .7mm !important;
+}
+
+#ticket-venta-container .ticket-business-info {
+    margin-bottom: .7mm !important;
+}
+
+#ticket-venta-container .ticket-social-row {
+    min-height: 0 !important;
+}
+
+#ticket-venta-container .ticket-section-data p,
+#ticket-venta-container .ticket-payment-summary p,
+#ticket-venta-container .ticket-repair-detail p {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    line-height: 1.18 !important;
+}
+
 /* Ajuste final del ticket de recepción: jerarquía simple como recibo impreso. */
 #ticket-recepcion-container.ticket-service-receipt {
     padding: 5mm 4mm 6mm;
@@ -13031,20 +13090,23 @@ html.receipt-print-58mm #ticket-recepcion-container * {
 }
 
 #ticket-recepcion-container .ticket-main-header {
-    padding: 4mm 0;
+    margin: 0 !important;
+    padding: 1.5mm 0 2mm !important;
 }
 
 #ticket-recepcion-container .ticket-main-header h2 {
-    margin: 0 0 3mm;
+    margin: 0 0 .8mm !important;
     font-size: 21px;
+    line-height: 1 !important;
 }
 
 #ticket-recepcion-container .ticket-whatsapp {
     display: flex;
     justify-content: center;
     gap: 2mm;
-    margin: 0 0 2.5mm !important;
+    margin: 0 0 .7mm !important;
     font-size: 17px !important;
+    line-height: 1 !important;
 }
 
 #ticket-recepcion-container .ticket-whatsapp i {
@@ -13053,22 +13115,18 @@ html.receipt-print-58mm #ticket-recepcion-container * {
 }
 
 #ticket-recepcion-container .ticket-business-info {
-    margin: 0 auto 3mm !important;
+    margin: 0 auto .7mm !important;
     font-size: 10px !important;
+    line-height: 1.12 !important;
 }
 
-#ticket-recepcion-container .ticket-social-icons {
-    gap: 10mm;
-    margin: 0 0 1.5mm;
-}
-
-#ticket-recepcion-container .ticket-social-icons i {
-    font-size: 21px;
-}
-
-#ticket-recepcion-container .ticket-social-handle {
+#ticket-recepcion-container .ticket-social-info,
+#ticket-recepcion-container .ticket-social-row {
     margin: 0 !important;
-    font-size: 13px !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+    font-size: 9px !important;
+    line-height: 1.1 !important;
 }
 
 #ticket-recepcion-container .ticket-meta-block,
@@ -13105,8 +13163,9 @@ html.receipt-print-58mm #ticket-recepcion-container * {
 }
 
 #ticket-recepcion-container .ticket-section-data p {
-    margin: 0 0 1.2mm;
+    margin: 0 !important;
     font-size: 10px;
+    line-height: 1.18 !important;
 }
 
 #ticket-recepcion-container .ticket-section-data p strong {
@@ -13142,4 +13201,37 @@ html.receipt-print-58mm #ticket-recepcion-container * {
 
 .receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-section-data h4 i {
     display: none !important;
+}
+
+/* Última prioridad para mantener compacto el encabezado en la imagen térmica. */
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-main-header {
+    margin: 0 !important;
+    padding: 6px 0 8px !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-main-header h2 {
+    margin: 0 0 4px !important;
+    font-size: 34px !important;
+    line-height: 1 !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-whatsapp {
+    margin: 0 0 3px !important;
+    font-size: 28px !important;
+    line-height: 1 !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-business-info {
+    margin: 0 auto 3px !important;
+    font-size: 17px !important;
+    line-height: 1.08 !important;
+}
+
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-social-info,
+.receipt-capture-stage[data-paper="58mm"] #ticket-recepcion-container .ticket-social-row {
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+    font-size: 16px !important;
+    line-height: 1.05 !important;
 }
