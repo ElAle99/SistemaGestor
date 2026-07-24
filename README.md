@@ -737,3 +737,5 @@ Antes de reportar un problema incluye:
 - Pasos para reproducirlo.
 - Logs del backend sin credenciales ni datos sensibles.
 
+#   S i s t e m a G e s t o r 1 . 5  
+ 
