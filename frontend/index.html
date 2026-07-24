@@ -1448,14 +1448,60 @@
                 <!-- VIEW: CONFIGURACIÓN                        -->
                 <!-- ========================================== -->
                 <section class="view-section hidden" id="view-configuracion">
-                    <div class="config-layout">
+                    <div class="config-hero">
+                        <div>
+                            <span class="config-eyebrow">Configuración</span>
+                            <h2>Preferencias del sistema</h2>
+                            <p>Configura la información que utiliza AllFix y los servicios disponibles en este equipo.</p>
+                        </div>
+                    </div>
+                    <div class="config-workspace">
+                        <nav class="config-section-nav" aria-label="Secciones de configuración" role="tablist">
+                            <div class="config-nav-title">Secciones</div>
+                            <a href="#config-establishment-card" class="config-section-link active" role="tab" aria-selected="true" aria-controls="config-establishment-card">
+                                <span class="config-nav-icon"><i class="fa-solid fa-store"></i></span>
+                                <span class="config-nav-copy">
+                                    <strong>Establecimiento</strong>
+                                    <small>Identidad y contacto</small>
+                                </span>
+                                <i class="fa-solid fa-chevron-right config-nav-arrow"></i>
+                            </a>
+                            <a href="#config-print-card" class="config-section-link" role="tab" aria-selected="false" aria-controls="config-print-card">
+                                <span class="config-nav-icon"><i class="fa-solid fa-print"></i></span>
+                                <span class="config-nav-copy">
+                                    <strong>Impresión</strong>
+                                    <small>QZ Tray y tickets</small>
+                                </span>
+                                <i class="fa-solid fa-chevron-right config-nav-arrow"></i>
+                            </a>
+                            <a href="#config-users-card" class="config-section-link admin-only" role="tab" aria-selected="false" aria-controls="config-users-card">
+                                <span class="config-nav-icon"><i class="fa-solid fa-users"></i></span>
+                                <span class="config-nav-copy">
+                                    <strong>Usuarios</strong>
+                                    <small>Accesos y permisos</small>
+                                </span>
+                                <i class="fa-solid fa-chevron-right config-nav-arrow"></i>
+                            </a>
+                        </nav>
+                        <div class="config-layout">
                         <!-- Panel de Configuración General -->
-                        <div class="card">
-                            <div class="card-header">
-                                <h3>Datos del Establecimiento</h3>
+                        <div class="card config-card config-panel-active" id="config-establishment-card" role="tabpanel">
+                            <div class="card-header config-card-header">
+                                <div class="config-card-heading">
+                                    <span class="config-card-icon config-card-icon-blue"><i class="fa-solid fa-store"></i></span>
+                                    <div>
+                                        <h3>Datos del establecimiento</h3>
+                                        <p>Información visible en el sistema y en los comprobantes.</p>
+                                    </div>
+                                </div>
                             </div>
                             <div class="card-body">
                                 <form id="config-general-form">
+                                    <div class="config-form-section">
+                                        <div class="config-form-section-title">
+                                            <span>Identidad visual</span>
+                                            <small>Logo principal del negocio</small>
+                                        </div>
                                     <div class="business-brand-settings">
                                         <div class="business-logo-preview-box">
                                             <img src="img/logoallfixv2.png" alt="Logo actual" id="cfg-logo-preview">
@@ -1471,6 +1517,12 @@
                                             <span id="cfg-logo-filename">Logo actual del sistema</span>
                                         </div>
                                     </div>
+                                    </div>
+                                    <div class="config-form-section">
+                                        <div class="config-form-section-title">
+                                            <span>Información de contacto</span>
+                                            <small>Datos comerciales y redes sociales</small>
+                                        </div>
                                     <div class="form-row-2">
                                         <div class="form-group">
                                             <label for="cfg-business-name">Nombre del Negocio</label>
@@ -1505,18 +1557,34 @@
                                             <input type="text" id="cfg-business-instagram" class="form-control" placeholder="Ej. @allfixbacalar">
                                         </div>
                                     </div>
+                                    </div>
+                                    <div class="config-form-section">
+                                        <div class="config-form-section-title">
+                                            <span>Políticas del ticket</span>
+                                            <small>Texto legal que recibirá el cliente</small>
+                                        </div>
                                     <div class="form-group">
                                         <label for="cfg-business-terms">Términos Legales en Ticket (Cláusula de Abandono)</label>
                                         <textarea id="cfg-business-terms" class="form-control" rows="4" required>IMPORTANTE: Una vez que su equipo esté listo y haya sido notificado, contará con un plazo máximo de 30 días para recogerlo. Después de ese plazo el establecimiento podrá disponer del equipo conforme a sus políticas internas.</textarea>
                                     </div>
-                                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                                    </div>
+                                    <div class="config-form-actions">
+                                        <span><i class="fa-solid fa-circle-info"></i> Los cambios se aplicarán a los próximos tickets.</span>
+                                        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Guardar establecimiento</button>
+                                    </div>
                                 </form>
                             </div>
                         </div>
 
-                        <div class="card">
-                            <div class="card-header">
-                                <h3>Impresión de Tickets</h3>
+                        <div class="card config-card" id="config-print-card" role="tabpanel" hidden>
+                            <div class="card-header config-card-header">
+                                <div class="config-card-heading">
+                                    <span class="config-card-icon config-card-icon-violet"><i class="fa-solid fa-print"></i></span>
+                                    <div>
+                                        <h3>Impresión local</h3>
+                                        <p>Conecta esta computadora con su impresora térmica mediante QZ Tray.</p>
+                                    </div>
+                                </div>
                             </div>
                             <div class="card-body">
                                 <form id="config-printer-form">
@@ -1537,46 +1605,67 @@
                                             </div>
                                         </div>
                                     </div>
+                                    <div class="printer-status-panel">
+                                        <span>Estado de QZ Tray</span>
+                                        <strong id="qz-connection-status" class="qz-status qz-status-disconnected">Desconectado</strong>
+                                    </div>
                                     <div class="form-row-2">
                                         <div class="form-group">
-                                            <label for="cfg-ticket-printer">Impresora preferida</label>
+                                            <label for="cfg-ticket-printer">Impresora térmica</label>
                                             <select id="cfg-ticket-printer" class="form-select">
-                                                <option value="">Impresora predeterminada del sistema</option>
+                                                <option value="">Selecciona una impresora</option>
                                             </select>
                                         </div>
                                         <div class="form-group">
-                                            <label>Tamaño detectado</label>
-                                            <div class="form-control" id="cfg-ticket-paper-detected">Se detecta desde la impresora seleccionada</div>
+                                            <label for="cfg-ticket-paper">Papel</label>
+                                            <select id="cfg-ticket-paper" class="form-select">
+                                                <option value="58mm">58 mm</option>
+                                                <option value="80mm">80 mm</option>
+                                            </select>
                                         </div>
                                     </div>
                                     <div class="form-row-2">
                                         <div class="form-group">
-                                            <label for="cfg-ticket-print-mode">Al confirmar un cobro</label>
+                                            <label for="cfg-ticket-print-mode">Impresión automática</label>
                                             <select id="cfg-ticket-print-mode" class="form-select">
-                                                <option value="direct">Abrir impresión al confirmar</option>
+                                                <option value="direct">Activada</option>
                                                 <option value="ask">Preguntar antes de imprimir</option>
                                             </select>
                                         </div>
                                         <div class="form-group">
                                             <button type="button" class="btn btn-secondary" id="btn-detect-printers">
-                                                <i class="fa-solid fa-magnifying-glass"></i> Detectar impresoras
+                                                <i class="fa-solid fa-rotate"></i> Actualizar impresoras
                                             </button>
                                         </div>
                                     </div>
+                                    <div class="printer-config-actions">
+                                        <button type="button" class="btn btn-secondary" id="btn-test-printer">
+                                            <i class="fa-solid fa-print"></i> Imprimir prueba
+                                        </button>
+                                        <button type="button" class="btn btn-secondary" id="btn-browser-print-test">
+                                            <i class="fa-solid fa-window-restore"></i> Impresión normal
+                                        </button>
+                                    </div>
                                     <p class="config-help-text" id="printer-config-status">
-                                        Puedes abrir la impresión al terminar el cobro o mostrar una confirmación para decidir en cada venta.
+                                        Abre QZ Tray y presiona “Actualizar impresoras” para consultar las impresoras de esta computadora.
                                     </p>
-                                    <button type="submit" class="btn btn-primary">Guardar Impresión</button>
+                                    <div class="config-form-actions">
+                                        <span><i class="fa-solid fa-computer"></i> Esta configuración se guarda solo en esta computadora.</span>
+                                        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Guardar impresión</button>
+                                    </div>
                                 </form>
                             </div>
                         </div>
 
                         <!-- Panel de Gestión de Usuarios (Admin Only) -->
-                        <div class="card admin-only">
-                            <div class="card-header flex-header">
-                                <div>
+                        <div class="card config-card admin-only" id="config-users-card" role="tabpanel" hidden>
+                            <div class="card-header flex-header config-card-header">
+                                <div class="config-card-heading">
+                                    <span class="config-card-icon config-card-icon-emerald"><i class="fa-solid fa-users-gear"></i></span>
+                                    <div>
                                     <h3>Gestión de usuarios</h3>
-                                    <p class="config-help-text">Administra operadores, roles y acceso temporal desde login.</p>
+                                    <p>Administra operadores, roles y acceso temporal desde el login.</p>
+                                    </div>
                                 </div>
                                 <button class="btn btn-sm btn-primary" id="btn-add-user-modal">
                                     <i class="fa-solid fa-user-plus"></i> Agregar Usuario
@@ -1614,6 +1703,7 @@
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
                         </div>
                     </div>
                 </section>
@@ -3226,7 +3316,10 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" id="btn-print-action" onclick="window.printReceipt && window.printReceipt()">
+                <button type="button" class="btn btn-secondary" id="btn-browser-print-action" onclick="window.printReceiptBrowser && window.printReceiptBrowser()">
+                    <i class="fa-solid fa-window-restore"></i> Impresión normal
+                </button>
+                <button type="button" class="btn btn-primary" id="btn-print-action" onclick="window.printReceipt && window.printReceipt()">
                     <i class="fa-solid fa-print"></i> Imprimir ticket
                 </button>
                 <button type="button" class="btn btn-primary" id="btn-close-receipt">Cerrar</button>
@@ -3445,6 +3538,8 @@
     <script src="/vendor/dayjs/locale/es.js"></script>
     <script src="/vendor/jspdf/jspdf.umd.min.js"></script>
     <script src="/vendor/jspdf-autotable/jspdf.plugin.autotable.min.js"></script>
+    <script src="/vendor/qz-tray/qz-tray.js"></script>
+    <script src="js/qzPrinterService.js?v=20260724-qz-v1"></script>
 
     <!-- Main System JavaScript Logic -->
     <script src="js/app.js?v=20260719-profile-v6"></script>

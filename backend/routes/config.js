@@ -163,8 +163,19 @@ router.put('/negocio', authMiddleware, adminOnly, async (req, res) => {
       papel_ticket,
       auto_imprimir_ticket
     } = req.body;
-    const normalizedPaper = papel_ticket === '58mm' ? '58mm' : '80mm';
-    const autoPrint = auto_imprimir_ticket !== false;
+    const currentResult = await pool.query(
+      'SELECT impresora_ticket, papel_ticket, auto_imprimir_ticket FROM configuracion WHERE id = 1'
+    );
+    const currentPrintConfig = currentResult.rows[0] || {};
+    const preservedPrinter = impresora_ticket === undefined
+      ? (currentPrintConfig.impresora_ticket || '')
+      : (impresora_ticket || '');
+    const preservedPaper = papel_ticket === undefined
+      ? (currentPrintConfig.papel_ticket || '80mm')
+      : (papel_ticket === '58mm' ? '58mm' : '80mm');
+    const preservedAutoPrint = auto_imprimir_ticket === undefined
+      ? (currentPrintConfig.auto_imprimir_ticket !== false)
+      : (auto_imprimir_ticket !== false);
     await pool.query(
       `INSERT INTO configuracion (
          id, nombre, direccion, telefono, whatsapp, redes_sociales, terminos_legales,
@@ -192,9 +203,9 @@ router.put('/negocio', authMiddleware, adminOnly, async (req, res) => {
         terminos_legales,
         logo_url || '',
         logo_ticket_url || '',
-        impresora_ticket || '',
-        normalizedPaper,
-        autoPrint
+        preservedPrinter,
+        preservedPaper,
+        preservedAutoPrint
       ]
     );
     res.json({ message: 'Configuración actualizada' });

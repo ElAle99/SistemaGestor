@@ -449,11 +449,75 @@ document.addEventListener('DOMContentLoaded', async () => {
     initReportFilters();
     initUsuarios();
     initEstablishmentConfigForm();
-    initPrinterConfigForm();
+    initQZPrinterConfigForm();
+    initConfigurationNavigation();
     initCotizaciones();
     initCalendarioEvents();
     checkSession();
 });
+
+function initConfigurationNavigation() {
+    const view = document.getElementById('view-configuracion');
+    const links = Array.from(document.querySelectorAll('.config-section-link'));
+    const panels = Array.from(document.querySelectorAll('.config-card[role="tabpanel"]'));
+    if (!view || !links.length) return;
+
+    const openPanel = (targetId, options = {}) => {
+        const targetPanel = document.getElementById(targetId);
+        if (!targetPanel || !panels.includes(targetPanel)) return;
+
+        links.forEach(link => {
+            const isActive = link.getAttribute('href') === `#${targetId}`;
+            link.classList.toggle('active', isActive);
+            link.setAttribute('aria-selected', String(isActive));
+            link.tabIndex = isActive ? 0 : -1;
+        });
+
+        panels.forEach(panel => {
+            const isActive = panel.id === targetId;
+            panel.hidden = !isActive;
+            panel.classList.toggle('config-panel-active', isActive);
+        });
+
+        if (options.updateHash) {
+            history.replaceState(null, '', `#${targetId}`);
+        }
+        if (options.focusPanel) {
+            targetPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
+
+    links.forEach((link, index) => {
+        link.addEventListener('click', event => {
+            const targetId = link.getAttribute('href')?.slice(1);
+            event.preventDefault();
+            if (targetId) openPanel(targetId, { updateHash: true, focusPanel: true });
+        });
+
+        link.addEventListener('keydown', event => {
+            if (!['ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
+            event.preventDefault();
+            const visibleLinks = links.filter(item => item.offsetParent !== null);
+            const currentIndex = visibleLinks.indexOf(link);
+            let nextIndex = currentIndex;
+            if (event.key === 'Home') nextIndex = 0;
+            else if (event.key === 'End') nextIndex = visibleLinks.length - 1;
+            else if (event.key === 'ArrowDown' || event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % visibleLinks.length;
+            else nextIndex = (currentIndex - 1 + visibleLinks.length) % visibleLinks.length;
+
+            const nextLink = visibleLinks[nextIndex] || links[index];
+            const targetId = nextLink.getAttribute('href')?.slice(1);
+            nextLink.focus();
+            if (targetId) openPanel(targetId, { updateHash: true });
+        });
+    });
+
+    const requestedPanel = window.location.hash.slice(1);
+    const initialPanel = panels.some(panel => panel.id === requestedPanel)
+        ? requestedPanel
+        : 'config-establishment-card';
+    openPanel(initialPanel);
+}
 
 // ==========================================
 // NAVEGACIÓN Y LOGUEO
@@ -4753,7 +4817,13 @@ function initOrderRegistration() {
 
                 if (!isEditing) {
                     // Previsualizar Ticket inmediatamente al crear una nueva orden
-                    viewOrderDetails(finalOrder.id);
+                    await viewOrderDetails(finalOrder.id);
+                    if (ESTABLISHMENT_CONFIG.autoPrintTicket !== false) {
+                        const printed = await printReceipt(null, { silent: true });
+                        if (!printed) {
+                            alert('Orden creada correctamente.\n\nNo fue posible imprimir el ticket. Puedes reintentar desde la vista previa o usar la impresión normal.');
+                        }
+                    }
                 }
             } else {
                 const err = await response.json();
@@ -4940,6 +5010,7 @@ async function editOrderDetails(id) {
 // ==========================================
 const receiptModal = document.getElementById('receipt-modal');
 const receiptPrint80Button = document.getElementById('btn-print-action');
+const receiptBrowserPrintButton = document.getElementById('btn-browser-print-action');
 const saleSuccessModal = document.getElementById('sale-success-modal');
 const saleSuccessPrintButton = document.getElementById('btn-sale-success-print');
 const saleSuccessPreviewButton = document.getElementById('btn-sale-success-preview');
@@ -5432,14 +5503,26 @@ function buildDirectReceiptText(size) {
 }
 
 function setReceiptPrintBusy(isBusy) {
-    [receiptPrint80Button, saleSuccessPrintButton].forEach(button => {
+    [receiptPrint80Button, receiptBrowserPrintButton, saleSuccessPrintButton].forEach(button => {
         if (!button) return;
         button.disabled = isBusy;
         button.classList.toggle('disabled', isBusy);
     });
+    if (receiptPrint80Button) {
+        receiptPrint80Button.innerHTML = isBusy
+            ? '<i class="fa-solid fa-spinner fa-spin"></i> Enviando ticket...'
+            : '<i class="fa-solid fa-print"></i> Imprimir ticket';
+    }
 }
 
 async function printReceipt(size, options = {}) {
+    if (!window.qzPrinterService) {
+        if (!options.silent) {
+            alert('QZ Tray no está disponible. Puedes utilizar la impresión normal del navegador.');
+        }
+        return false;
+    }
+
     const activeReceiptElement = getActiveReceiptElement();
     if (activeReceiptElement) {
         refreshReceiptOptionalSections(activeReceiptElement);
@@ -5460,12 +5543,16 @@ async function printReceipt(size, options = {}) {
             throw new Error('No se pudo cargar el generador de imagen del ticket. Recarga el sistema e intenta de nuevo.');
         }
 
-        await sendReceiptPreviewToPrinter(receiptElement, detectedPaper);
+        const result = await sendReceiptPreviewToPrinter(receiptElement, detectedPaper);
+        if (!options.silent) {
+            alert(`Ticket enviado a ${result.printerName}.`);
+        }
         return true;
     } catch (err) {
         console.error('Error de impresion:', err);
         if (!options.silent) {
-            alert(err.message || 'No se pudo enviar el ticket a la impresora.');
+            const message = err.userMessage || err.message || 'No se pudo enviar el ticket a la impresora.';
+            alert(`${message}\n\nPuedes utilizar la impresión normal del navegador.`);
         }
         return false;
     } finally {
@@ -5541,27 +5628,30 @@ function normalizeReceiptCanvasForThermalPrint(sourceCanvas, targetWidthPx) {
 async function sendReceiptPreviewToPrinter(receiptElement, paper) {
     const detectedPaper = normalizeTicketPaper(paper);
     const capture = await captureReceiptPreviewImage(receiptElement, detectedPaper);
-    const response = await fetch(`${BASE_API_URL}/configuracion/imprimir-ticket`, {
-        method: 'POST',
-        body: JSON.stringify({
-            imageData: capture.imageData,
-            pixelWidth: capture.pixelWidth,
-            pixelHeight: capture.pixelHeight,
-            sourcePixelWidth: capture.sourcePixelWidth,
-            sourcePixelHeight: capture.sourcePixelHeight,
-            renderScale: capture.renderScale,
-            dpi: THERMAL_PRINT_DPI,
-            printerName: ESTABLISHMENT_CONFIG.ticketPrinter || '',
-            paper: detectedPaper,
-            detectedPaper,
-            copies: 1
-        })
+    const preferences = window.qzPrinterService.readPreferences();
+    return window.qzPrinterService.printImageTicket({
+        imageData: capture.imageData,
+        density: THERMAL_PRINT_DPI,
+        printerName: preferences.printerName,
+        paperWidth: detectedPaper,
+        jobName: 'Allfix - Ticket térmico'
     });
+}
 
-    if (!response.ok) {
-        const errorPayload = await response.json().catch(() => ({}));
-        throw new Error(errorPayload.error || 'No se pudo enviar el ticket a la impresora.');
+function printReceiptBrowser(size) {
+    const activeReceiptElement = getActiveReceiptElement();
+    if (!activeReceiptElement) {
+        alert('No hay un ticket listo para imprimir.');
+        return false;
     }
+
+    const detectedPaper = normalizeTicketPaper(
+        size || (activeReceiptElement.id === 'ticket-corte-container' ? '58mm' : detectConfiguredTicketPaper())
+    );
+    refreshReceiptOptionalSections(activeReceiptElement);
+    setReceiptPrintSize(detectedPaper);
+    window.print();
+    return true;
 }
 
 function showSaleSuccessModal(sale, options = {}) {
@@ -5594,10 +5684,17 @@ function showSaleSuccessModal(sale, options = {}) {
 
 async function handleCompletedSale(completedVenta) {
     saleSuccessModal?.classList.add('hidden');
-    viewVentaDetails(completedVenta);
+    window.viewVentaDetails(completedVenta, { openPreview: false });
+
+    let printed = false;
+    if (ESTABLISHMENT_CONFIG.autoPrintTicket !== false) {
+        printed = await printReceipt(null, { silent: true });
+    }
+    showSaleSuccessModal(completedVenta, { printed });
 }
 
 window.printReceipt = printReceipt;
+window.printReceiptBrowser = printReceiptBrowser;
 window.addEventListener('afterprint', clearReceiptPrintSize);
 
 function getConfiguredTicketPaper() {
@@ -9348,15 +9445,22 @@ async function loadEstablishmentConfig() {
                 ticketLogoUrl: serverConfig.logo_ticket_url || serverConfig.ticketLogoUrl || ESTABLISHMENT_CONFIG.ticketLogoUrl || '',
                 whatsapp: serverConfig.whatsapp || ESTABLISHMENT_CONFIG.whatsapp || '',
                 redes_sociales: serverConfig.redes_sociales || ESTABLISHMENT_CONFIG.redes_sociales || '',
-                ticketPrinter: serverConfig.impresora_ticket || serverConfig.ticketPrinter || ESTABLISHMENT_CONFIG.ticketPrinter || '',
-                ticketPaper: serverConfig.papel_ticket === '58mm' ? '58mm' : '80mm',
-                autoPrintTicket: serverConfig.auto_imprimir_ticket !== false
+                ticketPrinter: ESTABLISHMENT_CONFIG.ticketPrinter || '',
+                ticketPaper: ESTABLISHMENT_CONFIG.ticketPaper || '58mm',
+                autoPrintTicket: ESTABLISHMENT_CONFIG.autoPrintTicket !== false
             };
             Object.assign(ESTABLISHMENT_CONFIG, mappedConfig);
             localStorage.setItem('allfix_establishment_config', JSON.stringify(ESTABLISHMENT_CONFIG));
         }
     } catch (err) {
         console.warn('No se pudo cargar la configuración del establecimiento desde el backend:', err);
+    }
+
+    if (window.qzPrinterService) {
+        const localPrintPreferences = window.qzPrinterService.readPreferences();
+        ESTABLISHMENT_CONFIG.ticketPrinter = localPrintPreferences.printerName;
+        ESTABLISHMENT_CONFIG.ticketPaper = localPrintPreferences.paperWidth;
+        ESTABLISHMENT_CONFIG.autoPrintTicket = localPrintPreferences.autoPrint;
     }
 
     applyBusinessBranding();
@@ -9392,9 +9496,7 @@ async function saveEstablishmentConfig(config) {
             logo_ticket_url: normalizedConfig.ticketLogoUrl,
             whatsapp: normalizedConfig.whatsapp,
             redes_sociales: normalizedConfig.redes_sociales,
-            impresora_ticket: normalizedConfig.ticketPrinter,
-            papel_ticket: normalizedConfig.ticketPaper,
-            auto_imprimir_ticket: normalizedConfig.autoPrintTicket
+            // Printer preferences are intentionally local to each browser/computer.
         })
     });
 
@@ -9507,32 +9609,20 @@ function initEstablishmentConfigForm() {
 }
 
 async function detectAvailablePrinters() {
-    try {
-        const response = await fetch(`${BASE_API_URL}/configuracion/impresoras`);
-        if (response.ok) {
-            const printers = await response.json();
-            return (printers || []).map(normalizePrinterInfo).filter(printer => printer.name);
-        }
-    } catch (err) {
-        console.warn('No se pudieron consultar impresoras desde el backend:', err);
+    if (!window.qzPrinterService) {
+        throw new Error('No se pudo cargar la integración con QZ Tray.');
     }
-
-    const printerProviders = [
-        window.allfixPrinterBridge,
-        window.allfixPrinter,
-        window.printerAPI,
-        window.electronAPI
-    ].filter(Boolean);
-
-    for (const provider of printerProviders) {
-        const getPrinters = provider.getPrinters || provider.listPrinters;
-        if (typeof getPrinters !== 'function') continue;
-
-        const printers = await getPrinters.call(provider);
-        return (printers || []).map(normalizePrinterInfo).filter(printer => printer.name);
-    }
-
-    return [];
+    const [printerNames, defaultPrinter] = await Promise.all([
+        window.qzPrinterService.getPrinters(),
+        window.qzPrinterService.getDefaultPrinter().catch(() => '')
+    ]);
+    window.qzPrinterService.getPrinterDetails().catch(() => []);
+    return printerNames.map(name => ({
+        name,
+        isDefault: name === defaultPrinter,
+        paperMm: null,
+        ticketPaper: null
+    }));
 }
 
 function normalizePrinterInfo(printer) {
@@ -9668,6 +9758,185 @@ function initPrinterConfigForm() {
             alert('Configuración de impresión guardada con éxito.');
         } catch (err) {
             alert(err.message || 'No se pudo guardar la configuración de impresión.');
+        }
+    });
+}
+
+function initQZPrinterConfigForm() {
+    const form = document.getElementById('config-printer-form');
+    if (!form) return;
+
+    const printerInput = document.getElementById('cfg-ticket-printer');
+    const paperSelect = document.getElementById('cfg-ticket-paper');
+    const printModeSelect = document.getElementById('cfg-ticket-print-mode');
+    const detectButton = document.getElementById('btn-detect-printers');
+    const testButton = document.getElementById('btn-test-printer');
+    const browserPrintButton = document.getElementById('btn-browser-print-test');
+    const status = document.getElementById('printer-config-status');
+    const connectionStatus = document.getElementById('qz-connection-status');
+    const ticketLogoInput = document.getElementById('cfg-ticket-logo');
+    const selectTicketLogoButton = document.getElementById('btn-select-ticket-logo');
+    const removeTicketLogoButton = document.getElementById('btn-remove-ticket-logo');
+    const preferences = window.qzPrinterService?.readPreferences() || {
+        printerName: '',
+        paperWidth: '58mm',
+        autoPrint: true
+    };
+
+    Object.assign(ESTABLISHMENT_CONFIG, {
+        ticketPrinter: preferences.printerName,
+        ticketPaper: preferences.paperWidth,
+        autoPrintTicket: preferences.autoPrint
+    });
+    if (paperSelect) paperSelect.value = preferences.paperWidth;
+    if (printModeSelect) printModeSelect.value = preferences.autoPrint ? 'direct' : 'ask';
+    setTicketLogoPreview();
+
+    const setQZStatus = (state, label, description) => {
+        if (connectionStatus) {
+            connectionStatus.textContent = label;
+            connectionStatus.className = `qz-status qz-status-${state}`;
+        }
+        if (description && status) status.textContent = description;
+    };
+
+    const renderPrinters = (printers, selectedPrinter) => {
+        AVAILABLE_TICKET_PRINTERS = printers.map(normalizePrinterInfo).filter(printer => printer.name);
+        const names = AVAILABLE_TICKET_PRINTERS.map(printer => printer.name);
+        const selectedMissing = Boolean(selectedPrinter && !names.includes(selectedPrinter));
+        const options = ['<option value="">Selecciona una impresora</option>'];
+
+        if (selectedMissing) {
+            options.push(`<option value="${escapeHtml(selectedPrinter)}">${escapeHtml(selectedPrinter)} (no disponible)</option>`);
+        }
+        AVAILABLE_TICKET_PRINTERS.forEach(printer => {
+            const suffix = printer.isDefault ? ' (predeterminada de Windows)' : '';
+            options.push(`<option value="${escapeHtml(printer.name)}">${escapeHtml(printer.name + suffix)}</option>`);
+        });
+        printerInput.innerHTML = options.join('');
+        printerInput.value = selectedPrinter || '';
+        return selectedMissing;
+    };
+
+    renderPrinters([], preferences.printerName);
+
+    selectTicketLogoButton?.addEventListener('click', () => ticketLogoInput?.click());
+    ticketLogoInput?.addEventListener('change', () => {
+        const file = ticketLogoInput.files?.[0];
+        if (!file) return setTicketLogoPreview();
+        const reader = new FileReader();
+        reader.onload = () => setTicketLogoPreview(reader.result, file.name);
+        reader.onerror = () => alert('No se pudo leer el logo seleccionado para el ticket.');
+        reader.readAsDataURL(file);
+    });
+    removeTicketLogoButton?.addEventListener('click', () => {
+        ESTABLISHMENT_CONFIG.ticketLogoUrl = '';
+        if (ticketLogoInput) ticketLogoInput.value = '';
+        setTicketLogoPreview(DEFAULT_TICKET_LOGO, 'Se usará el logo base al guardar');
+        applyTicketLogoSource();
+    });
+
+    printerInput?.addEventListener('change', () => {
+        ESTABLISHMENT_CONFIG.ticketPrinter = printerInput.value.trim();
+        window.qzPrinterService?.savePreferences({ printerName: ESTABLISHMENT_CONFIG.ticketPrinter });
+    });
+    paperSelect?.addEventListener('change', () => {
+        ESTABLISHMENT_CONFIG.ticketPaper = paperSelect.value === '80mm' ? '80mm' : '58mm';
+        window.qzPrinterService?.savePreferences({ paperWidth: ESTABLISHMENT_CONFIG.ticketPaper });
+    });
+    printModeSelect?.addEventListener('change', () => {
+        ESTABLISHMENT_CONFIG.autoPrintTicket = printModeSelect.value === 'direct';
+        window.qzPrinterService?.savePreferences({ autoPrint: ESTABLISHMENT_CONFIG.autoPrintTicket });
+    });
+
+    async function refreshQZPrinters() {
+        setQZStatus('connecting', 'Conectando...', 'Conectando con QZ Tray...');
+        if (detectButton) detectButton.disabled = true;
+        try {
+            const printers = await detectAvailablePrinters();
+            const selectedPrinter = window.qzPrinterService.readPreferences().printerName;
+            const selectedMissing = renderPrinters(printers, selectedPrinter);
+            if (!printers.length) {
+                setQZStatus(
+                    'connected',
+                    'Conectado',
+                    'QZ Tray está conectado, pero no se encontraron impresoras instaladas en Windows.'
+                );
+            } else if (selectedMissing) {
+                setQZStatus(
+                    'connected',
+                    'Conectado',
+                    'La impresora configurada ya no está disponible. Selecciona otra impresora y guarda los cambios.'
+                );
+            } else {
+                setQZStatus(
+                    'connected',
+                    'Conectado',
+                    `Conectado con QZ Tray. Se encontraron ${printers.length} impresora(s).`
+                );
+            }
+        } catch (error) {
+            setQZStatus(
+                'unavailable',
+                'No disponible',
+                `${error.userMessage || error.message || 'No fue posible conectar con QZ Tray.'} Puedes utilizar la impresión normal del navegador.`
+            );
+        } finally {
+            if (detectButton) detectButton.disabled = false;
+        }
+    }
+
+    detectButton?.addEventListener('click', refreshQZPrinters);
+    document.querySelector('[data-view="configuracion"]')?.addEventListener('click', refreshQZPrinters);
+
+    testButton?.addEventListener('click', async () => {
+        if (!printerInput.value) {
+            alert('Selecciona una impresora antes de imprimir la prueba.');
+            return;
+        }
+        testButton.disabled = true;
+        testButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando prueba...';
+        try {
+            const result = await window.qzPrinterService.printTestTicket({
+                printerName: printerInput.value,
+                paperWidth: paperSelect?.value || '58mm'
+            });
+            setQZStatus('connected', 'Conectado', `Ticket de prueba enviado a ${result.printerName}.`);
+            alert(`Ticket de prueba enviado a ${result.printerName}.`);
+        } catch (error) {
+            setQZStatus('unavailable', 'No disponible', error.userMessage || error.message);
+            alert(`${error.userMessage || error.message || 'No fue posible imprimir la prueba.'}\n\nPuedes utilizar la impresión normal del navegador.`);
+        } finally {
+            testButton.disabled = false;
+            testButton.innerHTML = '<i class="fa-solid fa-print"></i> Imprimir prueba';
+        }
+    });
+
+    browserPrintButton?.addEventListener('click', () => {
+        alert('Abre la vista previa de un ticket y utiliza el botón “Impresión normal”.');
+    });
+
+    form.addEventListener('submit', async event => {
+        event.preventDefault();
+        try {
+            const localPreferences = window.qzPrinterService.savePreferences({
+                printerName: printerInput.value.trim(),
+                paperWidth: paperSelect?.value || '58mm',
+                autoPrint: (printModeSelect?.value || 'direct') === 'direct'
+            });
+            Object.assign(ESTABLISHMENT_CONFIG, {
+                ticketPrinter: localPreferences.printerName,
+                ticketPaper: localPreferences.paperWidth,
+                autoPrintTicket: localPreferences.autoPrint
+            });
+            const ticketLogoUrl = await uploadTicketLogoIfNeeded();
+            await saveEstablishmentConfig({ ticketLogoUrl });
+            if (ticketLogoInput) ticketLogoInput.value = '';
+            setTicketLogoPreview();
+            if (status) status.textContent = 'Configuración de impresión guardada en esta computadora.';
+            alert('Configuración de impresión guardada con éxito en esta computadora.');
+        } catch (error) {
+            alert(error.message || 'No se pudo guardar la configuración de impresión.');
         }
     });
 }

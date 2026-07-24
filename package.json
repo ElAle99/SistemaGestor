@@ -9,6 +9,7 @@
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
+    "qz-tray": "^2.2.6",
     "recharts": "^3.9.2"
   }
 }
