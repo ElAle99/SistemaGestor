@@ -625,42 +625,84 @@
                 <!-- VIEW: ÓRDENES                              -->
                 <!-- ========================================== -->
                 <section class="view-section hidden" id="view-ordenes">
+                    <div class="orders-overview">
+                        <div class="orders-overview-copy">
+                            <span class="orders-eyebrow">Centro de operaciones</span>
+                            <h2>Seguimiento de órdenes</h2>
+                            <p>Consulta avances, actualiza estados y administra cada reparación desde un solo lugar.</p>
+                        </div>
+                        <div class="orders-kpi-grid">
+                            <div class="orders-kpi-card">
+                                <span class="orders-kpi-icon is-blue"><i class="fa-solid fa-clipboard-list"></i></span>
+                                <div><strong id="order-stat-total">0</strong><span>Total</span></div>
+                            </div>
+                            <div class="orders-kpi-card">
+                                <span class="orders-kpi-icon is-amber"><i class="fa-solid fa-screwdriver-wrench"></i></span>
+                                <div><strong id="order-stat-active">0</strong><span>En proceso</span></div>
+                            </div>
+                            <div class="orders-kpi-card">
+                                <span class="orders-kpi-icon is-purple"><i class="fa-solid fa-box-open"></i></span>
+                                <div><strong id="order-stat-ready">0</strong><span>Por entregar</span></div>
+                            </div>
+                            <div class="orders-kpi-card">
+                                <span class="orders-kpi-icon is-green"><i class="fa-solid fa-circle-check"></i></span>
+                                <div><strong id="order-stat-delivered">0</strong><span>Entregadas</span></div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="search-actions-bar orders-toolbar">
-                        <div class="search-input-wrapper orders-search-wrapper">
-                            <i class="fa-solid fa-magnifying-glass"></i>
-                            <input type="text" id="order-search" placeholder="Buscar por folio, cliente, equipo o modelo">
+                        <div class="orders-toolbar-main">
+                            <div class="search-input-wrapper orders-search-wrapper">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" id="order-search" placeholder="Buscar folio, cliente, teléfono, equipo, IMEI...">
+                                <button type="button" id="btn-clear-order-search" class="orders-clear-search hidden" aria-label="Limpiar búsqueda">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                            <div class="filters-wrapper orders-filter-wrapper">
+                                <i class="fa-solid fa-filter"></i>
+                                <select id="filter-order-status" class="form-select" aria-label="Filtrar por estado">
+                                    <option value="ALL">Todos los estados</option>
+                                    <option value="Recibido">Recibido</option>
+                                    <option value="Diagnóstico">Diagnóstico</option>
+                                    <option value="Esperando autorización">Esperando autorización</option>
+                                    <option value="En reparación">En reparación</option>
+                                    <option value="Esperando refacción">Esperando refacción</option>
+                                    <option value="Retrasado">Retrasado</option>
+                                    <option value="Listo para entregar">Listo para entregar</option>
+                                    <option value="Terminado">Terminado</option>
+                                    <option value="Entregado">Entregado</option>
+                                    <option value="Cancelado">Cancelado</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="filters-wrapper orders-filter-wrapper">
-                            <select id="filter-order-status" class="form-select">
-                                <option value="ALL">Todos los Estados</option>
-                                <option value="Recibido">Recibido</option>
-                                <option value="Diagnóstico">Diagnóstico</option>
-                                <option value="Esperando autorización">Esperando autorización</option>
-                                <option value="En reparación">En reparación</option>
-                                <option value="Esperando refacción">Esperando refacción</option>
-                                <option value="Retrasado">Retrasado</option>
-                                <option value="Listo para entregar">Listo para entregar</option>
-                                <option value="Terminado">Terminado</option>
-                                <option value="Entregado">Entregado</option>
-                                <option value="Cancelado">Cancelado</option>
-                            </select>
+                        <div class="orders-toolbar-side">
+                            <span id="orders-results-count">0 órdenes</span>
+                            <button class="btn btn-primary btn-new-order-trigger">
+                                <i class="fa-solid fa-plus"></i><span>Registrar orden</span>
+                            </button>
                         </div>
-                        <button class="btn btn-primary btn-new-order-trigger">
-                            <i class="fa-solid fa-plus"></i> Registrar Orden
-                        </button>
                     </div>
 
                     <div class="card orders-table-card">
-                        <div class="card-body table-responsive">
+                        <div class="orders-table-heading">
+                            <div>
+                                <h3>Órdenes de servicio</h3>
+                                <p>Haz clic en una fila para consultar un resumen rápido.</p>
+                            </div>
+                            <span class="orders-table-hint"><i class="fa-solid fa-arrow-pointer"></i> Selecciona una orden</span>
+                        </div>
+                        <div class="card-body table-responsive orders-table-scroll">
                             <table class="table table-hover" id="orders-main-table">
                                 <thead>
                                     <tr>
-                                        <th>Folio</th>
+                                        <th>Orden</th>
                                         <th>Cliente</th>
-                                        <th>Equipo / Modelo</th>
-                                        <th>Falla Reportada</th>
-                                        <th>Fecha Estimada</th>
-                                        <th>Costo Estimado</th>
+                                        <th>Equipo</th>
+                                        <th>Servicio / falla</th>
+                                        <th>Entrega</th>
+                                        <th>Total</th>
                                         <th>Estado</th>
                                         <th>Acciones</th>
                                     </tr>
@@ -1271,14 +1313,20 @@
                 <!-- ========================================== -->
                 <section class="view-section hidden" id="view-reportes">
                     <div class="financial-report-toolbar">
-                        <div class="date-filters">
-                            <label>Rango de reporte</label>
+                        <div class="report-toolbar-heading">
+                            <span class="report-toolbar-icon"><i class="fa-solid fa-calendar-days"></i></span>
+                            <div>
+                                <strong>Periodo del reporte</strong>
+                                <span>Selecciona el rango que deseas analizar</span>
+                            </div>
+                        </div>
+                        <div class="date-filters" aria-label="Rango de reporte">
                             <div class="report-range-buttons">
-                                <button class="btn btn-sm btn-outline active" data-range="day">Hoy</button>
+                                <button class="btn btn-sm btn-outline active" data-range="day"><i class="fa-solid fa-calendar-day"></i> Hoy</button>
                                 <button class="btn btn-sm btn-outline" data-range="week">Esta Semana</button>
                                 <button class="btn btn-sm btn-outline" data-range="month">Este Mes</button>
                                 <button class="btn btn-sm btn-outline" data-range="year">Este Año</button>
-                                <button class="btn btn-sm btn-outline" data-range="custom">Personalizado</button>
+                                <button class="btn btn-sm btn-outline" data-range="custom"><i class="fa-solid fa-sliders"></i> Personalizado</button>
                             </div>
                         </div>
                         <div class="report-custom-range hidden" id="report-custom-range">
@@ -1291,7 +1339,7 @@
                                 <input type="date" id="report-date-to" class="form-control">
                             </div>
                         </div>
-                        <button class="btn btn-secondary" id="btn-print-report">
+                        <button class="btn btn-primary report-export-btn" id="btn-print-report">
                             <i class="fa-solid fa-file-pdf"></i> Imprimir / PDF
                         </button>
                     </div>
@@ -1299,9 +1347,11 @@
                     <article class="financial-report-sheet" id="financial-report-sheet">
                         <header class="financial-report-header">
                             <div class="financial-report-brand">
-                                <img src="img/logoallfixv2.png" alt="AllFix Bacalar" id="financial-report-logo">
+                                <div class="financial-report-logo-wrap">
+                                    <img src="img/logoallfixv2.png" alt="AllFix Bacalar" id="financial-report-logo">
+                                </div>
                                 <div>
-                                    <span id="financial-report-business">AllFix Bacalar</span>
+                                    <span class="financial-report-eyebrow"><i class="fa-solid fa-chart-line"></i> <span id="financial-report-business">AllFix Bacalar</span></span>
                                     <h2>Reporte financiero</h2>
                                     <p>Resumen administrativo de ingresos, gastos, caja y movimientos.</p>
                                 </div>
@@ -1315,41 +1365,41 @@
 
                         <section class="financial-section">
                             <div class="financial-section-title">
-                                <h3>Resumen general</h3>
-                                <span>Totales del rango consultado</span>
+                                <i class="fa-solid fa-chart-pie"></i>
+                                <div><h3>Resumen general</h3><span>Totales del rango consultado</span></div>
                             </div>
                             <div class="financial-summary-grid">
-                                <div class="financial-kpi income"><span>Total ingresos</span><strong id="rep-ingresos">$0.00</strong></div>
-                                <div class="financial-kpi expense admin-only"><span>Total gastos</span><strong id="rep-gastos">$0.00</strong></div>
-                                <div class="financial-kpi profit admin-only"><span>Ganancia neta</span><strong id="rep-ganancias">$0.00</strong></div>
-                                <div class="financial-kpi"><span>Fondo inicial caja</span><strong id="rep-caja-inicial">$0.00</strong></div>
-                                <div class="financial-kpi"><span>Monto esperado caja</span><strong id="rep-caja-esperado">$0.00</strong></div>
-                                <div class="financial-kpi"><span>Diferencia caja</span><strong id="rep-caja-diferencia">$0.00</strong></div>
-                                <div class="financial-kpi"><span>Órdenes cobradas</span><strong id="rep-reparaciones">0</strong></div>
-                                <div class="financial-kpi"><span>Ventas productos</span><strong id="rep-ventas">0</strong></div>
+                                <div class="financial-kpi income"><div class="financial-kpi-head"><span>Total ingresos</span><i class="fa-solid fa-arrow-trend-up"></i></div><strong id="rep-ingresos">$0.00</strong><small>Entradas del periodo</small></div>
+                                <div class="financial-kpi expense admin-only"><div class="financial-kpi-head"><span>Total gastos</span><i class="fa-solid fa-arrow-trend-down"></i></div><strong id="rep-gastos">$0.00</strong><small>Salidas registradas</small></div>
+                                <div class="financial-kpi profit admin-only"><div class="financial-kpi-head"><span>Ganancia neta</span><i class="fa-solid fa-sack-dollar"></i></div><strong id="rep-ganancias">$0.00</strong><small>Ingresos menos gastos</small></div>
+                                <div class="financial-kpi cash"><div class="financial-kpi-head"><span>Fondo inicial caja</span><i class="fa-solid fa-vault"></i></div><strong id="rep-caja-inicial">$0.00</strong><small>Base del corte</small></div>
+                                <div class="financial-kpi cash"><div class="financial-kpi-head"><span>Monto esperado caja</span><i class="fa-solid fa-cash-register"></i></div><strong id="rep-caja-esperado">$0.00</strong><small>Saldo calculado</small></div>
+                                <div class="financial-kpi difference"><div class="financial-kpi-head"><span>Diferencia caja</span><i class="fa-solid fa-scale-balanced"></i></div><strong id="rep-caja-diferencia">$0.00</strong><small>Esperado vs. contado</small></div>
+                                <div class="financial-kpi orders"><div class="financial-kpi-head"><span>Órdenes cobradas</span><i class="fa-solid fa-screwdriver-wrench"></i></div><strong id="rep-reparaciones">0</strong><small>Servicios pagados</small></div>
+                                <div class="financial-kpi sales"><div class="financial-kpi-head"><span>Ventas productos</span><i class="fa-solid fa-bag-shopping"></i></div><strong id="rep-ventas">0</strong><small>Tickets procesados</small></div>
                             </div>
                         </section>
 
                         <section class="financial-section">
                             <div class="financial-section-title">
-                                <h3>Detalle de ingresos</h3>
-                                <span>Ventas, reparaciones y métodos de pago</span>
+                                <i class="fa-solid fa-wallet"></i>
+                                <div><h3>Detalle de ingresos</h3><span>Ventas, reparaciones y métodos de pago</span></div>
                             </div>
                             <div class="financial-breakdown-grid">
-                                <div><span>Reparaciones</span><strong id="rep-ingresos-reparaciones">$0.00</strong></div>
-                                <div><span>POS productos/accesorios</span><strong id="rep-ingresos-pos">$0.00</strong></div>
-                                <div><span>Efectivo</span><strong id="rep-pagos-efectivo">$0.00</strong></div>
-                                <div><span>Transferencia</span><strong id="rep-pagos-transferencia">$0.00</strong></div>
-                                <div><span>Tarjeta</span><strong id="rep-pagos-tarjeta">$0.00</strong></div>
-                                <div><span>Pagos mixtos</span><strong id="rep-pagos-mixtos">$0.00</strong></div>
-                                <div><span>Descuentos</span><strong id="rep-descuentos">$0.00</strong></div>
+                                <div><i class="fa-solid fa-screwdriver-wrench"></i><span>Reparaciones</span><strong id="rep-ingresos-reparaciones">$0.00</strong></div>
+                                <div><i class="fa-solid fa-cart-shopping"></i><span>Productos y accesorios</span><strong id="rep-ingresos-pos">$0.00</strong></div>
+                                <div><i class="fa-solid fa-money-bill-wave"></i><span>Efectivo</span><strong id="rep-pagos-efectivo">$0.00</strong></div>
+                                <div><i class="fa-solid fa-building-columns"></i><span>Transferencia</span><strong id="rep-pagos-transferencia">$0.00</strong></div>
+                                <div><i class="fa-solid fa-credit-card"></i><span>Tarjeta</span><strong id="rep-pagos-tarjeta">$0.00</strong></div>
+                                <div><i class="fa-solid fa-shuffle"></i><span>Pagos mixtos</span><strong id="rep-pagos-mixtos">$0.00</strong></div>
+                                <div class="discount"><i class="fa-solid fa-tag"></i><span>Descuentos</span><strong id="rep-descuentos">$0.00</strong></div>
                             </div>
                         </section>
 
                         <section class="financial-section admin-only">
                             <div class="financial-section-title">
-                                <h3>Detalle de gastos</h3>
-                                <span>Costos de refacciones y salidas registradas</span>
+                                <i class="fa-solid fa-receipt"></i>
+                                <div><h3>Detalle de gastos</h3><span>Costos de refacciones y salidas registradas</span></div>
                             </div>
                             <div class="financial-table-wrap">
                                 <table class="financial-table" id="report-expenses-table">
@@ -1369,8 +1419,8 @@
 
                         <section class="financial-section">
                             <div class="financial-section-title">
-                                <h3>Corte de caja</h3>
-                                <span>Aperturas, cierres y diferencias</span>
+                                <i class="fa-solid fa-cash-register"></i>
+                                <div><h3>Corte de caja</h3><span>Aperturas, cierres y diferencias</span></div>
                             </div>
                             <div class="financial-table-wrap">
                                 <table class="financial-table" id="report-cashcut-table">
@@ -1394,8 +1444,8 @@
 
                         <section class="financial-section">
                             <div class="financial-section-title">
-                                <h3>Tabla de movimientos</h3>
-                                <span>Flujo financiero ordenado por fecha</span>
+                                <i class="fa-solid fa-arrow-right-arrow-left"></i>
+                                <div><h3>Movimientos financieros</h3><span>Flujo financiero ordenado por fecha</span></div>
                             </div>
                             <div class="financial-table-wrap">
                                 <table class="financial-table" id="report-movements-table">
@@ -1418,8 +1468,8 @@
 
                         <section class="financial-section">
                             <div class="financial-section-title">
-                                <h3>Desglose detallado de operaciones</h3>
-                                <span>Ventas y órdenes consideradas para el resumen</span>
+                                <i class="fa-solid fa-list-check"></i>
+                                <div><h3>Desglose de operaciones</h3><span>Ventas y órdenes consideradas para el resumen</span></div>
                             </div>
                             <div class="financial-table-wrap">
                                 <table class="financial-table" id="reportes-details-table">
@@ -1715,6 +1765,176 @@
     <!-- ========================================== -->
     <!-- MODALS: GARANTÍAS                          -->
     <!-- ========================================== -->
+    <div id="additional-repair-modal" class="modal-overlay hidden">
+        <div class="modal-container additional-repair-dialog animate-slide-up">
+            <div class="modal-header additional-repair-header">
+                <div class="additional-repair-title-group">
+                    <span class="additional-repair-title-icon"><i class="fa-solid fa-screwdriver-wrench"></i></span>
+                    <div>
+                        <span class="additional-repair-eyebrow">Ajuste de servicio</span>
+                        <h3>Agregar otra reparación</h3>
+                        <p id="additional-repair-order-label"></p>
+                    </div>
+                </div>
+                <button class="btn-close-modal" id="btn-close-additional-repair" aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body additional-repair-body">
+                <form id="additional-repair-form" class="additional-repair-form">
+                    <input type="hidden" id="additional-repair-order-id">
+                    <section class="additional-repair-section">
+                        <div class="additional-repair-section-head">
+                            <span>1</span>
+                            <div>
+                                <h4>Describe el trabajo adicional</h4>
+                                <p>Explica claramente qué problema se detectó y qué se realizará.</p>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="additional-repair-description">Nueva reparación <em>Obligatorio</em></label>
+                            <textarea id="additional-repair-description" class="form-control" rows="3" required placeholder="Ej. Se detectó daño en el centro de carga; se realizará el reemplazo del módulo."></textarea>
+                            <small class="additional-repair-field-hint"><i class="fa-regular fa-lightbulb"></i> Esta descripción quedará registrada en el historial de la orden.</small>
+                        </div>
+                    </section>
+
+                    <section class="additional-repair-section">
+                        <div class="additional-repair-section-head">
+                            <span>2</span>
+                            <div>
+                                <h4>Define el costo del servicio</h4>
+                                <p>Captura únicamente la mano de obra; las piezas se suman por separado.</p>
+                            </div>
+                        </div>
+                        <div class="additional-repair-service-price">
+                            <div class="form-group">
+                                <label for="additional-repair-price">Mano de obra / servicio</label>
+                                <div class="additional-repair-money-input">
+                                    <span>$</span>
+                                    <input type="number" id="additional-repair-price" class="form-control" min="0" step="0.01" value="0" placeholder="0.00">
+                                    <small>MXN</small>
+                                </div>
+                            </div>
+                            <div class="additional-repair-service-note">
+                                <i class="fa-solid fa-circle-info"></i>
+                                <span>Puedes dejarlo en $0 si sólo agregarás una refacción.</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="additional-repair-section additional-repair-parts-panel">
+                        <div class="additional-repair-section-head">
+                            <span>3</span>
+                            <div>
+                                <h4>Agrega refacciones</h4>
+                                <p>Las existencias se descontarán automáticamente al guardar.</p>
+                            </div>
+                        </div>
+                        <div class="additional-repair-parts-head">
+                            <strong>Selección del inventario</strong>
+                            <span id="additional-repair-parts-count" class="photo-count-pill">0 refacciones</span>
+                        </div>
+                        <div class="additional-repair-part-controls">
+                            <div class="form-group">
+                                <label for="additional-repair-part">Refacción</label>
+                                <select id="additional-repair-part" class="form-select">
+                                    <option value="">Selecciona una refacción</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="additional-repair-part-qty">Cantidad</label>
+                                <input type="number" id="additional-repair-part-qty" class="form-control" min="1" step="1" value="1">
+                            </div>
+                            <button type="button" class="btn btn-secondary" id="btn-add-additional-repair-part">
+                                <i class="fa-solid fa-plus"></i> Agregar
+                            </button>
+                        </div>
+                        <div id="additional-repair-parts-list" class="additional-repair-parts-list">
+                            <div class="additional-repair-empty-parts">
+                                <i class="fa-solid fa-box-open"></i>
+                                <span>Sin refacciones agregadas</span>
+                                <small>Selecciona una pieza para incluirla en esta reparación.</small>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div class="additional-repair-summary">
+                        <div>
+                            <span>Total actual</span>
+                            <strong id="additional-repair-current-total">$0.00</strong>
+                        </div>
+                        <i class="fa-solid fa-arrow-right"></i>
+                        <div>
+                            <span>Importe adicional</span>
+                            <strong id="additional-repair-added-total">$0.00</strong>
+                        </div>
+                        <div class="is-new-total">
+                            <span>Nuevo total</span>
+                            <strong id="additional-repair-new-total">$0.00</strong>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer additional-repair-footer">
+                        <span><i class="fa-solid fa-lock"></i> El inventario y el total se actualizarán al confirmar.</span>
+                        <button type="button" class="btn btn-secondary" id="btn-cancel-additional-repair">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" id="btn-save-additional-repair">
+                            <i class="fa-solid fa-check"></i> Confirmar reparación
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="quick-warranty-modal" class="modal-overlay hidden">
+        <div class="modal-container animate-slide-up">
+            <div class="modal-header">
+                <div>
+                    <h3>Agregar garantía</h3>
+                    <p id="quick-warranty-order-label" class="text-muted"></p>
+                </div>
+                <button class="btn-close-modal" id="btn-close-quick-warranty" aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="quick-warranty-form" class="warranty-form">
+                    <input type="hidden" id="quick-warranty-order-id">
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label for="quick-warranty-days">Duración *</label>
+                            <select id="quick-warranty-days" class="form-select" required>
+                                <option value="15">15 días</option>
+                                <option value="30" selected>30 días</option>
+                                <option value="60">60 días</option>
+                                <option value="90">90 días</option>
+                                <option value="180">180 días</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="quick-warranty-start">Fecha de inicio *</label>
+                            <input type="date" id="quick-warranty-start" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="quick-warranty-service">Reparación o servicio cubierto *</label>
+                        <input type="text" id="quick-warranty-service" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="quick-warranty-conditions">Condiciones</label>
+                        <textarea id="quick-warranty-conditions" class="form-control" rows="2" placeholder="Ej. No cubre golpes, humedad ni manipulación por terceros"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="quick-warranty-notes">Observaciones</label>
+                        <textarea id="quick-warranty-notes" class="form-control" rows="2"></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" id="btn-cancel-quick-warranty">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" id="btn-save-quick-warranty">
+                            <i class="fa-solid fa-shield-halved"></i> Guardar garantía
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <div id="warranty-detail-modal" class="modal-overlay hidden">
         <div class="modal-container modal-large animate-slide-up">
             <div class="modal-header">
@@ -2398,58 +2618,97 @@
                         <!-- TAB 5: FINANCIAL & WORK STATUS -->
                         <div class="new-order-step hidden" data-step="4">
                     <div class="modal-tab-content order-section-card" id="tab-economicos">
-                        <div class="form-row-3">
-                            <div class="form-group">
-                                <label for="form-costo-estimado">Costo estimado</label>
-                                <div class="input-money-wrapper">
-                                    <span class="money-symbol">$</span>
-                                    <input type="number" id="form-costo-estimado" class="form-control" step="0.01" placeholder="Sin presupuesto">
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="form-anticipo">Anticipo</label>
-                                <div class="input-money-wrapper">
-                                    <span class="money-symbol">$</span>
-                                    <input type="number" id="form-anticipo" class="form-control" step="0.01" placeholder="Opcional">
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="form-saldo-pendiente">Saldo pendiente</label>
-                                <div class="input-money-wrapper bg-disabled">
-                                    <span class="money-symbol">$</span>
-                                    <input type="text" id="form-saldo-pendiente" class="form-control" disabled value="0.00">
-                                </div>
+                        <div class="order-costs-intro">
+                            <div class="order-costs-intro-icon"><i class="fa-solid fa-calculator"></i></div>
+                            <div>
+                                <h4>Presupuesto de la reparación</h4>
+                                <p>Define el servicio, agrega las refacciones y registra el anticipo. El total y el saldo se calculan automáticamente.</p>
                             </div>
                         </div>
 
-                        <div class="form-row-2">
-                            <div class="form-group">
-                                <label for="form-anticipo-metodo">Método de pago del anticipo/abono</label>
-                                <select id="form-anticipo-metodo" class="form-select">
-                                    <option value="Efectivo">Efectivo</option>
-                                    <option value="Tarjeta">Tarjeta Bancaria</option>
-                                    <option value="Transferencia">Transferencia SPEI</option>
-                                </select>
+                        <div class="order-costs-workspace">
+                            <div class="order-cost-card order-cost-primary-card">
+                                <div class="order-cost-card-heading">
+                                    <span><i class="fa-solid fa-screwdriver-wrench"></i></span>
+                                    <div>
+                                        <h5>Servicio y presupuesto</h5>
+                                        <p>Importes acordados con el cliente.</p>
+                                    </div>
+                                </div>
+                                <div class="order-cost-fields">
+                                    <div class="form-group">
+                                        <label for="form-mano-obra">Mano de obra / servicio</label>
+                                        <div class="input-money-wrapper">
+                                            <span class="money-symbol">$</span>
+                                            <input type="number" id="form-mano-obra" class="form-control" min="0" step="0.01" value="0">
+                                        </div>
+                                        <small class="order-field-help">Costo del trabajo técnico, sin refacciones.</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="form-costo-estimado">Total presupuestado</label>
+                                        <div class="input-money-wrapper">
+                                            <span class="money-symbol">$</span>
+                                            <input type="number" id="form-costo-estimado" class="form-control" min="0" step="0.01" placeholder="Sin presupuesto">
+                                        </div>
+                                        <small class="order-field-help">Se calcula al agregar mano de obra o refacciones; también puedes capturarlo manualmente.</small>
+                                    </div>
+                                </div>
                             </div>
+
+                            <aside class="order-cost-summary-card" aria-label="Resumen del presupuesto">
+                                <div class="order-cost-summary-label">Resumen a cobrar</div>
+                                <div class="order-cost-summary-row">
+                                    <span>Total</span>
+                                    <strong id="order-summary-total">$0.00</strong>
+                                </div>
+                                <div class="order-cost-summary-advance">
+                                    <label for="form-anticipo">Anticipo recibido</label>
+                                    <div class="input-money-wrapper">
+                                        <span class="money-symbol">$</span>
+                                        <input type="number" id="form-anticipo" class="form-control" min="0" step="0.01" placeholder="0.00">
+                                    </div>
+                                    <small id="order-advance-feedback" class="order-cost-feedback"></small>
+                                </div>
+                                <div class="order-cost-summary-balance">
+                                    <span>Saldo pendiente</span>
+                                    <div class="input-money-wrapper bg-disabled">
+                                        <span class="money-symbol">$</span>
+                                        <input type="text" id="form-saldo-pendiente" class="form-control" disabled value="0.00">
+                                    </div>
+                                </div>
+                            </aside>
                         </div>
 
-                        <div class="form-row-2">
-                            <div class="form-group">
-                                <label for="form-fecha-entrega">Fecha de Entrega Estimada</label>
-                                <input type="date" id="form-fecha-entrega" class="form-control">
+                        <div class="order-cost-card order-payment-card">
+                            <div class="order-cost-card-heading">
+                                <span><i class="fa-solid fa-wallet"></i></span>
+                                <div>
+                                    <h5>Pago y entrega</h5>
+                                    <p>Información del anticipo y fecha prometida.</p>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label for="form-mano-obra">Mano de obra / servicio</label>
-                                <div class="input-money-wrapper">
-                                    <span class="money-symbol">$</span>
-                                    <input type="number" id="form-mano-obra" class="form-control" step="0.01" value="0">
+                            <div class="form-row-2">
+                                <div class="form-group">
+                                    <label for="form-anticipo-metodo">Método del anticipo / abono</label>
+                                    <select id="form-anticipo-metodo" class="form-select">
+                                        <option value="Efectivo">Efectivo</option>
+                                        <option value="Tarjeta">Tarjeta bancaria</option>
+                                        <option value="Transferencia">Transferencia SPEI</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="form-fecha-entrega">Fecha estimada de entrega</label>
+                                    <input type="date" id="form-fecha-entrega" class="form-control">
                                 </div>
                             </div>
                         </div>
 
                         <div class="order-parts-panel">
                             <div class="order-parts-header">
-                                <div class="form-section-title">Refacciones utilizadas</div>
+                                <div>
+                                    <div class="form-section-title">Refacciones utilizadas</div>
+                                    <p class="order-parts-subtitle">Busca productos del inventario; el costo se sumará automáticamente.</p>
+                                </div>
                                 <span id="order-parts-count" class="photo-count-pill">0 refacciones</span>
                             </div>
                             <div class="form-row-3">
@@ -2544,50 +2803,6 @@
                             <div class="form-group hidden" id="status-reason-group">
                                 <label id="status-reason-label" for="form-status-reason">Motivo *</label>
                                 <input type="text" id="form-status-reason" class="form-control">
-                            </div>
-                        </div>
-
-                        <div class="warranty-order-panel">
-                            <div class="warranty-order-head">
-                                <label class="order-lock-switch warranty-toggle">
-                                    <input type="checkbox" id="form-warranty-enabled">
-                                    <span class="order-lock-slider"></span>
-                                    <span class="order-lock-copy">
-                                        <strong>Tiene garantía</strong>
-                                        <small id="warranty-order-status">Sin garantía</small>
-                                    </span>
-                                </label>
-                                <span class="warranty-help-text">La garantía se asigna al servicio o reparación realizada.</span>
-                            </div>
-                            <div class="warranty-order-fields hidden" id="warranty-order-fields">
-                                <div class="form-row-3">
-                                    <div class="form-group">
-                                        <label for="form-warranty-days">Duración en días</label>
-                                        <input type="number" id="form-warranty-days" class="form-control" min="1" step="1" value="30">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="form-warranty-start">Inicio de garantía</label>
-                                        <input type="date" id="form-warranty-start" class="form-control">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="form-warranty-end">Fecha de vencimiento</label>
-                                        <input type="date" id="form-warranty-end" class="form-control" readonly>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label for="form-warranty-service">Servicio o reparación cubierta</label>
-                                    <input type="text" id="form-warranty-service" class="form-control" placeholder="Ej. Cambio de pantalla, centro de carga, batería...">
-                                </div>
-                                <div class="form-row-2">
-                                    <div class="form-group">
-                                        <label for="form-warranty-conditions">Condiciones de la garantía</label>
-                                        <textarea id="form-warranty-conditions" class="form-control auto-grow-textarea" rows="4" placeholder="Condiciones aplicables y exclusiones"></textarea>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="form-warranty-notes">Observaciones</label>
-                                        <textarea id="form-warranty-notes" class="form-control auto-grow-textarea" rows="4" placeholder="Notas internas sobre la garantía"></textarea>
-                                    </div>
-                                </div>
                             </div>
                         </div>
 
@@ -3248,7 +3463,12 @@
                             <span id="ticket-rec-whatsapp">983 190 9656</span>
                         </p>
                         <p class="ticket-business-info" id="ticket-rec-business-info">Av. 19 Libramiento entre Calle 26<br>Bacalar, Q. Roo</p>
-                        <p class="ticket-social-info" id="ticket-rec-social-info"></p>
+                        <div class="ticket-social-icons" aria-label="Redes sociales">
+                            <i class="fa-brands fa-facebook" aria-hidden="true"></i>
+                            <i class="fa-brands fa-instagram" aria-hidden="true"></i>
+                            <i class="fa-brands fa-tiktok" aria-hidden="true"></i>
+                        </div>
+                        <p class="ticket-social-handle" id="ticket-rec-social-handle">@allfixbacalar</p>
                     </div>
 
                     <div class="ticket-meta-block">

@@ -81,6 +81,22 @@ router.put('/:id', authMiddleware, async (req, res) => {
   }
 });
 
+router.post('/:id/reparaciones-adicionales', authMiddleware, async (req, res) => {
+  try {
+    const repair = await ordenService.addReparacionAdicional(
+      parseInt(req.params.id, 10),
+      req.body,
+      req.user.id
+    );
+    res.status(201).json(repair);
+  } catch (error) {
+    console.error(error);
+    res.status(error.statusCode || 500).json({
+      error: error.statusCode ? error.message : 'Error al agregar la reparación.'
+    });
+  }
+});
+
 router.delete('/:id', authMiddleware, adminOnly, async (req, res) => {
   try {
     const deleted = await ordenService.deleteOrden(parseInt(req.params.id), req.user.id);

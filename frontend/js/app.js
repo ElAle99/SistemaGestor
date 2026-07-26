@@ -957,12 +957,6 @@ function initNavigation() {
         });
     });
 
-    document.addEventListener('click', (event) => {
-        const preview = document.getElementById('order-quick-preview');
-        if (!preview || preview.classList.contains('hidden')) return;
-        if (preview.contains(event.target) || event.target.closest('.order-click-row')) return;
-        hideOrderQuickPreview();
-    });
 }
 
 function getInputValue(id, fallback = '') {
@@ -2187,60 +2181,437 @@ window.deleteClient = async function(id) {
 // ==========================================
 // RENDER: ÓRDENES
 // ==========================================
+function getOrderClientFullName(order = {}) {
+    const parts = [String(order.clientName || '').trim()].filter(Boolean);
+    let normalizedParts = normalizeText(parts.join(' ')).split(/\s+/).filter(Boolean);
+    [order.clientLastNamePaternal, order.clientLastNameMaternal].forEach(lastName => {
+        const value = String(lastName || '').trim();
+        const normalized = normalizeText(value);
+        if (value && normalized && !normalizedParts.includes(normalized)) {
+            parts.push(value);
+            normalizedParts = normalizeText(parts.join(' ')).split(/\s+/).filter(Boolean);
+        }
+    });
+    return parts.join(' ') || 'Cliente sin nombre';
+}
+
 function renderOrdenes() {
     const tableBody = document.querySelector('#orders-main-table tbody');
     tableBody.innerHTML = '';
     
-    const searchVal = document.getElementById('order-search').value.toLowerCase();
+    const searchInput = document.getElementById('order-search');
+    const searchVal = normalizeText(searchInput.value);
     const filterStatus = document.getElementById('filter-order-status').value;
+    const orders = APP_STATE.ordenes || [];
+    const activeStatuses = new Set(['Recibido', 'Diagnóstico', 'Esperando autorización', 'En reparación', 'Esperando refacción', 'Retrasado']);
+    const readyStatuses = new Set(['Listo para entregar', 'Terminado']);
 
-    const filtered = APP_STATE.ordenes.filter(o => {
-        const matchSearch = o.folio.toLowerCase().includes(searchVal) ||
-                            o.clientName.toLowerCase().includes(searchVal) ||
-                            o.model.toLowerCase().includes(searchVal) ||
-                            (o.imei && o.imei.includes(searchVal));
+    setTextContent('order-stat-total', orders.length);
+    setTextContent('order-stat-active', orders.filter(order => activeStatuses.has(order.status)).length);
+    setTextContent('order-stat-ready', orders.filter(order => readyStatuses.has(order.status)).length);
+    setTextContent('order-stat-delivered', orders.filter(order => order.status === 'Entregado').length);
+    document.getElementById('btn-clear-order-search')?.classList.toggle('hidden', !searchVal);
+
+    const filtered = orders.filter(o => {
+        const haystack = normalizeText([
+            o.folio,
+            getOrderClientFullName(o),
+            o.clientPhone,
+            o.deviceType,
+            o.brand,
+            o.model,
+            o.imei,
+            o.serial,
+            o.falla_reportada,
+            o.servicio_solicitado
+        ].filter(Boolean).join(' '));
+        const matchSearch = !searchVal || haystack.includes(searchVal);
         
         const matchStatus = filterStatus === 'ALL' || o.status === filterStatus;
         return matchSearch && matchStatus;
     });
+    setTextContent('orders-results-count', `${filtered.length} ${filtered.length === 1 ? 'orden' : 'órdenes'}`);
 
     if (filtered.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="8" class="text-center">No se encontraron Órdenes de servicio.</td></tr>';
+        tableBody.innerHTML = `
+            <tr class="orders-empty-row">
+                <td colspan="8">
+                    <div class="orders-empty-state">
+                        <span><i class="fa-solid fa-magnifying-glass"></i></span>
+                        <strong>No encontramos órdenes</strong>
+                        <p>Prueba con otro término de búsqueda o cambia el filtro de estado.</p>
+                    </div>
+                </td>
+            </tr>
+        `;
     } else {
         filtered.forEach(o => {
+            const orderWarranty = APP_STATE.garantias.find(g => Number(g.orden_id) === Number(o.id));
+            const canAddWarranty = o.status === 'Entregado';
+            const canAddRepair = normalizeText(o.estado_pago) !== 'pagado'
+                && !['Entregado', 'Cancelado'].includes(o.status);
+            const additionalRepairs = o.reparaciones_adicionales || [];
+            const clientName = getOrderClientFullName(o);
+            const clientInitial = clientName.trim().charAt(0).toUpperCase() || 'C';
+            const device = [o.deviceType, o.brand, o.model].filter(Boolean).join(' ') || 'Equipo sin especificar';
+            const issue = o.servicio_solicitado || o.falla_reportada || 'Revisión general';
+            const total = Number(o.costo_real || o.costo_estimado || 0);
+            const paymentStatus = normalizeText(o.estado_pago) === 'pagado' ? 'Pagado' : 'Pendiente';
             const tr = document.createElement('tr');
-            tr.classList.add('order-click-row');
             tr.innerHTML = `
-                <td><strong>${o.folio}</strong></td>
-                <td>${o.clientName}</td>
-                <td>${o.deviceType} ${o.brand} ${o.model}</td>
-                <td>${o.falla_reportada || 'Revisión'}</td>
-                <td>${o.estimatedDate || 'N/A'}</td>
-                <td>$${(o.costo_estimado || 0).toFixed(2)}</td>
-                <td>
+                <td data-label="Orden">
+                    <div class="order-folio-cell">
+                        <strong>${escapeHtml(o.folio || '-')}</strong>
+                        <span>#${String(o.id).padStart(4, '0')}</span>
+                    </div>
+                </td>
+                <td data-label="Cliente">
+                    <div class="order-client-cell">
+                        <span class="order-client-avatar">${escapeHtml(clientInitial)}</span>
+                        <div>
+                            <strong>${escapeHtml(clientName)}</strong>
+                            <small>${escapeHtml(o.clientPhone || 'Sin teléfono')}</small>
+                        </div>
+                    </div>
+                </td>
+                <td data-label="Equipo">
+                    <div class="order-device-cell">
+                        <span><i class="fa-solid fa-mobile-screen-button"></i></span>
+                        <div>
+                            <strong>${escapeHtml(device)}</strong>
+                            <small>${escapeHtml(o.imei || o.serial || 'Sin IMEI/serie')}</small>
+                        </div>
+                    </div>
+                </td>
+                <td data-label="Servicio">
+                    <div class="order-issue-cell">
+                        <strong>${escapeHtml(issue)}</strong>
+                        ${additionalRepairs.length ? `<span><i class="fa-solid fa-circle-plus"></i> ${additionalRepairs.length} adicional${additionalRepairs.length === 1 ? '' : 'es'}</span>` : ''}
+                    </div>
+                </td>
+                <td data-label="Entrega">
+                    <div class="order-date-cell">
+                        <i class="fa-regular fa-calendar"></i>
+                        <span>${o.estimatedDate ? formatDateOnly(o.estimatedDate) : 'Sin fecha'}</span>
+                    </div>
+                </td>
+                <td data-label="Total">
+                    <div class="order-total-cell">
+                        <strong>${formatCurrency(total)}</strong>
+                        <span class="${paymentStatus === 'Pagado' ? 'is-paid' : 'is-pending'}">${paymentStatus}</span>
+                    </div>
+                </td>
+                <td data-label="Estado">
                     <select class="form-select quick-status-select ${getStatusBadgeClass(o.status)}" data-order-id="${o.id}" data-current-status="${escapeHtml(o.status)}">
                         ${getOrderStatusOptions(o.status)}
                     </select>
                 </td>
-                <td>
-                    <button class="btn btn-xs btn-secondary" onclick="viewOrderDetails(${o.id})" title="Ver Ticket/QR"><i class="fa-solid fa-print"></i></button>
-                    <button class="btn btn-xs btn-primary" onclick="editOrderDetails(${o.id})" title="Editar Orden"><i class="fa-solid fa-pen"></i></button>
-                    <button class="btn btn-xs btn-danger admin-only" onclick="deleteOrder(${o.id})" title="Eliminar Orden"><i class="fa-solid fa-trash"></i></button>
+                <td data-label="Acciones">
+                    <div class="order-row-actions">
+                    <button class="order-action-btn is-neutral" onclick="viewOrderDetails(${o.id})" title="Imprimir ticket" aria-label="Imprimir ticket"><i class="fa-solid fa-print"></i></button>
+                    <button class="order-action-btn is-primary" onclick="editOrderDetails(${o.id})" title="Editar orden" aria-label="Editar orden"><i class="fa-solid fa-pen"></i></button>
+                    ${canAddRepair
+                        ? `<button class="order-action-btn is-service" onclick="openAdditionalRepairModal(${o.id})" title="Agregar reparación" aria-label="Agregar reparación"><i class="fa-solid fa-screwdriver-wrench"></i><span>+</span></button>`
+                        : ''}
+                    ${orderWarranty
+                        ? `<button class="order-action-btn is-warranty admin-only" onclick="viewWarrantyDetail(${orderWarranty.id})" title="Ver garantía" aria-label="Ver garantía"><i class="fa-solid fa-shield-halved"></i></button>`
+                        : canAddWarranty
+                            ? `<button class="order-action-btn is-warranty admin-only" onclick="openQuickWarrantyModal(${o.id})" title="Agregar garantía" aria-label="Agregar garantía"><i class="fa-solid fa-shield-halved"></i></button>`
+                            : ''}
+                    <button class="order-action-btn is-danger admin-only" onclick="deleteOrder(${o.id})" title="Eliminar orden" aria-label="Eliminar orden"><i class="fa-solid fa-trash"></i></button>
+                    </div>
                 </td>
             `;
-            tr.addEventListener('click', (event) => {
-                if (event.target.closest('button') || event.target.closest('select')) return;
-                showOrderQuickPreview(o, event);
-            });
-
             tableBody.appendChild(tr);
         });
     }
+    applyRolePermissions();
 }
 
 // ==========================================
 // RENDER: GARANTIAS
 // ==========================================
+let ADDITIONAL_REPAIR_BASE_TOTAL = 0;
+let ADDITIONAL_REPAIR_PARTS = [];
+
+function closeAdditionalRepairModal() {
+    document.getElementById('additional-repair-modal')?.classList.add('hidden');
+}
+
+function getAdditionalRepairPartsTotal() {
+    return ADDITIONAL_REPAIR_PARTS.reduce(
+        (sum, part) => sum + (Number(part.cantidad) * Number(part.precio_unitario)),
+        0
+    );
+}
+
+function updateAdditionalRepairTotalPreview() {
+    const servicePrice = Number(getInputValue('additional-repair-price')) || 0;
+    const extra = servicePrice + getAdditionalRepairPartsTotal();
+    setTextContent('additional-repair-current-total', formatCurrency(ADDITIONAL_REPAIR_BASE_TOTAL));
+    setTextContent('additional-repair-added-total', formatCurrency(extra));
+    setTextContent('additional-repair-new-total', formatCurrency(ADDITIONAL_REPAIR_BASE_TOTAL + extra));
+}
+
+function renderAdditionalRepairParts() {
+    const container = document.getElementById('additional-repair-parts-list');
+    setTextContent(
+        'additional-repair-parts-count',
+        `${ADDITIONAL_REPAIR_PARTS.length} ${ADDITIONAL_REPAIR_PARTS.length === 1 ? 'refacción' : 'refacciones'}`
+    );
+    if (!container) return;
+    if (!ADDITIONAL_REPAIR_PARTS.length) {
+        container.innerHTML = `
+            <div class="additional-repair-empty-parts">
+                <i class="fa-solid fa-box-open"></i>
+                <span>Sin refacciones agregadas</span>
+                <small>Selecciona una pieza para incluirla en esta reparación.</small>
+            </div>
+        `;
+        updateAdditionalRepairTotalPreview();
+        return;
+    }
+    container.innerHTML = ADDITIONAL_REPAIR_PARTS.map(part => `
+        <div class="additional-repair-part-row">
+            <div>
+                <strong>${escapeHtml(part.nombre)}</strong>
+                <small>Stock: ${Number(part.stock)} · ${formatCurrency(part.precio_unitario)} c/u</small>
+            </div>
+            <span>${Number(part.cantidad)} pz</span>
+            <strong>${formatCurrency(Number(part.cantidad) * Number(part.precio_unitario))}</strong>
+            <button type="button" class="btn btn-xs btn-danger" data-remove-additional-part="${part.producto_id}" title="Quitar refacción">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        </div>
+    `).join('');
+    container.querySelectorAll('[data-remove-additional-part]').forEach(button => {
+        button.addEventListener('click', () => {
+            ADDITIONAL_REPAIR_PARTS = ADDITIONAL_REPAIR_PARTS.filter(
+                part => Number(part.producto_id) !== Number(button.dataset.removeAdditionalPart)
+            );
+            renderAdditionalRepairParts();
+        });
+    });
+    updateAdditionalRepairTotalPreview();
+}
+
+function populateAdditionalRepairInventory() {
+    const select = document.getElementById('additional-repair-part');
+    if (!select) return;
+    const parts = APP_STATE.inventario
+        .filter(product => getInventoryCategoryGroup(product.categoria) === 'Refacciones')
+        .filter(product => Number(product.stock || 0) > 0)
+        .sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'));
+    select.innerHTML = '<option value="">Selecciona una refacción</option>' + parts.map(product => `
+        <option value="${product.id}">
+            ${escapeHtml(product.nombre)} · Stock ${Number(product.stock || 0)} · ${formatCurrency(product.precio || 0)}
+        </option>
+    `).join('');
+}
+
+window.openAdditionalRepairModal = function(orderId) {
+    const order = APP_STATE.ordenes.find(item => Number(item.id) === Number(orderId));
+    if (!order) {
+        alert('No se encontró la orden.');
+        return;
+    }
+    if (normalizeText(order.estado_pago) === 'pagado' || ['Entregado', 'Cancelado'].includes(order.status)) {
+        alert('No se puede cambiar el precio de una orden pagada, entregada o cancelada.');
+        return;
+    }
+
+    document.getElementById('additional-repair-form')?.reset();
+    setInputValue('additional-repair-order-id', order.id);
+    setInputValue('additional-repair-price', '0');
+    setInputValue('additional-repair-part-qty', '1');
+    ADDITIONAL_REPAIR_PARTS = [];
+    ADDITIONAL_REPAIR_BASE_TOTAL = Number(order.costo_real || order.costo_estimado || 0);
+    setTextContent(
+        'additional-repair-order-label',
+        `${order.folio} · ${order.clientName || 'Cliente'} · ${`${order.deviceType || ''} ${order.brand || ''} ${order.model || ''}`.trim()}`
+    );
+    populateAdditionalRepairInventory();
+    renderAdditionalRepairParts();
+    updateAdditionalRepairTotalPreview();
+    document.getElementById('additional-repair-modal')?.classList.remove('hidden');
+    setTimeout(() => document.getElementById('additional-repair-description')?.focus(), 0);
+};
+
+document.getElementById('additional-repair-price')?.addEventListener('input', updateAdditionalRepairTotalPreview);
+document.getElementById('btn-add-additional-repair-part')?.addEventListener('click', () => {
+    const productId = Number(getInputValue('additional-repair-part'));
+    const cantidad = Number(getInputValue('additional-repair-part-qty'));
+    const product = APP_STATE.inventario.find(item => Number(item.id) === productId);
+    if (!product) {
+        alert('Selecciona una refacción del inventario.');
+        return;
+    }
+    if (!Number.isInteger(cantidad) || cantidad <= 0) {
+        alert('Indica una cantidad válida.');
+        return;
+    }
+    const existing = ADDITIONAL_REPAIR_PARTS.find(part => Number(part.producto_id) === productId);
+    const nextQuantity = cantidad + Number(existing?.cantidad || 0);
+    if (nextQuantity > Number(product.stock || 0)) {
+        alert(`Stock insuficiente. Disponible: ${Number(product.stock || 0)} pz.`);
+        return;
+    }
+    if (existing) {
+        existing.cantidad = nextQuantity;
+    } else {
+        ADDITIONAL_REPAIR_PARTS.push({
+            producto_id: productId,
+            nombre: product.nombre,
+            stock: Number(product.stock || 0),
+            cantidad,
+            precio_unitario: Number(product.precio || 0)
+        });
+    }
+    setInputValue('additional-repair-part', '');
+    setInputValue('additional-repair-part-qty', '1');
+    renderAdditionalRepairParts();
+});
+document.getElementById('btn-close-additional-repair')?.addEventListener('click', closeAdditionalRepairModal);
+document.getElementById('btn-cancel-additional-repair')?.addEventListener('click', closeAdditionalRepairModal);
+document.getElementById('additional-repair-modal')?.addEventListener('click', event => {
+    if (event.target.id === 'additional-repair-modal') closeAdditionalRepairModal();
+});
+document.getElementById('additional-repair-form')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const orderId = Number(getInputValue('additional-repair-order-id'));
+    const descripcion = getInputValue('additional-repair-description').trim();
+    const precio = Number(getInputValue('additional-repair-price'));
+    const partsTotal = getAdditionalRepairPartsTotal();
+    if (!orderId || !descripcion || !Number.isFinite(precio) || precio < 0 || (precio + partsTotal) <= 0) {
+        alert('Escribe la reparación y agrega un precio de servicio o una refacción.');
+        return;
+    }
+
+    const saveButton = document.getElementById('btn-save-additional-repair');
+    if (saveButton) {
+        saveButton.disabled = true;
+        saveButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
+    }
+    try {
+        const response = await fetch(`${BASE_API_URL}/ordenes/${orderId}/reparaciones-adicionales`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                descripcion,
+                precio,
+                refacciones: ADDITIONAL_REPAIR_PARTS.map(part => ({
+                    producto_id: part.producto_id,
+                    cantidad: part.cantidad,
+                    precio_unitario: part.precio_unitario
+                }))
+            })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'No se pudo agregar la reparación.');
+
+        closeAdditionalRepairModal();
+        await loadAllData();
+        alert(`Reparación agregada a ${result.folio}. Nuevo total: ${formatCurrency(result.costo_real)}.`);
+    } catch (error) {
+        alert(error.message || 'No se pudo agregar la reparación.');
+    } finally {
+        if (saveButton) {
+            saveButton.disabled = false;
+            saveButton.innerHTML = '<i class="fa-solid fa-check"></i> Confirmar reparación';
+        }
+    }
+});
+
+function closeQuickWarrantyModal() {
+    document.getElementById('quick-warranty-modal')?.classList.add('hidden');
+}
+
+window.openQuickWarrantyModal = function(orderId) {
+    const order = APP_STATE.ordenes.find(item => Number(item.id) === Number(orderId));
+    if (!order) {
+        alert('No se encontró la orden.');
+        return;
+    }
+    if (order.status !== 'Entregado') {
+        alert('La garantía solo puede agregarse cuando la orden esté Entregada.');
+        return;
+    }
+
+    const existing = APP_STATE.garantias.find(item => Number(item.orden_id) === Number(orderId));
+    if (existing) {
+        viewWarrantyDetail(existing.id);
+        return;
+    }
+
+    document.getElementById('quick-warranty-form')?.reset();
+    setInputValue('quick-warranty-order-id', order.id);
+    setInputValue('quick-warranty-days', '30');
+    setInputValue('quick-warranty-start', order.fecha_entrega_real
+        ? String(order.fecha_entrega_real).slice(0, 10)
+        : todayDateString());
+    setInputValue(
+        'quick-warranty-service',
+        order.servicio_solicitado || order.reparacion_realizada || order.falla_reportada || ''
+    );
+    setTextContent(
+        'quick-warranty-order-label',
+        `${order.folio} · ${order.clientName || 'Cliente'} · ${`${order.deviceType || ''} ${order.brand || ''} ${order.model || ''}`.trim()}`
+    );
+    document.getElementById('quick-warranty-modal')?.classList.remove('hidden');
+    setTimeout(() => document.getElementById('quick-warranty-service')?.focus(), 0);
+};
+
+document.getElementById('btn-close-quick-warranty')?.addEventListener('click', closeQuickWarrantyModal);
+document.getElementById('btn-cancel-quick-warranty')?.addEventListener('click', closeQuickWarrantyModal);
+document.getElementById('quick-warranty-modal')?.addEventListener('click', event => {
+    if (event.target.id === 'quick-warranty-modal') closeQuickWarrantyModal();
+});
+document.getElementById('quick-warranty-form')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const saveButton = document.getElementById('btn-save-quick-warranty');
+    const orderId = Number(getInputValue('quick-warranty-order-id'));
+    const payload = {
+        orden_id: orderId,
+        duracion_dias: Number(getInputValue('quick-warranty-days')),
+        fecha_inicio: getInputValue('quick-warranty-start'),
+        servicio_cubierto: getInputValue('quick-warranty-service').trim(),
+        condiciones: getInputValue('quick-warranty-conditions').trim() || null,
+        observaciones: getInputValue('quick-warranty-notes').trim() || null
+    };
+
+    if (!payload.orden_id || !payload.duracion_dias || !payload.fecha_inicio || !payload.servicio_cubierto) {
+        alert('Completa la duración, fecha de inicio y servicio cubierto.');
+        return;
+    }
+
+    if (saveButton) {
+        saveButton.disabled = true;
+        saveButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
+    }
+    try {
+        const response = await fetch(`${BASE_API_URL}/garantias`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'No se pudo guardar la garantía.');
+
+        closeQuickWarrantyModal();
+        await loadGarantias();
+        renderOrdenes();
+        renderGarantias();
+        alert(`Garantía agregada correctamente a la orden ${result.folio || result.folio_orden || ''}.`);
+    } catch (error) {
+        alert(error.message || 'No se pudo guardar la garantía.');
+    } finally {
+        if (saveButton) {
+            saveButton.disabled = false;
+            saveButton.innerHTML = '<i class="fa-solid fa-shield-halved"></i> Guardar garantía';
+        }
+    }
+});
+
 function getWarrantyBadgeClass(status = '') {
     const normalized = normalizeText(status);
     if (normalized.includes('proxima')) return 'proxima';
@@ -2715,96 +3086,14 @@ document.getElementById('warranty-close-form')?.addEventListener('submit', async
     alert('Ingreso de garantía cerrado correctamente.');
 });
 
-function getOrderFirstPhoto(order) {
-    const photos = getOrderPhotos(order);
-    return photos.find(Boolean) || '';
-}
-
-function getOrderQuickPreviewEl() {
-    let preview = document.getElementById('order-quick-preview');
-    if (!preview) {
-        preview = document.createElement('div');
-        preview.id = 'order-quick-preview';
-        preview.className = 'order-quick-preview hidden';
-        document.body.appendChild(preview);
-    }
-    return preview;
-}
-
-function showOrderQuickPreview(order, event) {
-    const preview = getOrderQuickPreviewEl();
-    const firstPhoto = getOrderFirstPhoto(order);
-    const pending = Math.max((Number(order.costo_estimado) || 0) - (Number(order.anticipo) || 0), 0);
-
-    preview.innerHTML = `
-        <div class="order-quick-preview-header">
-            <div>
-                <strong>${escapeHtml(order.folio)}</strong>
-                <span>${escapeHtml(order.status || 'Sin estado')}</span>
-            </div>
-            <div class="order-quick-preview-actions">
-                <button type="button" class="btn btn-xs btn-primary" data-edit-order="${order.id}">
-                    <i class="fa-solid fa-pen"></i> Editar
-                </button>
-                <button type="button" class="btn btn-xs btn-secondary" data-close-order-preview title="Cerrar">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-        </div>
-        <div class="order-quick-preview-body">
-            <div class="order-quick-preview-photo">
-                ${firstPhoto ? `<img src="${firstPhoto}" alt="Foto de la orden">` : '<i class="fa-regular fa-image"></i>'}
-            </div>
-            <div class="order-quick-preview-data">
-                <p><b>Cliente:</b> ${escapeHtml(order.clientName || 'N/A')}</p>
-                <p><b>Tel:</b> ${escapeHtml(order.clientPhone || 'N/A')}</p>
-                <p><b>Equipo:</b> ${escapeHtml(`${order.deviceType || ''} ${order.brand || ''} ${order.model || ''}`.trim())}</p>
-                <p><b>IMEI/Serie:</b> ${escapeHtml(order.imei || order.serial || 'N/A')}</p>
-                <p><b>Falla:</b> ${escapeHtml(order.falla_reportada || 'Revisión')}</p>
-                <p><b>Ingreso:</b> ${escapeHtml(order.dateIn || 'N/A')}</p>
-                <p><b>Estimado:</b> ${escapeHtml(order.estimatedDate || 'N/A')}</p>
-                <p><b>Pendiente:</b> $${pending.toFixed(2)}</p>
-            </div>
-        </div>
-    `;
-
-    preview.querySelector('[data-edit-order]').addEventListener('click', () => {
-        hideOrderQuickPreview();
-        editOrderDetails(order.id);
-    });
-    preview.querySelector('[data-close-order-preview]').addEventListener('click', hideOrderQuickPreview);
-
-    preview.classList.remove('hidden');
-    positionOrderQuickPreview(event);
-}
-
-function positionOrderQuickPreview(event) {
-    const preview = getOrderQuickPreviewEl();
-    if (preview.classList.contains('hidden')) return;
-
-    const margin = 14;
-    const rect = preview.getBoundingClientRect();
-    let left = event.clientX + margin;
-    let top = event.clientY + margin;
-
-    if (left + rect.width > window.innerWidth - margin) {
-        left = event.clientX - rect.width - margin;
-    }
-    if (top + rect.height > window.innerHeight - margin) {
-        top = window.innerHeight - rect.height - margin;
-    }
-
-    preview.style.left = `${Math.max(margin, left)}px`;
-    preview.style.top = `${Math.max(margin, top)}px`;
-}
-
-function hideOrderQuickPreview() {
-    const preview = getOrderQuickPreviewEl();
-    preview.classList.add('hidden');
-}
-
 document.getElementById('order-search').addEventListener('input', renderOrdenes);
 document.getElementById('filter-order-status').addEventListener('change', renderOrdenes);
+document.getElementById('btn-clear-order-search')?.addEventListener('click', () => {
+    const input = document.getElementById('order-search');
+    if (input) input.value = '';
+    renderOrdenes();
+    input?.focus();
+});
 document.getElementById('warranty-search')?.addEventListener('input', renderGarantias);
 document.getElementById('warranty-state-filter')?.addEventListener('change', renderGarantias);
 document.getElementById('warranty-date-from')?.addEventListener('change', renderGarantias);
@@ -2824,7 +3113,6 @@ window.deleteOrder = async function(id) {
         }
 
         alert('Orden eliminada correctamente.');
-        hideOrderQuickPreview();
         await loadAllData();
     } catch (err) {
         console.error(err);
@@ -3043,19 +3331,10 @@ function validateOrderWizardStep(step) {
     }
 
     if (step === 4) {
-        const warrantyData = collectOrderWarrantyData();
         const selectedStatus = getInputValue('form-order-status') || 'Recibido';
         const reasonRequired = selectedStatus === 'Retrasado' || selectedStatus === 'Cancelado';
         if (reasonRequired && !getInputValue('form-status-reason').trim()) {
             showOrderWizardError('Indica el motivo requerido para el estado seleccionado.', 'form-status-reason');
-            return false;
-        }
-        if (warrantyData.tiene_garantia && selectedStatus !== 'Entregado') {
-            showOrderWizardError('La garantía solo puede activarse cuando la orden esté marcada como Entregado.', 'form-order-status');
-            return false;
-        }
-        if (warrantyData.tiene_garantia && (!warrantyData.duracion_dias || !warrantyData.servicio_cubierto)) {
-            showOrderWizardError('Indica la duración y el servicio cubierto por la garantía.', 'form-warranty-days');
             return false;
         }
     }
@@ -3116,7 +3395,6 @@ function renderOrderWizardSummary() {
     const summary = document.getElementById('new-order-summary-grid');
     if (!summary) return;
 
-    const warrantyEnabled = document.getElementById('form-warranty-enabled')?.checked;
     const items = [
         ['Cliente', buildClientFullName() || 'Sin cliente'],
         ['Equipo', [getInputValue('form-device-type'), getInputValue('form-device-brand'), getInputValue('form-device-model')].filter(Boolean).join(' ') || getInputValue('form-device-description') || 'Sin equipo'],
@@ -3128,8 +3406,7 @@ function renderOrderWizardSummary() {
         ['Anticipo', `$${(parseFloat(getInputValue('form-anticipo')) || 0).toFixed(2)}`],
         ['Saldo', `$${(parseFloat(getInputValue('form-saldo-pendiente')) || 0).toFixed(2)}`],
         ['Fecha estimada', getInputValue('form-fecha-entrega') || 'Sin fecha'],
-        ['Estado', getInputValue('form-order-status') || 'Recibido'],
-        ['Garantía', warrantyEnabled ? `${getInputValue('form-warranty-days') || 0} días` : 'Sin garantía']
+        ['Estado', getInputValue('form-order-status') || 'Recibido']
     ];
 
     summary.innerHTML = items.map(([label, value]) => `
@@ -3145,7 +3422,6 @@ function renderOrderWizardSummaryCards() {
     const summary = document.getElementById('new-order-summary-grid');
     if (!summary) return;
 
-    const warrantyEnabled = document.getElementById('form-warranty-enabled')?.checked;
     const evidenceCount = document.getElementById('order-photo-count')?.textContent || '0 fotos';
     const blocks = [
         {
@@ -3190,14 +3466,6 @@ function renderOrderWizardSummaryCards() {
             items: [
                 ['Fotos', evidenceCount],
                 ['Visible cliente', document.getElementById('evidence-visible-client')?.checked ? 'Si' : 'No']
-            ]
-        },
-        {
-            title: 'Garantia',
-            step: 4,
-            items: [
-                ['Estado', warrantyEnabled ? 'Con garantia' : 'Sin garantia'],
-                ['Duracion', warrantyEnabled ? `${getInputValue('form-warranty-days') || 0} dias` : 'No aplica']
             ]
         }
     ];
@@ -3296,6 +3564,7 @@ function updateOrderCostState() {
     const estimated = shouldAutoTotal ? labor + partsTotal : (parseFloat(estimatedInput?.value) || 0);
     const advance = parseFloat(advanceInput?.value) || 0;
     const balance = Math.max(estimated - advance, 0);
+    const advanceIsInvalid = advance > estimated && advance > 0;
 
     if (shouldAutoTotal && estimatedInput) estimatedInput.value = estimated.toFixed(2);
     if (shouldAutoTotal && realInput) realInput.value = estimated.toFixed(2);
@@ -3306,6 +3575,9 @@ function updateOrderCostState() {
     setTextContent('order-labor-total', `$${labor.toFixed(2)}`);
     setTextContent('order-repair-total', `$${estimated.toFixed(2)}`);
     setTextContent('order-balance-total', `$${balance.toFixed(2)}`);
+    setTextContent('order-summary-total', `$${estimated.toFixed(2)}`);
+    setTextContent('order-advance-feedback', advanceIsInvalid ? 'El anticipo no puede superar el total.' : '');
+    advanceInput?.setCustomValidity(advanceIsInvalid ? 'El anticipo no puede superar el total de la reparación.' : '');
     if (estimatedInput) {
         estimatedInput.placeholder = isDiagnosisOrderSelected() ? 'Pendiente de presupuesto' : 'Opcional';
     }
@@ -3314,69 +3586,6 @@ function updateOrderCostState() {
 function setTextContent(id, value) {
     const element = document.getElementById(id);
     if (element) element.textContent = value;
-}
-
-function updateOrderWarrantyDates() {
-    const startInput = document.getElementById('form-warranty-start');
-    const daysInput = document.getElementById('form-warranty-days');
-    const endInput = document.getElementById('form-warranty-end');
-    if (!startInput || !daysInput || !endInput) return;
-    if (!startInput.value) startInput.value = todayDateString();
-    endInput.value = addDaysToDate(startInput.value, daysInput.value || 0);
-}
-
-function updateOrderWarrantyUI() {
-    const enabled = document.getElementById('form-warranty-enabled')?.checked;
-    const fields = document.getElementById('warranty-order-fields');
-    fields?.classList.toggle('hidden', !enabled);
-    setTextContent('warranty-order-status', enabled ? 'Garantía activa' : 'Sin garantía');
-    if (enabled) {
-        if (!getInputValue('form-warranty-service')) {
-            setInputValue('form-warranty-service', getInputValue('form-servicio-solicitado') || getInputValue('form-falla-reportada'));
-        }
-        updateOrderWarrantyDates();
-    }
-}
-
-function resetOrderWarrantyFields() {
-    const enabled = document.getElementById('form-warranty-enabled');
-    if (enabled) enabled.checked = false;
-    setInputValue('form-warranty-days', '30');
-    setInputValue('form-warranty-start', todayDateString());
-    setInputValue('form-warranty-end', addDaysToDate(todayDateString(), 30));
-    setInputValue('form-warranty-service', '');
-    setInputValue('form-warranty-conditions', '');
-    setInputValue('form-warranty-notes', '');
-    updateOrderWarrantyUI();
-}
-
-function populateOrderWarrantyFields(garantia = null) {
-    if (!garantia) {
-        resetOrderWarrantyFields();
-        return;
-    }
-    const enabled = document.getElementById('form-warranty-enabled');
-    if (enabled) enabled.checked = garantia.activo !== false;
-    setInputValue('form-warranty-days', garantia.duracion_dias || 30);
-    setInputValue('form-warranty-start', garantia.fecha_inicio || todayDateString());
-    setInputValue('form-warranty-end', garantia.fecha_vencimiento || addDaysToDate(garantia.fecha_inicio || todayDateString(), garantia.duracion_dias || 30));
-    setInputValue('form-warranty-service', garantia.servicio_cubierto || garantia.reparacion_realizada || '');
-    setInputValue('form-warranty-conditions', garantia.condiciones || '');
-    setInputValue('form-warranty-notes', garantia.observaciones || '');
-    updateOrderWarrantyUI();
-}
-
-function collectOrderWarrantyData() {
-    const enabled = document.getElementById('form-warranty-enabled')?.checked || false;
-    return {
-        tiene_garantia: enabled,
-        duracion_dias: parseInt(getInputValue('form-warranty-days'), 10) || 0,
-        fecha_inicio: getInputValue('form-warranty-start') || todayDateString(),
-        fecha_vencimiento: getInputValue('form-warranty-end') || '',
-        servicio_cubierto: getInputValue('form-warranty-service'),
-        condiciones: getInputValue('form-warranty-conditions') || null,
-        observaciones: getInputValue('form-warranty-notes') || null
-    };
 }
 
 function getOrderPartsTotal() {
@@ -3697,7 +3906,6 @@ function openOrderModal() {
     setInputValue('form-mano-obra', '0');
     setInputValue('form-costo-refaccion', '0');
     setInputValue('form-costo-real', '');
-    resetOrderWarrantyFields();
     
     // Reiniciar Canvas
     clearSignature();
@@ -3722,7 +3930,6 @@ function openOrderModal() {
     document.getElementById('form-fecha-entrega').value = date.toISOString().split('T')[0];
     updateEvidenceStateUI();
     updateOrderCostState();
-    updateOrderWarrantyUI();
     updateOrderConditionalFields();
 
     // Ocultar sección de ganancias para no administradores
@@ -4632,14 +4839,6 @@ function initOrderRegistration() {
 
     document.getElementById('form-costo-estimado')?.addEventListener('input', updateOrderCostState);
     document.getElementById('form-anticipo')?.addEventListener('input', updateOrderCostState);
-    document.getElementById('form-warranty-enabled')?.addEventListener('change', updateOrderWarrantyUI);
-    document.getElementById('form-warranty-days')?.addEventListener('input', updateOrderWarrantyDates);
-    document.getElementById('form-warranty-start')?.addEventListener('change', updateOrderWarrantyDates);
-    document.getElementById('form-servicio-solicitado')?.addEventListener('input', () => {
-        if (document.getElementById('form-warranty-enabled')?.checked && !getInputValue('form-warranty-service')) {
-            setInputValue('form-warranty-service', getInputValue('form-servicio-solicitado'));
-        }
-    });
     document.querySelectorAll('input[name="order_type"]').forEach(radio => {
         radio.addEventListener('change', updateOrderCostState);
     });
@@ -4685,16 +4884,7 @@ function initOrderRegistration() {
         const orderPhotos = await collectOrderPhotos();
         updateOrderCostState();
         const orderParts = collectOrderParts();
-        const warrantyData = collectOrderWarrantyData();
         const selectedStatus = isEditing ? document.getElementById('form-order-status').value : 'Recibido';
-        if (warrantyData.tiene_garantia && selectedStatus !== 'Entregado') {
-            alert('La garantía solo puede activarse cuando la orden esté marcada como Entregado.');
-            return;
-        }
-        if (warrantyData.tiene_garantia && (!warrantyData.duracion_dias || !warrantyData.servicio_cubierto)) {
-            alert('Indica la duración y el servicio cubierto por la garantía.');
-            return;
-        }
 
         const orderData = {
             // Cliente
@@ -4790,8 +4980,7 @@ function initOrderRegistration() {
             evidenciasNuevas: orderPhotos,
             evidenciaEstado: isEditing ? document.getElementById('form-order-status').value : 'Recibido',
             evidenciaComentario: getInputValue('evidence-comment') || null,
-            evidenciaVisibleCliente: document.getElementById('evidence-visible-client')?.checked ?? true,
-            garantia: warrantyData
+            evidenciaVisibleCliente: document.getElementById('evidence-visible-client')?.checked ?? true
         };
 
         try {
@@ -4966,7 +5155,6 @@ async function editOrderDetails(id) {
     const orderTypeInput = document.querySelector(`input[name="order_type"][value="${o.tipo_orden || 'Reparación directa'}"]`);
     if (orderTypeInput) orderTypeInput.checked = true;
     updateOrderCostState();
-    populateOrderWarrantyFields(o.garantia || null);
     document.querySelectorAll('textarea.auto-grow-textarea').forEach(textarea => textarea.dispatchEvent(new Event('input')));
 
     // Estado
@@ -5018,7 +5206,7 @@ const saleSuccessCloseButton = document.getElementById('btn-sale-success-close')
 let AVAILABLE_TICKET_PRINTERS = [];
 const THERMAL_PRINT_DOTS = {
     '80mm': 576,
-    '58mm': 384
+    '58mm': 360
 };
 const THERMAL_PRINT_DPI = 203;
 const THERMAL_CAPTURE_SCALE = 5;
@@ -5619,8 +5807,7 @@ function normalizeReceiptCanvasForThermalPrint(sourceCanvas, targetWidthPx) {
     const context = outputCanvas.getContext('2d', { alpha: false });
     context.fillStyle = '#ffffff';
     context.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
-    context.imageSmoothingEnabled = true;
-    context.imageSmoothingQuality = 'high';
+    context.imageSmoothingEnabled = false;
     context.drawImage(sourceCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
 
     // Las impresoras térmicas pierden contraste con grises y bordes suavizados.
@@ -5631,7 +5818,7 @@ function normalizeReceiptCanvasForThermalPrint(sourceCanvas, targetWidthPx) {
         const luminance = (pixels[index] * 0.299)
             + (pixels[index + 1] * 0.587)
             + (pixels[index + 2] * 0.114);
-        const thermalColor = luminance < 235 ? 0 : 255;
+        const thermalColor = luminance < 215 ? 0 : 255;
         pixels[index] = thermalColor;
         pixels[index + 1] = thermalColor;
         pixels[index + 2] = thermalColor;
@@ -5735,7 +5922,6 @@ async function viewOrderDetails(id) {
     document.getElementById('ticket-rec-business-name').innerText = ESTABLISHMENT_CONFIG.name.toUpperCase();
     document.getElementById('ticket-rec-business-info').innerText = ESTABLISHMENT_CONFIG.address;
     applyOrderTicketHeaderContactInfo();
-    applyTicketContactInfo();
     document.getElementById('ticket-rec-legal-text').innerHTML = `<strong>IMPORTANTE:</strong> ${ESTABLISHMENT_CONFIG.terms}`;
     document.getElementById('thermal-business-name').innerText = ESTABLISHMENT_CONFIG.name.toUpperCase();
 
@@ -7144,6 +7330,10 @@ function addToCart(id) {
         });
     }
     updateCartUI();
+    requestAnimationFrame(() => {
+        const cartList = document.getElementById('pos-cart-list');
+        if (cartList) cartList.scrollTop = cartList.scrollHeight;
+    });
 }
 
 function updateCartUI() {
@@ -9395,9 +9585,7 @@ function applySaleTicketHeaderInfo() {
 function applyTicketContactInfo() {
     const items = getTicketContactItems();
     document.querySelectorAll('.ticket-social-info').forEach(element => {
-        const headerHasDedicatedWhatsapp = element.id === 'ticket-venta-social-info'
-            || element.id === 'ticket-rec-social-info';
-        const visibleItems = headerHasDedicatedWhatsapp
+        const visibleItems = element.id === 'ticket-venta-social-info'
             ? items.filter(item => item.label !== 'WhatsApp')
             : items;
         element.innerHTML = visibleItems.map(item => `
@@ -9682,8 +9870,14 @@ async function detectAvailablePrinters() {
 }
 
 function applyOrderTicketHeaderContactInfo() {
+    const socials = parseSocialProfiles();
+    const socialHandle = socials.instagram || socials.tiktok || socials.facebook || socials.raw || '@allfixbacalar';
+    const handleElement = document.getElementById('ticket-rec-social-handle');
     const whatsappElement = document.getElementById('ticket-rec-whatsapp');
 
+    if (handleElement) {
+        handleElement.textContent = String(socialHandle).trim();
+    }
     if (whatsappElement) {
         whatsappElement.textContent = String(
             ESTABLISHMENT_CONFIG.whatsapp || ESTABLISHMENT_CONFIG.phone || '983 190 9656'

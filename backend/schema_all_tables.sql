@@ -304,6 +304,18 @@ CREATE INDEX IF NOT EXISTS caja_movimientos_referencia_idx
 CREATE UNIQUE INDEX IF NOT EXISTS orden_refacciones_orden_producto_idx
   ON orden_refacciones (orden_id, producto_id);
 
+CREATE TABLE IF NOT EXISTS orden_reparaciones_adicionales (
+  id SERIAL PRIMARY KEY,
+  orden_id INTEGER NOT NULL REFERENCES ordenes_servicio(id) ON DELETE CASCADE,
+  descripcion TEXT NOT NULL,
+  precio NUMERIC(10,2) NOT NULL CHECK (precio > 0),
+  usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+  fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS orden_reparaciones_adicionales_orden_idx
+  ON orden_reparaciones_adicionales (orden_id, fecha_creacion DESC);
+
 INSERT INTO configuracion (id, nombre)
 VALUES (1, 'AllFix Bacalar')
 ON CONFLICT (id) DO NOTHING;

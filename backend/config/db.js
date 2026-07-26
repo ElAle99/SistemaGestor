@@ -164,6 +164,17 @@ async function initDB() {
       UNIQUE (orden_id, producto_id)
     );
 
+    CREATE TABLE IF NOT EXISTS orden_reparaciones_adicionales (
+      id SERIAL PRIMARY KEY,
+      orden_id INTEGER NOT NULL REFERENCES ordenes_servicio(id) ON DELETE CASCADE,
+      descripcion TEXT NOT NULL,
+      precio NUMERIC(10,2) NOT NULL CHECK (precio > 0),
+      usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+      fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS orden_reparaciones_adicionales_orden_idx
+      ON orden_reparaciones_adicionales (orden_id, fecha_creacion DESC);
+
     CREATE TABLE IF NOT EXISTS movimientos_inventario (
       id SERIAL PRIMARY KEY,
       producto_id INTEGER NOT NULL REFERENCES inventario(id),

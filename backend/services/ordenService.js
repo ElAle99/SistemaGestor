@@ -146,6 +146,24 @@ function buildClientFullName(data = {}) {
   return parts.join(' ') || 'Cliente sin nombre';
 }
 
+function buildStoredClientDisplayName(row = {}) {
+  const name = normalizeTextValue(row.clientname || row.cliente_nombre || row.nombre) || '';
+  const parts = [name];
+  let comparableName = normalizeComparableText(name);
+
+  [row.apellido_paterno, row.apellido_materno].forEach(lastName => {
+    const value = normalizeTextValue(lastName);
+    if (!value) return;
+    const comparableLastName = normalizeComparableText(value);
+    if (!comparableName.split(/\s+/).includes(comparableLastName)) {
+      parts.push(value);
+      comparableName = normalizeComparableText(parts.join(' '));
+    }
+  });
+
+  return parts.filter(Boolean).join(' ') || 'Cliente sin nombre';
+}
+
 function splitClientName(fullName = '') {
   const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
   if (parts.length <= 1) return { nombres: fullName || '', apellidoPaterno: '', apellidoMaterno: '' };
@@ -548,7 +566,7 @@ function formatOrderResponse(row, historial = [], evidencias = [], refacciones =
     clientId: row.cliente_id,
     
     // Cliente
-    clientName: row.clientname || row.cliente_nombre,
+    clientName: buildStoredClientDisplayName(row),
     clientLastNamePaternal: row.apellido_paterno || null,
     clientLastNameMaternal: row.apellido_materno || null,
     clientPhone: row.clientphone || row.cliente_telefono,
@@ -626,6 +644,7 @@ function formatOrderResponse(row, historial = [], evidencias = [], refacciones =
     refacciones,
     refacciones_utilizadas: refacciones,
     total_refacciones: refacciones.reduce((sum, item) => sum + Number(item.subtotal || 0), 0),
+    reparaciones_adicionales: row.reparaciones_adicionales || [],
 
     // Estatus
     status: row.estado || row.estado_actual,
@@ -809,6 +828,7 @@ async function getAllOrdenes() {
 
   const orderIds = orders.rows.map(order => order.id);
   const historiesByOrder = new Map();
+  const additionalRepairsByOrder = new Map();
   if (orderIds.length > 0) {
     const histories = await pool.query(
       'SELECT orden_id, estado, fecha, comentario FROM historial_estados WHERE orden_id = ANY($1::int[]) ORDER BY orden_id ASC, id ASC',
@@ -818,11 +838,29 @@ async function getAllOrdenes() {
       if (!historiesByOrder.has(history.orden_id)) historiesByOrder.set(history.orden_id, []);
       historiesByOrder.get(history.orden_id).push(history);
     });
+    const additionalRepairs = await pool.query(
+      `SELECT id, orden_id, descripcion, precio, usuario_id, fecha_creacion
+       FROM orden_reparaciones_adicionales
+       WHERE orden_id = ANY($1::int[])
+       ORDER BY orden_id ASC, id ASC`,
+      [orderIds]
+    );
+    additionalRepairs.rows.forEach(repair => {
+      if (!additionalRepairsByOrder.has(repair.orden_id)) additionalRepairsByOrder.set(repair.orden_id, []);
+      additionalRepairsByOrder.get(repair.orden_id).push({
+        ...repair,
+        precio: Number(repair.precio || 0)
+      });
+    });
   }
 
   const formattedOrders = [];
   for (const order of orders.rows) {
-    const formatted = formatOrderResponse({ ...order, fotografias: null }, historiesByOrder.get(order.id) || [], []);
+    const formatted = formatOrderResponse({
+      ...order,
+      fotografias: null,
+      reparaciones_adicionales: additionalRepairsByOrder.get(order.id) || []
+    }, historiesByOrder.get(order.id) || [], []);
     formatted.fotografias = null;
     formatted.fotos = [];
     formattedOrders.push(formatted);
@@ -849,9 +887,130 @@ async function getOrdenById(id) {
 
   const evidencias = await getEvidenciasOrden(id);
   const refacciones = await getOrdenRefacciones(id);
-  const formatted = formatOrderResponse(order.rows[0], historial.rows, evidencias, refacciones);
+  const additionalRepairs = await pool.query(
+    `SELECT id, orden_id, descripcion, precio, usuario_id, fecha_creacion
+     FROM orden_reparaciones_adicionales WHERE orden_id = $1 ORDER BY id ASC`,
+    [id]
+  );
+  const formatted = formatOrderResponse({
+    ...order.rows[0],
+    reparaciones_adicionales: additionalRepairs.rows.map(repair => ({
+      ...repair,
+      precio: Number(repair.precio || 0)
+    }))
+  }, historial.rows, evidencias, refacciones);
   formatted.garantia = await garantiaService.getGarantiaByOrderId(id);
   return formatted;
+}
+
+async function addReparacionAdicional(ordenId, data = {}, usuarioId = 1) {
+  const descripcion = normalizeTextValue(data.descripcion);
+  const precioServicio = Number(data.precio || 0);
+  const nuevasRefacciones = normalizeOrderRefacciones(data.refacciones || []);
+  const totalNuevasRefacciones = nuevasRefacciones.reduce(
+    (sum, part) => sum + (Number(part.cantidad) * Number(part.precio_unitario)),
+    0
+  );
+  const precio = precioServicio + totalNuevasRefacciones;
+  if (!descripcion) {
+    const error = new Error('Describe la reparación adicional.');
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!Number.isFinite(precioServicio) || precioServicio < 0 || !Number.isFinite(precio) || precio <= 0) {
+    const error = new Error('Agrega un precio de servicio o al menos una refacción.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const orderResult = await client.query(
+      `SELECT id, folio, estado, estado_pago, costo_estimado, costo_real
+       FROM ordenes_servicio WHERE id = $1 FOR UPDATE`,
+      [ordenId]
+    );
+    if (orderResult.rows.length === 0) {
+      const error = new Error('Orden no encontrada.');
+      error.statusCode = 404;
+      throw error;
+    }
+    const order = orderResult.rows[0];
+    if (order.estado_pago === 'Pagado' || ['Entregado', 'Cancelado'].includes(order.estado)) {
+      const error = new Error('No se puede cambiar el precio de una orden pagada, entregada o cancelada.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (nuevasRefacciones.length > 0) {
+      const actuales = await getOrdenRefacciones(ordenId, client);
+      const merged = new Map(actuales.map(part => [Number(part.producto_id), {
+        producto_id: Number(part.producto_id),
+        cantidad: Number(part.cantidad),
+        precio_unitario: Number(part.precio_unitario)
+      }]));
+      nuevasRefacciones.forEach(part => {
+        const existing = merged.get(Number(part.producto_id));
+        if (existing) {
+          existing.cantidad += Number(part.cantidad);
+          existing.precio_unitario = Number(part.precio_unitario) || existing.precio_unitario;
+        } else {
+          merged.set(Number(part.producto_id), part);
+        }
+      });
+      await syncOrdenRefacciones(ordenId, Array.from(merged.values()), {
+        client,
+        usuarioId,
+        estado: order.estado
+      });
+    }
+
+    const inserted = await client.query(
+      `INSERT INTO orden_reparaciones_adicionales (orden_id, descripcion, precio, usuario_id)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, orden_id, descripcion, precio, usuario_id, fecha_creacion`,
+      [ordenId, descripcion, precio, usuarioId || null]
+    );
+    const updated = await client.query(
+      `UPDATE ordenes_servicio
+       SET costo_real = CASE
+             WHEN costo_real IS NULL OR costo_real <= 0 THEN COALESCE(costo_estimado, 0) + $1
+             ELSE costo_real + $1
+           END,
+           costo_estimado = COALESCE(costo_estimado, 0) + $1,
+           fecha_actualizacion = CURRENT_TIMESTAMP
+       WHERE id = $2
+       RETURNING costo_estimado, costo_real`,
+      [precio, ordenId]
+    );
+    await client.query(
+      `INSERT INTO historial_estados (orden_id, estado, usuario_id, comentario)
+       VALUES ($1, $2, $3, $4)`,
+      [
+        ordenId,
+        order.estado,
+        usuarioId || 1,
+        `Reparación adicional: ${descripcion}. Servicio: $${precioServicio.toFixed(2)}. Refacciones: $${totalNuevasRefacciones.toFixed(2)}. Importe agregado: $${precio.toFixed(2)}.`
+      ]
+    );
+    await client.query('COMMIT');
+    return {
+      ...inserted.rows[0],
+      precio: Number(inserted.rows[0].precio),
+      folio: order.folio,
+      costo_estimado: Number(updated.rows[0].costo_estimado || 0),
+      costo_real: Number(updated.rows[0].costo_real || 0),
+      precio_servicio: precioServicio,
+      total_refacciones: totalNuevasRefacciones,
+      refacciones: nuevasRefacciones
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 async function getOrdenByFolio(folio) {
@@ -2254,6 +2413,7 @@ module.exports = {
   getOrdenByFolio,
   createOrden,
   updateOrden,
+  addReparacionAdicional,
   updateOrdenEstado,
   checkOverdueOrders,
   getEvidenciasOrden,
