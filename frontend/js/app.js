@@ -4521,6 +4521,8 @@ function initPatternLock() {
 
     const size = 240;
     const r = 18;
+    // Keep a small touch margin without catching neighbouring dots on diagonals.
+    const hitRadius = r + 6;
     const sequence = [];
     const selected = new Set();
     let isDrawing = false;
@@ -4609,7 +4611,7 @@ function initPatternLock() {
     function checkCollision(pos) {
         for (const dot of dots) {
             const dist = Math.hypot(pos.x - dot.x, pos.y - dot.y);
-            if (dist <= r * 2.2) return dot;
+            if (dist <= hitRadius) return dot;
         }
         return null;
     }
@@ -4774,8 +4776,8 @@ function initSignaturePad() {
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
         return {
-            x: clientX - rect.left,
-            y: clientY - rect.top
+            x: (clientX - rect.left) * (canvas.width / rect.width),
+            y: (clientY - rect.top) * (canvas.height / rect.height)
         };
     }
 
@@ -7512,12 +7514,12 @@ function renderCalendario() {
     }
     
     calendarInstance = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'dayGridMonth',
+        initialView: window.matchMedia('(max-width: 640px)').matches ? 'listWeek' : 'dayGridMonth',
         locale: 'es',
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            right: window.matchMedia('(max-width: 640px)').matches ? 'listWeek,dayGridMonth' : 'dayGridMonth,timeGridWeek,timeGridDay'
         },
         buttonText: {
             today: 'Hoy',
@@ -10743,13 +10745,13 @@ function renderCalendario() {
     }
 
     calendarInstance = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'dayGridMonth',
+        initialView: window.matchMedia('(max-width: 640px)').matches ? 'listWeek' : 'dayGridMonth',
         locale: 'es',
         height: 'auto',
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            right: window.matchMedia('(max-width: 640px)').matches ? 'listWeek,dayGridMonth' : 'dayGridMonth,timeGridWeek,timeGridDay'
         },
         buttonText: {
             today: 'Hoy',

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
     <title>Sistema Gestor - AllFix Bacalar</title>
     <!-- Google Fonts: Inter & Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Main Stylesheet -->
     <link rel="stylesheet" href="css/style.css?v=20260909-print-quality">
+    <link rel="stylesheet" href="css/responsive.css?v=20260910-mobile">
 </head>
 <body class="light-theme">
 
@@ -240,8 +241,9 @@
     <!-- ========================================== -->
     <div id="app-container" class="app-layout hidden">
         <!-- Sidebar Navigation -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="app-navigation" aria-label="Navegación principal">
             <div class="sidebar-brand">
+                <button type="button" class="mobile-only mobile-icon-button mobile-menu-close" id="mobile-menu-close" aria-label="Cerrar menú"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
                 <img src="img/logoallfixv2.png" alt="Logo del negocio" class="sidebar-logo" id="sidebar-business-logo" onerror="this.src='https://placehold.co/80x80/0d6efd/ffffff?text=AF'">
                 <div class="brand-text">
                     <span class="brand-name" id="sidebar-business-name">AllFix</span>
@@ -329,6 +331,7 @@
             <!-- Top Header Bar -->
             <header class="topbar">
                 <div class="topbar-left">
+                    <button type="button" class="mobile-only mobile-icon-button" id="mobile-menu-toggle" aria-label="Abrir menú" aria-controls="app-navigation" aria-expanded="false"><i class="fa-solid fa-bars" aria-hidden="true"></i></button>
                     <h2 class="view-title" id="current-view-title">Dashboard</h2>
                 </div>
                 <div class="topbar-right">
@@ -3785,7 +3788,7 @@
     <script src="js/qzPrinterService.js?v=20260909-print-quality"></script>
 
     <!-- Main System JavaScript Logic -->
-    <script src="js/app.js?v=20260909-print-quality"></script>
+    <script src="js/app.js?v=20260911-pattern"></script>
+    <script src="js/responsive.js?v=20260910-mobile"></script>
 </body>
 </html>
-
