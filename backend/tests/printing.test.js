@@ -4,18 +4,59 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-function printerHarness() {
+function printerHarness(qzOverrides = {}) {
   const jobs = [];
   const window = { qz: {
     websocket: { isActive: () => true }, printers: {},
     configs: { create: (printer, options) => ({ printer, options }) },
-    print: async (config, data) => jobs.push({ config, data })
+    print: async (config, data) => jobs.push({ config, data }),
+    ...qzOverrides
   } };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../frontend/js/qzPrinterService.js'), 'utf8'), {
     window, console, localStorage: { getItem: () => null }
   });
   return { service: window.qzPrinterService, jobs };
 }
+
+test('detection shares the connection and returns all installed printers without duplicates', async () => {
+  let active = false;
+  let connections = 0;
+  const { service } = printerHarness({
+    websocket: {
+      isActive: () => active,
+      connect: async () => { connections++; active = true; }
+    },
+    printers: {
+      find: async (...args) => {
+        assert.equal(active, true);
+        assert.equal(args.length, 0);
+        return ['USB', 'Network', 'Bluetooth', 'USB', '', null];
+      },
+      getDefault: async () => 'Network'
+    }
+  });
+  const [printers, defaultPrinter] = await Promise.all([service.getPrinters(), service.getDefaultPrinter()]);
+  assert.deepEqual(Array.from(printers), ['USB', 'Network', 'Bluetooth']);
+  assert.equal(defaultPrinter, 'Network');
+  assert.equal(connections, 1);
+});
+
+test('detection can retry after an immediate connection failure and explains how to connect', async () => {
+  let attempts = 0;
+  const { service } = printerHarness({
+    websocket: {
+      isActive: () => false,
+      connect: () => {
+        if (++attempts === 1) throw new Error('Failed to start');
+        return Promise.resolve();
+      }
+    },
+    printers: { find: async () => [] }
+  });
+  await assert.rejects(service.getPrinters(), error => /Abre QZ Tray/.test(error.userMessage));
+  assert.deepEqual(Array.from(await service.getPrinters()), []);
+  assert.equal(attempts, 2);
+});
 
 for (const paperWidth of ['58mm', '80mm']) {
   test(`${paperWidth} uses real DPI and preserves a long receipt without fitting to a page`, async () => {

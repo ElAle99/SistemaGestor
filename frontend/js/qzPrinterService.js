@@ -63,17 +63,17 @@
         if (isQZConnected()) return true;
         if (connectionPromise) return connectionPromise;
 
-        connectionPromise = (async () => {
+        connectionPromise = Promise.resolve().then(async () => {
             try {
                 const qz = getQZ();
                 await qz.websocket.connect({ retries: 2, delay: 1 });
                 return true;
             } catch (error) {
-                throw normalizeError(error, 'No fue posible conectar con QZ Tray.');
-            } finally {
-                connectionPromise = null;
+                throw normalizeError(error, 'No fue posible conectar con QZ Tray. Abre QZ Tray y vuelve a detectar las impresoras; acepta la solicitud de conexión si aparece.');
             }
-        })();
+        }).finally(() => {
+            connectionPromise = null;
+        });
 
         return connectionPromise;
     }
@@ -96,7 +96,7 @@
         try {
             const printers = await getQZ().printers.find();
             const values = Array.isArray(printers) ? printers : (printers ? [printers] : []);
-            return values.map(String).filter(Boolean);
+            return [...new Set(values.filter(name => typeof name === 'string' && name.trim()))];
         } catch (error) {
             throw normalizeError(error, 'No fue posible consultar las impresoras de esta computadora.');
         }

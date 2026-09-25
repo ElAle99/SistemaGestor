@@ -9869,7 +9869,6 @@ async function detectAvailablePrinters() {
         window.qzPrinterService.getPrinters(),
         window.qzPrinterService.getDefaultPrinter().catch(() => '')
     ]);
-    window.qzPrinterService.getPrinterDetails().catch(() => []);
     return printerNames.map(name => ({
         name,
         isDefault: name === defaultPrinter,
@@ -10118,7 +10117,10 @@ function initQZPrinterConfigForm() {
         window.qzPrinterService?.savePreferences({ autoPrint: ESTABLISHMENT_CONFIG.autoPrintTicket });
     });
 
+    let detectingPrinters = false;
     async function refreshQZPrinters() {
+        if (detectingPrinters) return;
+        detectingPrinters = true;
         setQZStatus('connecting', 'Conectando...', 'Conectando con QZ Tray...');
         if (detectButton) detectButton.disabled = true;
         try {
@@ -10129,7 +10131,7 @@ function initQZPrinterConfigForm() {
                 setQZStatus(
                     'connected',
                     'Conectado',
-                    'QZ Tray está conectado, pero no se encontraron impresoras instaladas en Windows.'
+                    'QZ Tray está conectado, pero no se encontraron impresoras. Verifica que estén instaladas en el sistema operativo; si son Bluetooth, comprueba también que estén emparejadas.'
                 );
             } else if (selectedMissing) {
                 setQZStatus(
@@ -10151,6 +10153,7 @@ function initQZPrinterConfigForm() {
                 `${error.userMessage || error.message || 'No fue posible conectar con QZ Tray.'} Puedes utilizar la impresión normal del navegador.`
             );
         } finally {
+            detectingPrinters = false;
             if (detectButton) detectButton.disabled = false;
         }
     }
