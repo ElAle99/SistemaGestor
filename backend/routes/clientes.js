@@ -30,7 +30,10 @@ router.get('/', authMiddleware, async (req, res) => {
         c.apellido_materno,
         [c.nombre, c.apellido_paterno, c.apellido_materno].filter(Boolean).join(' '),
         c.telefono_principal,
-        c.telefono
+        c.telefono,
+        c.telefono_alternativo_1,
+        c.telefono_alternativo_2,
+        c.telefono_alternativo_3
       ].some(value => {
         const normalizedValue = normalizeSearchText(value);
         const normalizedPhone = normalizePhone(value);

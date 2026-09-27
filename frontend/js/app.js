@@ -164,6 +164,23 @@ function fileToDataUrl(file) {
     });
 }
 
+async function readOrderPhotoFiles(files, { maxBytes = Infinity, onError = alert } = {}) {
+    const photos = [];
+    for (const file of Array.from(files || [])) {
+        if (!ORDER_PHOTO_ACCEPTED_TYPES.includes(file.type)) {
+            onError(`Formato no permitido: ${file.name}. Usa JPG, JPEG, PNG o WEBP.`);
+            continue;
+        }
+        if (file.size > maxBytes) {
+            onError(`La foto ${file.name} supera el tamaño permitido.`);
+            continue;
+        }
+        try { photos.push(await fileToDataUrl(file)); }
+        catch (_) { onError(`No se pudo cargar la foto: ${file.name}`); }
+    }
+    return photos;
+}
+
 function getOrderPhotos(orderOrPhotos) {
     const raw = orderOrPhotos?.fotos || orderOrPhotos?.fotografias || orderOrPhotos || [];
     let parsed = raw;
@@ -3498,21 +3515,7 @@ function initOrderPhotoInputs() {
     async function addOrderPhotoFiles(files) {
         if (!files || files.length === 0) return;
         const currentPhotos = getOrderPhotos(document.getElementById('order-form')?.dataset.currentPhotos || []);
-        const newPhotos = [];
-
-        for (const file of Array.from(files)) {
-            if (!ORDER_PHOTO_ACCEPTED_TYPES.includes(file.type)) {
-                alert(`Formato no permitido: ${file.name}. Usa JPG, JPEG, PNG o WEBP.`);
-                continue;
-            }
-
-            try {
-                newPhotos.push(await fileToDataUrl(file));
-            } catch (err) {
-                console.error('No se pudo leer la foto de la orden:', err);
-                alert(`No se pudo cargar la foto: ${file.name}`);
-            }
-        }
+        const newPhotos = await readOrderPhotoFiles(files);
 
         renderOrderPhotoPreviews([...currentPhotos, ...newPhotos]);
     }
@@ -3882,7 +3885,8 @@ function validateOrderMinimums() {
     return true;
 }
 
-function openOrderModal() {
+function openOrderModal(editing = false) {
+    if (!editing) return openQuickOrder();
     document.getElementById('order-form').reset();
     document.getElementById('order-form').dataset.currentPhotos = JSON.stringify(getOrderPhotos({}));
     document.getElementById('order-form').dataset.selectedClientId = '';
@@ -4512,12 +4516,12 @@ function initDeviceAutocomplete() {
 }
 
 // Canvas del patrón de seguridad
-function initPatternLock() {
-    const canvas = document.getElementById('pattern-canvas');
+function initPatternLock(options = null) {
+    const canvas = document.getElementById(options?.canvasId || 'pattern-canvas');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const display = document.getElementById('pattern-sequence-display');
-    const inputSeq = document.getElementById('form-lock-pattern-sequence');
+    const display = document.getElementById(options?.displayId || 'pattern-sequence-display');
+    const inputSeq = document.getElementById(options?.inputId || 'form-lock-pattern-sequence');
 
     const size = 240;
     const r = 18;
@@ -4727,15 +4731,22 @@ function initPatternLock() {
         drawGrid();
     }
 
-    window.setPatternSequence = setPatternSequence;
-
-    window.clearPattern = function() {
+    const clearPatternPad = function() {
         sequence.length = 0;
         selected.clear();
         currentPointer = null;
         updateSequenceDisplay();
         drawGrid();
     };
+
+    if (options) {
+        document.getElementById(options.clearId)?.addEventListener('click', clearPatternPad);
+        drawGrid();
+        return { clear: clearPatternPad, setSequence: setPatternSequence };
+    }
+
+    window.setPatternSequence = setPatternSequence;
+    window.clearPattern = clearPatternPad;
 
     document.getElementById('btn-clear-pattern').addEventListener('click', window.clearPattern);
     document.getElementById('equipment-has-lock')?.addEventListener('change', () => {
@@ -5051,7 +5062,7 @@ async function editOrderDetails(id) {
 
     const o = await response.json();
 
-    openOrderModal();
+    openOrderModal(true);
     document.getElementById('order-modal-title').innerText = `Editar Orden - ${o.folio}`;
     document.getElementById('form-order-id').value = o.id;
 
@@ -5921,7 +5932,7 @@ async function viewOrderDetails(id) {
     const response = await fetch(`${BASE_API_URL}/ordenes/${id}`);
     if (!response.ok) {
         alert('No se pudo obtener información de la orden.');
-        return;
+        return false;
     }
 
     const o = await response.json();

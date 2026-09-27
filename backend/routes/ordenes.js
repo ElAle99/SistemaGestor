@@ -2,8 +2,19 @@ const express = require('express');
 const { authMiddleware, adminOnly } = require('../middleware/auth');
 const ordenService = require('../services/ordenService');
 const { rateLimit } = require('../middleware/rateLimit');
+const { createQuickOrder } = require('../services/quickOrderService');
+const { scopeForUser } = require('../services/catalogService');
 
 const router = express.Router();
+
+router.post('/rapida', authMiddleware, async (req, res) => {
+  try {
+    res.status(201).json(await createQuickOrder(req.body, req.user.id, scopeForUser(req.user)));
+  } catch (error) {
+    console.error(error);
+    res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : 'No se pudo crear la orden.' });
+  }
+});
 
 router.get('/', authMiddleware, async (req, res) => {
   try {

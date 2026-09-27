@@ -864,6 +864,10 @@ async function getAllOrdenes() {
     }, historiesByOrder.get(order.id) || [], []);
     formatted.fotografias = null;
     formatted.fotos = [];
+    // Access secrets belong only to authenticated detail/edit responses.
+    delete formatted.lock_pin;
+    delete formatted.lock_pass;
+    delete formatted.lock_pattern;
     formattedOrders.push(formatted);
   }
 

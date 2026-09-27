@@ -1,0 +1,98 @@
+/* Reception workspace: isolated from the advanced order editor. */
+#quick-order-modal { padding: 24px; background: rgba(15, 23, 42, .55); }
+#quick-order-modal .quick-order-container { width: min(1080px, 100%); max-width: 1080px; max-height: 94dvh; overflow: hidden; border: 0; border-radius: 20px; box-shadow: 0 28px 90px #0f172a40; background: #f5f7fb; }
+#quick-order-modal .modal-header { padding: 24px 28px; gap: 16px; flex-shrink: 0; background: #fff; border-bottom: 1px solid #e7ecf3; }
+.quick-title-block { flex: 1; }
+.quick-eyebrow { display: block; color: #2563eb; font-size: 10px; letter-spacing: .15em; font-weight: 800; margin-bottom: 7px; }
+#quick-order-modal .modal-header h3 { font-size: 24px; letter-spacing: -.6px; color: #14233d; }
+.quick-title-block p { margin: 5px 0 0; font-size: 13px; color: #64748b; }
+.quick-status-badge { color: #047857; background: #ecfdf5; border: 1px solid #d1fae5; border-radius: 24px; padding: 6px 12px; font-size: 12px; white-space: nowrap; }
+#quick-order-close { width: 36px; height: 36px; border-radius: 50%; background: #f1f5f9; font-size: 23px; }
+#quick-order-modal .modal-body { padding: 24px 24px 0; overflow-y: auto; overscroll-behavior: contain; scroll-padding-bottom: 130px; }
+#quick-order-form { display: grid; grid-template-columns: minmax(0, 1fr) 306px; gap: 20px; align-items: start; }
+.quick-form-main { min-width: 0; display: grid; gap: 16px; }
+#quick-order-form fieldset { min-width: 0; margin: 0; padding: 18px 20px 20px; border: 1px solid #e6ebf2; border-radius: 14px; background: #fff; }
+#quick-order-form legend { float: left; width: 100%; margin: 0 0 14px; padding: 0; font-size: 15px; font-weight: 700; color: #1e293b; text-transform: none; display: flex; align-items: center; gap: 8px; }
+#quick-order-form legend + * { clear: both; }
+.quick-section-icon { display: inline-grid; place-items: center; width: 28px; height: 28px; background: #eff6ff; color: #2563eb; border-radius: 8px; font-size: 19px; }
+.quick-section-description { margin: 0 0 14px; color: #64748b; font-size: 12px; line-height: 1.6; }
+#quick-order-form legend small { margin-left: auto; font-weight: 500; font-size: 10px; color: #64748b; background: #f1f5f9; border-radius: 5px; padding: 3px 6px; }
+.quick-order-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+.quick-order-wide { grid-column: 1 / -1; }
+#quick-order-form .form-group { margin: 0; min-width: 0; }
+#quick-order-form .form-group > label { display: block; font-size: 12px; font-weight: 600; color: #475569; text-transform: none; letter-spacing: 0; margin-bottom: 7px; }
+#quick-order-form .form-control { width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid #dce3ed; border-radius: 9px; font-size: 14px; background: #fff; color: #172b4d; box-shadow: none; }
+#quick-order-form .form-control:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px #3b82f617; outline: none; }
+#quick-order-form .form-control::placeholder { color: #94a3b8; }
+#quick-order-form textarea { resize: vertical; }
+.quick-order-note { font-size: 12px; line-height: 1.6; margin: 8px 0 0; color: #64748b; }
+.quick-order-note:empty { display: none; }
+.quick-client-matches { max-height: 160px; overflow-y: auto; border: 1px solid #dbeafe; border-radius: 9px; margin-top: 10px; background: #f8fbff; }
+.quick-client-matches button { display: block; width: 100%; padding: 12px; border: 0; background: transparent; color: #1e293b; text-align: left; cursor: pointer; }
+.quick-client-matches button:hover, .quick-client-matches button:focus-visible { background: #eff6ff; }
+.quick-financial-panel { position: sticky; top: 0; padding: 20px; background: #fff; border: 1px solid #e6ebf2; border-radius: 14px; }
+#quick-order-form .quick-financial-panel fieldset { padding: 0; border: 0; border-radius: 0; }
+.quick-financial-panel .quick-order-grid { grid-template-columns: 1fr; }
+.quick-payment-note { padding: 10px 0; font-size: 11px; }
+.quick-balance-card { background: #eff6ff; border: 1px solid #dbeafe; border-radius: 12px; padding: 16px; margin-top: 12px; }
+.quick-balance-line { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; color: #64748b; margin-bottom: 12px; }
+.quick-balance-line strong { color: #334155; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.quick-balance-total { border-top: 1px dashed #bfdbfe; padding-top: 16px; display: grid; gap: 6px; color: #1d4ed8; }
+.quick-balance-total span { font-size: 12px; font-weight: 600; }
+.quick-balance-total output { font-size: 29px; font-weight: 750; letter-spacing: -.8px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+#quick-balance-hint { font-size: 11px; line-height: 1.6; color: #52688e; margin: 10px 0 0; }
+.quick-financial-footnote { font-size: 11px; line-height: 1.6; color: #94a3b8; margin: 14px 0 0; }
+.quick-submit-bar { grid-column: 1 / -1; position: sticky; bottom: 0; z-index: 6; display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 16px 0; background: #f5f7fb; border-top: 1px solid #dfe6f0; }
+.quick-footer-balance { display: grid; gap: 4px; }
+.quick-footer-balance span { font-size: 11px; color: #64748b; }
+.quick-footer-balance strong { font-size: 20px; color: #1e3a5f; font-variant-numeric: tabular-nums; }
+.quick-footer-actions { display: flex; align-items: center; justify-content: flex-end; gap: 14px; flex-wrap: wrap; max-width: 75%; }
+#quick-order-submit { min-height: 46px; min-width: 170px; padding: 12px 25px; border-radius: 10px; font-weight: 650; background: #2563eb; box-shadow: 0 4px 10px #2563eb25; }
+#quick-order-submit:hover { background: #1d4ed8; }
+#quick-order-submit:disabled { opacity: .6; cursor: wait; }
+.quick-order-error { color: #b91c1c; font-size: 12px; flex-basis: 100%; margin: 0; }
+#quick-order-form #quick-catalog-root { margin: 0; max-width: 290px; }
+.quick-pattern-group { margin-top: 12px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+#quick-pattern-canvas { width: 180px; height: 180px; touch-action: none; border: 1px solid #dce3ed; border-radius: 12px; background: #f8fafc; }
+#quick-pattern-display { display: block; font-size: 12px; margin-bottom: 8px; }
+.quick-photo-drop { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; border: 1px dashed #b9cbe2; border-radius: 10px; padding: 18px 12px; background: #f8fbff; }
+.quick-photo-drop .quick-order-note { width: 100%; text-align: center; margin: 0; }
+.quick-photo-drop.is-dragover { background: #eff6ff; border-color: #2563eb; }
+.quick-photo-previews { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.quick-photo-previews:empty { display: none; }
+.quick-photo-item { position: relative; }
+.quick-photo-item img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; }
+.quick-photo-item button { position: absolute; right: 0; top: 0; padding: 0 6px; }
+#quick-order-success { padding: 55px 20px; text-align: center; }
+.quick-success-icon { display: inline-grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: #dcfce7; color: #15803d; font-size: 30px; margin-bottom: 20px; }
+#quick-order-success h4 { font-size: 24px; margin-bottom: 10px; }
+.quick-order-actions { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 24px 0; }
+@media (max-width: 820px) {
+  #quick-order-form { grid-template-columns: 1fr; }
+  .quick-financial-panel { position: static; }
+  .quick-financial-panel .quick-order-grid { grid-template-columns: 1fr 1fr; }
+  .quick-balance-total { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+}
+@media (max-width: 600px) {
+  #quick-order-modal { padding: 0; align-items: stretch; }
+  #quick-order-modal .quick-order-container { width: 100%; max-height: 100dvh; height: 100dvh; border-radius: 0; }
+  #quick-order-modal .modal-header { padding: max(16px, env(safe-area-inset-top)) 16px 16px; gap: 10px; }
+  #quick-order-modal .modal-header h3 { font-size: 20px; }
+  .quick-title-block p { font-size: 11px; }
+  .quick-status-badge { display: none; }
+  #quick-order-modal .modal-body { padding: 14px 12px 0; scroll-padding-bottom: 180px; }
+  .quick-form-main { gap: 12px; }
+  #quick-order-form { gap: 12px; }
+  #quick-order-form fieldset, .quick-financial-panel { padding: 16px; border-radius: 12px; }
+  .quick-order-grid, .quick-financial-panel .quick-order-grid { grid-template-columns: 1fr; gap: 13px; }
+  #quick-order-form .form-control { font-size: 16px; min-height: 46px; }
+  .quick-submit-bar { gap: 12px; padding: 12px 4px max(12px, env(safe-area-inset-bottom)); }
+  .quick-footer-actions { max-width: 62%; gap: 8px; }
+  #quick-order-submit { width: 100%; min-width: 140px; padding: 12px 16px; }
+  .quick-footer-balance strong { font-size: 18px; overflow-wrap: anywhere; }
+  .quick-footer-balance { min-width: 0; }
+  #quick-order-form #quick-catalog-root .ant-checkbox-wrapper { font-size: 10px; line-height: 1.4; }
+  .quick-balance-total output { font-size: 26px; }
+  .quick-order-actions .btn { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { #quick-order-modal * { scroll-behavior: auto; transition: none; } }

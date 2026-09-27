@@ -13,6 +13,8 @@
     <!-- Main Stylesheet -->
     <link rel="stylesheet" href="css/style.css?v=20260909-print-quality">
     <link rel="stylesheet" href="css/responsive.css?v=20260910-mobile">
+    <link rel="stylesheet" href="css/quickOrder.css?v=20260926-redesign">
+    <link rel="stylesheet" href="dist/order-catalog.css?v=20260926">
 </head>
 <body class="light-theme">
 
@@ -2146,6 +2148,161 @@
     <!-- ========================================== -->
     <!-- INTERACTIVE MODAL: NEW / EDIT ORDER        -->
     <!-- ========================================== -->
+    <div id="quick-order-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="quick-order-title">
+        <div class="modal-container quick-order-container">
+            <div class="modal-header">
+                <div class="quick-title-block"><span class="quick-eyebrow">RECEPCIÓN DE EQUIPOS</span><h3 id="quick-order-title">Nueva orden de servicio</h3><p>Todo listo para recibir tu próximo equipo.</p></div>
+                <span class="quick-status-badge">● Recibido</span>
+                <button type="button" class="btn-close-modal" id="quick-order-close" aria-label="Cerrar">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="quick-order-form"><div class="quick-form-main">
+                    <fieldset>
+                        <legend><span class="quick-section-icon" aria-hidden="true">◎</span> Datos del cliente</legend>
+                        <p class="quick-section-description">Busca por nombre o teléfono, o registra un cliente nuevo.</p>
+                        <div class="quick-order-grid">
+                            <div class="form-group quick-order-wide">
+                                <label for="quick-client-name">Nombre del cliente *</label>
+                                <input id="quick-client-name" class="form-control" required maxlength="200" autocomplete="off" placeholder="Juan Pérez" aria-controls="quick-client-matches">
+                            </div>
+                            <div class="form-group">
+                                <label for="quick-client-phone">Contacto principal *</label>
+                                <input id="quick-client-phone" class="form-control" type="tel" required maxlength="20" autocomplete="off" placeholder="9831909656" aria-controls="quick-client-matches">
+                            </div>
+                            <div class="form-group">
+                                <label for="quick-client-alt">Contacto alternativo</label>
+                                <input id="quick-client-alt" class="form-control" type="tel" maxlength="20" autocomplete="off">
+                            </div>
+                        </div>
+                        <div id="quick-client-matches" class="quick-client-matches hidden" aria-label="Clientes existentes"></div>
+                        <div id="quick-client-status" class="quick-order-note" role="status"></div>
+                    </fieldset>
+                    <fieldset>
+                        <legend><span class="quick-section-icon" aria-hidden="true">▣</span> Equipo a recibir</legend>
+                        <div class="quick-order-grid">
+                            <div class="form-group">
+                                <label for="quick-device">Equipo *</label>
+                                <select id="quick-device" class="form-control" required>
+                                    <option value="">Seleccionar</option>
+                                    <option>Celular</option><option>Tablet</option><option>Laptop</option><option>Consola</option>
+                                    <option>Control</option><option>Bocina</option><option>Smartwatch</option><option>Otro</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="quick-brand">Marca *</label>
+                                <input id="quick-brand" class="form-control" required maxlength="100" list="quick-brands" placeholder="Samsung">
+                                <datalist id="quick-brands"><option>Samsung</option><option>Apple</option><option>Motorola</option><option>Xiaomi</option><option>Huawei</option><option>Lenovo</option><option>HP</option><option>Sony</option><option>Nintendo</option><option>Microsoft</option><option>Otra</option></datalist>
+                            </div>
+                            <div class="form-group">
+                                <label for="quick-model">Modelo *</label>
+                                <input id="quick-model" class="form-control" required maxlength="100" placeholder="A55 5G">
+                            </div>
+                            <div class="form-group">
+                                <label for="quick-color">Color</label>
+                                <input id="quick-color" class="form-control" maxlength="50" placeholder="Azul">
+                            </div>
+                        </div>
+                    </fieldset>
+                    <fieldset>
+                        <legend><span class="quick-section-icon" aria-hidden="true">⌁</span> Servicio</legend>
+                        <div class="quick-order-grid">
+                            <div class="form-group quick-order-wide">
+                                <label for="quick-fault">Falla reportada *</label>
+                                <textarea id="quick-fault" class="form-control" rows="2" required maxlength="10000" placeholder="No carga"></textarea>
+                            </div>
+                            <div class="form-group quick-order-wide">
+                                <label for="quick-repair">Reparación a realizar *</label>
+                                <textarea id="quick-repair" class="form-control" rows="2" required maxlength="10000" placeholder="Cambio de centro de carga"></textarea>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <fieldset id="quick-reception-section">
+                        <legend><span class="quick-section-icon" aria-hidden="true">☷</span> Recepción del equipo <small>Opcional</small></legend>
+                        <div id="quick-reception-fields"></div>
+                    </fieldset>
+                    <fieldset id="quick-access-section">
+                        <legend><span class="quick-section-icon" aria-hidden="true">⌑</span> Acceso del equipo <small>Opcional</small></legend>
+                        <div class="quick-order-grid">
+                            <div class="form-group">
+                                <label for="quick-lock-type">Tipo de acceso</label>
+                                <select id="quick-lock-type" class="form-control">
+                                    <option value="Ninguno">Sin contraseña</option>
+                                    <option>PIN</option><option>Contraseña</option><option>Patrón</option>
+                                </select>
+                            </div>
+                            <div id="quick-pin-group" class="form-group hidden">
+                                <label for="quick-lock-pin">PIN</label>
+                                <input id="quick-lock-pin" class="form-control" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="20" autocomplete="off" placeholder="Opcional">
+                            </div>
+                            <div id="quick-password-group" class="form-group hidden">
+                                <label for="quick-lock-pass">Contraseña</label>
+                                <input id="quick-lock-pass" class="form-control" type="password" maxlength="100" autocomplete="new-password" placeholder="Opcional">
+                            </div>
+                        </div>
+                        <div id="quick-pattern-group" class="hidden quick-pattern-group">
+                            <canvas id="quick-pattern-canvas" width="240" height="240" aria-label="Dibujar patrón de desbloqueo de 9 puntos"></canvas>
+                            <input type="hidden" id="quick-lock-pattern">
+                            <div><span id="quick-pattern-display" aria-live="polite"></span>
+                                <button type="button" class="btn btn-secondary btn-sm" id="quick-pattern-clear">Limpiar patrón</button></div>
+                        </div>
+                    </fieldset>
+                    <fieldset id="quick-evidence-section">
+                        <legend><span class="quick-section-icon" aria-hidden="true">▧</span> Evidencia fotográfica <small>Opcional</small></legend>
+                        <div id="quick-photo-drop" class="quick-photo-drop">
+                            <button type="button" id="quick-photo-choose" class="btn btn-secondary btn-sm">Seleccionar imágenes</button>
+                            <button type="button" id="quick-photo-camera" class="btn btn-secondary btn-sm">Tomar foto</button>
+                            <span class="quick-order-note">o arrastra imágenes aquí</span>
+                        </div>
+                        <input type="file" id="quick-photo-files" accept="image/jpeg,image/png,image/webp" multiple hidden>
+                        <input type="file" id="quick-photo-capture" accept="image/*" capture="environment" hidden>
+                        <div id="quick-photo-previews" class="quick-photo-previews"></div>
+                        <p id="quick-photo-status" class="quick-order-note" role="status"></p>
+                    </fieldset>
+                    </div><aside class="quick-financial-panel" aria-label="Resumen de pago"><fieldset>
+                        <legend>Resumen de pago</legend>
+                        <p class="quick-section-description">Define el precio ahora o déjalo pendiente.</p>
+                        <div class="quick-order-grid">
+                            <div class="form-group">
+                                <label for="quick-cost">Costo de reparación</label>
+                                <input id="quick-cost" class="form-control" type="number" inputmode="decimal" min="0" max="99999999.99" step="0.01" placeholder="$ Sin presupuesto">
+                            </div>
+                            <div class="form-group">
+                                <label for="quick-advance">Anticipo</label>
+                                <input id="quick-advance" class="form-control" type="number" inputmode="decimal" min="0" max="99999999.99" step="0.01" placeholder="$ 0.00">
+                            </div>
+                        </div>
+                        <p class="quick-order-note quick-payment-note">El anticipo se registra en efectivo. Requiere caja abierta.</p>
+                    </fieldset>
+                    <div class="quick-balance-card" aria-live="polite" aria-atomic="true">
+                        <div class="quick-balance-line"><span>Costo de reparación</span><strong id="quick-summary-cost">Por definir</strong></div>
+                        <div class="quick-balance-line"><span>Anticipo del cliente</span><strong id="quick-summary-advance">$0.00</strong></div>
+                        <div class="quick-balance-total"><span>Falta por pagar</span><output id="quick-summary-balance">Por definir</output></div>
+                        <p id="quick-balance-hint">Agrega un costo para calcular el saldo.</p>
+                    </div>
+                    <p class="quick-financial-footnote">El folio y la fecha se asignan al crear la orden.</p>
+                    </aside>
+                    <div class="quick-submit-bar">
+                        <div class="quick-footer-balance"><span>Saldo pendiente</span><strong id="quick-footer-balance">Por definir</strong></div>
+                        <div class="quick-footer-actions">
+                            <p id="quick-order-error" class="quick-order-error hidden" role="alert"></p>
+                            <button type="submit" id="quick-order-submit" class="btn btn-primary">Crear orden</button>
+                        </div>
+                    </div>
+                </form>
+                <div id="quick-order-success" class="hidden">
+                    <span class="quick-success-icon" aria-hidden="true">✓</span><h4>¡Equipo recibido!</h4>
+                    <p id="quick-order-success-message" role="status"></p>
+                    <div class="quick-order-actions">
+                        <button type="button" id="quick-order-print" class="btn btn-primary">Imprimir ticket</button>
+                        <button type="button" id="quick-order-view" class="btn btn-secondary">Ver orden</button>
+                        <button type="button" id="quick-order-new" class="btn btn-secondary">Nueva orden</button>
+                    </div>
+                    <p id="quick-order-print-status" role="status"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="order-modal" class="modal-overlay hidden new-order-modal">
         <div class="modal-container modal-large animate-slide-up new-order-dialog">
             <div class="modal-header">
@@ -3788,7 +3945,10 @@
     <script src="js/qzPrinterService.js?v=20260909-print-quality"></script>
 
     <!-- Main System JavaScript Logic -->
-    <script src="js/app.js?v=20260911-pattern"></script>
+    <script src="js/app.js?v=20260926-quick-order"></script>
+    <script src="js/quickOrderExtras.js?v=20260926-access"></script>
+    <script src="js/quickOrder.js?v=20260926-balance"></script>
+    <script defer src="dist/order-catalog.js?v=20260926"></script>
     <script src="js/responsive.js?v=20260910-mobile"></script>
 </body>
 </html>

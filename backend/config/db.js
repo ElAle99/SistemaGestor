@@ -113,6 +113,15 @@ async function initDB() {
       fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS auditoria_ordenes (
+      id BIGSERIAL PRIMARY KEY,
+      orden_id INTEGER NOT NULL,
+      usuario_id INTEGER NOT NULL,
+      accion VARCHAR(30) NOT NULL,
+      detalle JSONB NOT NULL DEFAULT '{}',
+      fecha TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS historial_estados (
       id SERIAL PRIMARY KEY,
       orden_id INTEGER NOT NULL REFERENCES ordenes_servicio(id),
@@ -521,6 +530,7 @@ async function initDB() {
   }
 
   await pool.query('INSERT INTO configuracion (id, nombre) VALUES (1, $1) ON CONFLICT (id) DO NOTHING', ['AllFix Bacalar']);
+  await require('../db/initCatalog').initCatalog(pool);
   await pool.query(
     `INSERT INTO configuracion_sistema (clave, valor)
      VALUES ($1, $2)
@@ -530,6 +540,4 @@ async function initDB() {
 }
 
 module.exports = { pool, initDB };
-
-
 

@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const app = fs.readFileSync(path.join(__dirname, '../../frontend/js/app.js'), 'utf8');
-const start = app.indexOf('function initPatternLock()');
+const start = app.indexOf('function initPatternLock(');
 const end = app.indexOf('\nfunction ', start + 1);
 const source = app.slice(start, end);
 
@@ -49,8 +49,14 @@ function patternPad(displaySize) {
         event('pointerup', ...points.at(-1));
         return input.value;
     }
-    return { draw };
+    return { draw, restore(value) { window.setPatternSequence(value); return input.value; } };
 }
+
+test('advanced editor restores the stored pattern sequence for visualization', () => {
+    const pad = patternPad(240);
+    assert.equal(pad.restore('1-2-5-8'), '1-2-5-8');
+    assert.equal(pad.restore(''), '');
+});
 
 const dot = id => [40 + ((id - 1) % 3) * 80, 40 + Math.floor((id - 1) / 3) * 80];
 

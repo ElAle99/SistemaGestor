@@ -111,6 +111,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/clientes', require('./routes/clientes'));
 app.use('/api/ordenes', require('./routes/ordenes'));
+app.use('/api/catalogos', require('./routes/catalogos'));
 app.use('/api/inventario', require('./routes/inventario'));
 app.use('/api/ventas', require('./routes/ventas'));
 app.use('/api/cotizaciones', require('./routes/cotizaciones'));

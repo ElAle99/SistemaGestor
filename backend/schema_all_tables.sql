@@ -124,6 +124,16 @@ CREATE TABLE IF NOT EXISTS ordenes_servicio (
   mano_obra NUMERIC(10,2) DEFAULT 0
 );
 
+-- Audit references intentionally survive deletion of the original record.
+CREATE TABLE IF NOT EXISTS auditoria_ordenes (
+  id BIGSERIAL PRIMARY KEY,
+  orden_id INTEGER NOT NULL,
+  usuario_id INTEGER NOT NULL,
+  accion VARCHAR(30) NOT NULL,
+  detalle JSONB NOT NULL DEFAULT '{}',
+  fecha TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS historial_estados (
   id SERIAL PRIMARY KEY,
   orden_id INTEGER NOT NULL REFERENCES ordenes_servicio(id),

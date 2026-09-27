@@ -1,0 +1,13 @@
+.smart-catalog-field .ant-select { width: 100%; }
+.smart-catalog-field .ant-select-dropdown { z-index: 1200; }
+.smart-catalog-field .ant-select-selection-overflow { gap: 3px; }
+.smart-manual { display: flex; gap: 4px; }
+#quick-catalog-root { margin: 0 0 12px; }
+#quick-catalog-root .ant-alert { margin-bottom: 8px; }
+#quick-order-form #quick-catalog-root .ant-checkbox-wrapper { display: inline-flex; font-size: 12px; }
+.smart-catalog-field .ant-select-selection-item { white-space: normal; }
+.quick-reception-other, .quick-reception-notice { margin-top: 10px; }
+@media (max-width: 600px) {
+    .smart-catalog-field .ant-select { min-height: 46px; font-size: 16px; }
+    .smart-catalog-field .ant-select-selection-search-input { font-size: 16px; }
+}
