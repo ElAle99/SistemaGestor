@@ -6,9 +6,11 @@ const fs = require('node:fs');
 function setup(native = false) {
     const elements = new Map();
     const calls = { downloads: 0, shares: 0, opens: 0, captures: 0 };
+    let observerCallback;
+    let warmup;
     const element = { outerHTML: 'first receipt', querySelector: () => ({ textContent: 'Venta #42' }) };
     const get = id => {
-        if (!elements.has(id)) elements.set(id, { innerHTML: 'WhatsApp', addEventListener(_, fn) { this.click = fn; } });
+        if (!elements.has(id)) elements.set(id, { innerHTML: 'WhatsApp', classList: { contains: () => false }, addEventListener(_, fn) { this.click = fn; } });
         return elements.get(id);
     };
     const navigator = native ? {
@@ -19,10 +21,20 @@ function setup(native = false) {
         document: { getElementById: get, body: { appendChild() {} }, createElement: () => ({ click() { calls.downloads++; }, remove() {} }) },
         navigator, window: { open() { calls.opens++; } },
         getActiveReceiptElement: () => element, detectConfiguredTicketPaper: () => '80mm',
-        html2canvas() {}, captureReceiptPreviewImage: async () => { calls.captures++; return { imageData: 'data:image/png;base64,aGVsbG8=' }; },
-        File, Uint8Array, atob, URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} }, setTimeout() {}
+        html2canvas() {}, captureReceiptPreviewImage: async (_, __, options) => {
+            assert.equal(options.digital, true);
+            calls.captures++;
+            return { blob: new Blob(['png'], { type: 'image/png' }) };
+        },
+        MutationObserver: class { constructor(callback) { observerCallback = callback; } observe() {} },
+        File, URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} },
+        clearTimeout() {}, setTimeout(callback, delay) { if (delay === 120) warmup = callback; }
     });
-    return { calls, get, element, navigator };
+    return { calls, get, element, navigator, async prewarm() {
+        observerCallback([{ target: {} }]);
+        warmup();
+        await new Promise(resolve => setImmediate(resolve));
+    } };
 }
 
 test('downloads the active receipt and refreshes after content changes', async () => {
@@ -54,4 +66,44 @@ test('unsupported browsers download the PNG and open WhatsApp', async () => {
     assert.equal(calls.downloads, 1);
     assert.equal(calls.opens, 1);
     assert.match(get('receipt-share-status').textContent, /Adjunta el PNG/);
+});
+
+test('opening a receipt prepares it once and the first click shares immediately', async () => {
+    const { calls, get, prewarm } = setup(true);
+    await prewarm();
+    assert.equal(calls.captures, 1);
+    await get('btn-share-receipt-whatsapp').click();
+    assert.equal(calls.shares, 1);
+    assert.equal(calls.captures, 1);
+});
+
+test('a quick capture shares on the first click while user activation remains', async () => {
+    const { calls, get, navigator } = setup(true);
+    navigator.userActivation = { isActive: true };
+    await get('btn-share-receipt-whatsapp').click();
+    assert.equal(calls.shares, 1);
+});
+
+test('digital capture preserves resolution and skips thermal thresholding', async () => {
+    const source = fs.readFileSync('frontend/js/app.js', 'utf8');
+    const captureFunction = source.slice(source.indexOf('async function captureReceiptPreviewImage('), source.indexOf('function normalizeReceiptCanvasForThermalPrint('));
+    let removed = false;
+    const node = { classList: { remove() {} }, getBoundingClientRect: () => ({ width: 300 }) };
+    const context = {
+        normalizeTicketPaper: () => '80mm', getThermalPrintWidthPx: () => 576,
+        document: { fonts: { ready: Promise.resolve() }, body: { appendChild() {} }, createElement: () => ({ style: {}, dataset: {}, appendChild() {}, remove() { removed = true; } }) },
+        refreshReceiptOptionalSections() {},
+        html2canvas: async (_, options) => {
+            assert.equal(options.scale, 4);
+            return { width: 1200, height: 3000, toBlob(callback) { callback(new Blob(['png'])); } };
+        },
+        normalizeReceiptCanvasForThermalPrint() { assert.fail('Digital images must not be reduced to thermal resolution'); }
+    };
+    vm.createContext(context);
+    vm.runInContext(captureFunction, context);
+    const result = await context.captureReceiptPreviewImage({ cloneNode: () => node }, '80mm', { digital: true });
+    assert.equal(result.pixelWidth, 1200);
+    assert.equal(result.pixelHeight, 3000);
+    assert.ok(result.blob instanceof Blob);
+    assert.equal(removed, true);
 });

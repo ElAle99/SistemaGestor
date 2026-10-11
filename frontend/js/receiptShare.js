@@ -4,6 +4,8 @@
     const status = document.getElementById('receipt-share-status');
     const initialShareLabel = shareButton.innerHTML;
     let prepared = null;
+    let pending = null;
+    const modal = document.getElementById('receipt-modal');
 
     function currentReceipt() {
         const element = getActiveReceiptElement();
@@ -16,13 +18,39 @@
         if (typeof html2canvas !== 'function') {
             throw new Error('No se pudo cargar el generador de imagen. Recarga el sistema.');
         }
-        const capture = await captureReceiptPreviewImage(receipt.element, receipt.paper);
-        const bytes = Uint8Array.from(atob(capture.imageData.split(',')[1]), char => char.charCodeAt(0));
+        const capture = await captureReceiptPreviewImage(receipt.element, receipt.paper, { digital: true });
         const folio = receipt.element.querySelector('.ticket-folio-number, #thermal-val-folio')?.textContent || 'ticket';
         const filename = `${folio.trim().replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 80) || 'ticket'}.png`;
-        const file = new File([bytes], filename, { type: 'image/png' });
+        const file = new File([capture.blob], filename, { type: 'image/png' });
         return { key: receipt.key, file };
     }
+
+    function ensurePrepared(receipt) {
+        if (prepared?.key === receipt.key) return Promise.resolve(prepared);
+        if (pending?.key === receipt.key) return pending.promise;
+        const job = { key: receipt.key };
+        job.promise = prepare(receipt).then(result => {
+            if (!modal.classList.contains('hidden') && currentReceipt().key === result.key) prepared = result;
+            return result;
+        }).finally(() => { if (pending === job) pending = null; });
+        pending = job;
+        return job.promise;
+    }
+
+    // Prepare only the visible receipt, sharing the same work with button clicks.
+    let warmupTimer;
+    const observer = new MutationObserver(records => {
+        if (records.every(record => record.target.closest?.('.modal-footer'))) return;
+        clearTimeout(warmupTimer);
+        prepared = null;
+        status.textContent = '';
+        shareButton.innerHTML = initialShareLabel;
+        if (modal.classList.contains('hidden')) return;
+        warmupTimer = setTimeout(() => {
+            ensurePrepared(currentReceipt()).catch(() => { /* Retry on explicit action. */ });
+        }, 120);
+    });
+    observer.observe(modal, { attributes: true, childList: true, characterData: true, subtree: true });
 
     function download(file) {
         const url = URL.createObjectURL(file);
@@ -41,8 +69,13 @@
             const receipt = currentReceipt();
             if (!prepared || prepared.key !== receipt.key) {
                 status.textContent = 'Preparando imagen del ticket…';
-                prepared = await prepare(receipt);
-                if (share) {
+                const result = await ensurePrepared(receipt);
+                if (modal.classList.contains('hidden') || currentReceipt().key !== result.key) {
+                    status.textContent = 'El ticket cambió. Vuelve a pulsar para compartir el actual.';
+                    return;
+                }
+                prepared = result;
+                if (share && !navigator.userActivation?.isActive) {
                     // A fresh click preserves the user activation required to share files
                     // and open WhatsApp, even when rendering takes several seconds.
                     shareButton.innerHTML = '<i class="fa-brands fa-whatsapp"></i> Compartir PNG ahora';

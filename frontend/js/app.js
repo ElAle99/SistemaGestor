@@ -5789,7 +5789,7 @@ function getActiveReceiptElement() {
     return candidates.find(element => element && !element.classList.contains('hidden')) || null;
 }
 
-async function captureReceiptPreviewImage(receiptElement, paper) {
+async function captureReceiptPreviewImage(receiptElement, paper, options = {}) {
     const detectedPaper = normalizeTicketPaper(paper);
     const widthMm = detectedPaper === '58mm' ? 58 : 80;
     const targetWidthPx = getThermalPrintWidthPx(detectedPaper);
@@ -5807,14 +5807,24 @@ async function captureReceiptPreviewImage(receiptElement, paper) {
 
     try {
         if (document.fonts?.ready) await document.fonts.ready;
+        const renderScale = options.digital
+            ? 1200 / Math.max(1, captureNode.getBoundingClientRect().width)
+            : Math.max(THERMAL_CAPTURE_SCALE, window.devicePixelRatio || 1);
         const sourceCanvas = await html2canvas(captureNode, {
             backgroundColor: '#ffffff',
-            scale: Math.max(THERMAL_CAPTURE_SCALE, window.devicePixelRatio || 1),
+            scale: renderScale,
             useCORS: true,
             allowTaint: false,
             logging: false,
             removeContainer: true
         });
+        if (options.digital) {
+            const blob = await new Promise((resolve, reject) => sourceCanvas.toBlob(
+                value => value ? resolve(value) : reject(new Error('No se pudo generar el PNG.')),
+                'image/png'
+            ));
+            return { blob, pixelWidth: sourceCanvas.width, pixelHeight: sourceCanvas.height };
+        }
         const outputCanvas = normalizeReceiptCanvasForThermalPrint(sourceCanvas, targetWidthPx);
 
         return {
