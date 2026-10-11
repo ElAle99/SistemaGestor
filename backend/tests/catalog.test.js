@@ -28,6 +28,16 @@ test('catalog migration and tenant isolation on embedded PostgreSQL', async t =>
     const initial = await service.getCatalog(1);
     const phone = initial.tipos.find(row => row.nombre === 'Celular');
     const samsung = initial.marcas.find(row => row.nombre === 'Samsung' && row.tipo_equipo_id === phone.id);
+    await t.test('learning reuses verified parents instead of querying them for every value', async () => {
+      let reads = 0;
+      const counted = { query: (sql, params) => { if (sql.startsWith('SELECT')) reads++; return db.query(sql, params); } };
+      await db.query('BEGIN');
+      try {
+        await service.learnOrder({ deviceType: 'Celular', brand: 'Samsung', model: 'Samsung Galaxy A55 5G',
+          fallas: ['No carga'], reparaciones: ['Diagnóstico de placa'] }, 1, counted);
+        assert.equal(reads, 5);
+      } finally { await db.query('ROLLBACK'); }
+    });
     await t.test('seed includes requested types, complete fault lists and searchable A55', async () => {
       assert.equal(initial.tipos.length, 8);
       assert.equal(initial.fallas.filter(row => row.tipo_equipo_id === phone.id).length, 40);

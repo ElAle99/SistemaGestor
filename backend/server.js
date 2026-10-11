@@ -98,7 +98,6 @@ app.use('/vendor/html2canvas', express.static(path.join(__dirname, 'node_modules
 app.use('/vendor/jspdf', express.static(path.join(__dirname, 'node_modules', 'jspdf', 'dist')));
 app.use('/vendor/jspdf-autotable', express.static(path.join(__dirname, 'node_modules', 'jspdf-autotable', 'dist')));
 app.use('/vendor/dayjs', express.static(path.join(__dirname, 'node_modules', 'dayjs')));
-app.use('/vendor/qz-tray', express.static(path.join(__dirname, '..', 'node_modules', 'qz-tray')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.get('/', (req, res) => {

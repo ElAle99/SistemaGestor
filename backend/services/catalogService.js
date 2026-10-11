@@ -55,11 +55,13 @@ async function getModels(scope, brand, query = '') {
     AND (negocio_id IS NULL OR negocio_id = $2) AND strpos(clave, $3) > 0 ORDER BY nombre LIMIT 50`, [brand, scope, search]);
   return result.rows;
 }
-async function addEntry(kind, data, scope, db = pool) {
+async function addEntry(kind, data, scope, db = pool, verifiedParent = null) {
   if (!scope) throw error('Configura el negocio de esta instalación antes de guardar catálogos privados.', 409);
   const def = definition(kind);
   const name = cleanName(data.nombre, def.max);
-  if (def.parent) await visible(def.parent, data.parent_id, scope, db);
+  if (def.parent && (!verifiedParent || Number(verifiedParent.id) !== Number(data.parent_id))) {
+    await visible(def.parent, data.parent_id, scope, db);
+  }
   const params = [key(name), scope];
   const parentWhere = def.column ? `AND ${def.column} = $3` : '';
   if (def.column) params.push(Number(data.parent_id));
@@ -93,10 +95,12 @@ async function deactivate(kind, id, scope) {
 
 async function learnOrder(data, scope, db) {
   const type = await addEntry('tipos', { nombre: data.deviceType }, scope, db);
-  const brand = await addEntry('marcas', { nombre: data.brand, parent_id: type.id }, scope, db);
-  await addEntry('modelos', { nombre: data.model, parent_id: brand.id }, scope, db);
-  for (const name of data.fallas || []) await addEntry('fallas', { nombre: name, parent_id: type.id }, scope, db);
-  for (const name of data.reparaciones || []) await addEntry('reparaciones', { nombre: name, parent_id: type.id }, scope, db);
+  // Parents have already been resolved in this tenant and transaction. Reuse them
+  // instead of fetching the same type/brand again for every selected tag.
+  const brand = await addEntry('marcas', { nombre: data.brand, parent_id: type.id }, scope, db, type);
+  await addEntry('modelos', { nombre: data.model, parent_id: brand.id }, scope, db, brand);
+  for (const name of data.fallas || []) await addEntry('fallas', { nombre: name, parent_id: type.id }, scope, db, type);
+  for (const name of data.reparaciones || []) await addEntry('reparaciones', { nombre: name, parent_id: type.id }, scope, db, type);
   // Never infer a many-to-many repair diagnosis from merely co-occurring tags.
 }
 module.exports = { scopeForUser, getCatalog, getModels, addEntry, linkRepair, deactivate, learnOrder };

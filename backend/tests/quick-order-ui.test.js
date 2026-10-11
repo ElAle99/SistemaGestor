@@ -13,6 +13,7 @@ function ui({ failPrint = false, failSave = false, failPreview = false } = {}) {
       classList: { add: v => classes.add(v), remove: v => classes.delete(v), contains: v => classes.has(v),
         toggle(v, flag) { if (flag) classes.add(v); else classes.delete(v); } },
       addEventListener(type, callback) { this.events[type] = callback; },
+      setAttribute(name, value) { this[name] = value; }, removeAttribute(name) { delete this[name]; },
       replaceChildren() { this.children = []; }, appendChild(child) { this.children.push(child); },
       focus() {}, setCustomValidity(message) { this.validationMessage = message; }, reportValidity() { return true; },
       reset() { for (const item of elements.values()) item.value = ''; }
@@ -57,6 +58,8 @@ test('quick form sends only reception fields and blocks duplicate in-flight subm
   assert.equal(Object.keys(payload).length, 12); // eleven fields plus selected customer id
   assert.equal(h.element('quick-order-form').classList.contains('hidden'), true);
   assert.match(h.element('quick-order-success-message').textContent, /10043/);
+  assert.ok(!h.calls.some(c => c.preview || c.print));
+  await h.element('quick-order-print').events.click();
   assert.ok(h.calls.some(c => c.preview === 17));
   assert.ok(h.calls.some(c => c.print));
 });
@@ -81,6 +84,7 @@ test('failed save keeps captured fields and enables correction', async () => {
 test('printer failure preserves success and never restores the creation form', async () => {
   const h = ui({ failPrint: true });
   await h.submit();
+  await h.element('quick-order-print').events.click();
   assert.equal(h.element('quick-order-form').classList.contains('hidden'), true);
   assert.match(h.element('quick-order-print-status').textContent, /guardada/);
   assert.equal(h.element('quick-order-error').classList.contains('hidden'), true);
@@ -89,6 +93,7 @@ test('printer failure preserves success and never restores the creation form', a
 test('failed preview never prints a previously opened ticket', async () => {
   const h = ui({ failPreview: true });
   await h.submit();
+  await h.element('quick-order-print').events.click();
   assert.ok(!h.calls.some(c => c.print));
 });
 

@@ -317,11 +317,11 @@ function renderEvidenceHistory(order = {}) {
             const orderId = document.getElementById('form-order-id')?.value;
             const evidenceId = button.dataset.evidenceId;
             if (!orderId || !evidenceId) return;
-            if (!confirm('¿Eliminar esta evidencia?')) return;
+            if (!await AllfixUI.confirm('¿Eliminar esta evidencia?')) return;
 
             const response = await fetch(`${BASE_API_URL}/ordenes/${orderId}/evidencias/${evidenceId}`, { method: 'DELETE' });
             if (!response.ok) {
-                alert('No se pudo eliminar la evidencia.');
+                AllfixUI.notify('No se pudo eliminar la evidencia.');
                 return;
             }
 
@@ -426,7 +426,11 @@ window.fetch = async function(resource, options = {}) {
         headers.set('Content-Type', 'application/json');
     }
 
-    const response = await originalFetch(resource, { ...options, headers });
+    const { silent = false, ...fetchOptions } = options;
+    const finishLoading = silent ? null : window.AllfixUI?.loading();
+    let response;
+    try { response = await originalFetch(resource, { ...fetchOptions, headers }); }
+    finally { finishLoading?.(); }
     const requestUrl = typeof resource === 'string' ? resource : resource?.url || '';
     const isLoginRequest = requestUrl.includes('/api/auth/login');
 
@@ -434,6 +438,7 @@ window.fetch = async function(resource, options = {}) {
         clearSessionState();
         showLoginContainer();
     }
+    if (response.status === 403) window.AllfixUI?.notify('No tienes permiso para realizar esta acción.', 'warning');
 
     return response;
 };
@@ -461,7 +466,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initReportFilters();
     initUsuarios();
     initEstablishmentConfigForm();
-    initQZPrinterConfigForm();
+    initPrinterConfigForm();
     initConfigurationNavigation();
     initCotizaciones();
     initCalendarioEvents();
@@ -542,7 +547,7 @@ function checkSession() {
             clearSessionState();
             showLoginContainer();
             if (user && isTokenExpired(sessionData.token)) {
-                alert('Tu sesión expiró. Inicia sesión nuevamente para guardar cambios.');
+                AllfixUI.notify('Tu sesión expiró. Inicia sesión nuevamente para guardar cambios.');
             }
             return;
         }
@@ -583,7 +588,7 @@ function showAppContainer() {
 
 function initLogin() {
     const loginForm = document.getElementById('login-form');
-    loginForm.addEventListener('submit', async (e) => {
+    loginForm.addEventListener('submit', withFormFeedback(async (e) => {
         e.preventDefault();
         const username = document.getElementById('login-username').value.trim();
         const password = document.getElementById('login-password').value.trim();
@@ -614,7 +619,7 @@ function initLogin() {
             console.error('Error during login fetch:', err);
             errorMsg.classList.remove('hidden');
         }
-    });
+    }));
 
     const logoutButton = document.getElementById('btn-logout');
     if (logoutButton) {
@@ -628,7 +633,7 @@ function initLogin() {
     const registerLink = document.getElementById('btn-register-link');
     if (registerLink) {
         registerLink.addEventListener('click', () => {
-            alert("El registro de nuevos operadores se realiza desde el módulo de Configuración.");
+            AllfixUI.notify("El registro de nuevos operadores se realiza desde el módulo de Configuración.");
         });
     }
     applyRolePermissions();
@@ -692,7 +697,7 @@ async function initInitialSetup() {
         setLoginCardMode('login');
     });
 
-    setupForm.addEventListener('submit', async (e) => {
+    setupForm.addEventListener('submit', withFormFeedback(async (e) => {
         e.preventDefault();
 
         const nombre = document.getElementById('setup-admin-name')?.value.trim() || '';
@@ -741,9 +746,9 @@ async function initInitialSetup() {
                 submitButton.innerText = 'Registrar usuario';
             }
         }
-    });
+    }));
 
-    forgotForm?.addEventListener('submit', async (e) => {
+    forgotForm?.addEventListener('submit', withFormFeedback(async (e) => {
         e.preventDefault();
         const correo = document.getElementById('forgot-password-email')?.value.trim() || '';
         try {
@@ -757,9 +762,9 @@ async function initInitialSetup() {
             console.error('Error al solicitar recuperacion:', error);
             showAuthMessage('forgot-password-message', 'No se pudo solicitar la recuperacion.', 'error');
         }
-    });
+    }));
 
-    resetForm?.addEventListener('submit', async (e) => {
+    resetForm?.addEventListener('submit', withFormFeedback(async (e) => {
         e.preventDefault();
         const token = new URLSearchParams(window.location.search).get('reset_token') || '';
         const password = document.getElementById('reset-password-new')?.value || '';
@@ -790,7 +795,7 @@ async function initInitialSetup() {
             console.error('Error al restablecer contrasena:', error);
             showAuthMessage('reset-password-message', 'No se pudo restablecer la contrasena.', 'error');
         }
-    });
+    }));
 
     await refreshInitialSetupStatus();
 
@@ -1546,6 +1551,15 @@ function applyRolePermissions() {
 // ==========================================
 // CARGA DE DATOS DESDE LA API REAL (SQLITE)
 // ==========================================
+async function refreshQuickOrderData(hasAdvance = false) {
+    // A new reception does not change inventory, users, quotes or cash history.
+    await Promise.all([loadClientes(), loadOrdenes(), ...(hasAdvance ? [loadCaja()] : [])]);
+    renderDashboard();
+    renderClientes();
+    renderOrdenes();
+    if (hasAdvance) renderCaja();
+}
+
 async function loadAllData() {
     try {
         const promises = [
@@ -1577,6 +1591,7 @@ async function loadAllData() {
         }
     } catch (error) {
         console.error('Error al cargar datos del backend:', error);
+        window.AllfixUI?.notify('No se pudieron cargar los datos. Revisa tu conexión e intenta nuevamente.', 'error');
     }
 }
 
@@ -1664,6 +1679,8 @@ async function loadGarantias() {
 // RENDER: DASHBOARD
 // ==========================================
 function renderDashboard() {
+    const cajaState = document.getElementById('dash-caja-state');
+    if (cajaState) cajaState.textContent = APP_STATE.cajaActiva ? 'Abierta' : 'Cerrada';
     // 1. Contar estados
     const counts = {
         recibido: 0,
@@ -2120,7 +2137,7 @@ clientModal?.addEventListener('click', (event) => {
     if (event.target === clientModal) closeClientModal();
 });
 
-document.getElementById('client-form').addEventListener('submit', async (e) => {
+document.getElementById('client-form').addEventListener('submit', withFormFeedback(async (e) => {
     e.preventDefault();
     const id = document.getElementById('modal-client-id').value;
     const isEditing = id !== '';
@@ -2151,17 +2168,17 @@ document.getElementById('client-form').addEventListener('submit', async (e) => {
             body: JSON.stringify(data)
         });
         if (response.ok) {
-            alert(isEditing ? 'Cliente actualizado con éxito.' : 'Cliente registrado con éxito.');
+            AllfixUI.notify(isEditing ? 'Cliente actualizado con éxito.' : 'Cliente registrado con éxito.');
             closeClientModal();
             loadAllData();
         } else {
             const err = await response.json();
-            alert('Error: ' + err.error);
+            AllfixUI.notify('Error: ' + err.error);
         }
     } catch (err) {
         console.error(err);
     }
-});
+}));
 
 window.openEditClientModal = function(id) {
     const client = APP_STATE.clientes.find(c => c.id === id);
@@ -2176,22 +2193,22 @@ window.deleteClient = async function(id) {
     const confirmation = relatedOrders > 0
         ? `¿Eliminar al cliente "${client.nombre}" y sus ${relatedOrders} orden(es)? Esta acción también devolverá al inventario las refacciones usadas en esas órdenes.`
         : `¿Eliminar al cliente "${client.nombre}"?`;
-    if (!confirm(confirmation)) return;
+    if (!await AllfixUI.confirm(confirmation)) return;
 
     try {
         const response = await fetch(`${BASE_API_URL}/clientes/${id}`, { method: 'DELETE' });
         const result = await response.json().catch(() => ({}));
         if (!response.ok) {
-            alert('Error: ' + (result.error || 'No se pudo eliminar el cliente.'));
+            AllfixUI.notify('Error: ' + (result.error || 'No se pudo eliminar el cliente.'));
             return;
         }
 
-        alert(`Cliente eliminado correctamente. Órdenes eliminadas: ${result.ordenes_eliminadas || 0}.`);
+        AllfixUI.notify(`Cliente eliminado correctamente. Órdenes eliminadas: ${result.ordenes_eliminadas || 0}.`);
         document.getElementById('client-detail-panel')?.classList.add('hidden');
         await loadAllData();
     } catch (err) {
         console.error(err);
-        alert('No se pudo eliminar el cliente por un error de red.');
+        AllfixUI.notify('No se pudo eliminar el cliente por un error de red.');
     }
 };
 
@@ -2325,7 +2342,7 @@ function renderOrdenes() {
                 </td>
                 <td data-label="Acciones">
                     <div class="order-row-actions">
-                    <button class="order-action-btn is-neutral" onclick="viewOrderDetails(${o.id})" title="Imprimir ticket" aria-label="Imprimir ticket"><i class="fa-solid fa-print"></i></button>
+                    <button class="order-action-btn is-neutral" onclick="printOrderTicket(${o.id})" title="Imprimir ticket" aria-label="Imprimir ticket"><i class="fa-solid fa-print"></i></button>
                     <button class="order-action-btn is-primary" onclick="editOrderDetails(${o.id})" title="Editar orden" aria-label="Editar orden"><i class="fa-solid fa-pen"></i></button>
                     ${canAddRepair
                         ? `<button class="order-action-btn is-service" onclick="openAdditionalRepairModal(${o.id})" title="Agregar reparación" aria-label="Agregar reparación"><i class="fa-solid fa-screwdriver-wrench"></i><span>+</span></button>`
@@ -2429,11 +2446,11 @@ function populateAdditionalRepairInventory() {
 window.openAdditionalRepairModal = function(orderId) {
     const order = APP_STATE.ordenes.find(item => Number(item.id) === Number(orderId));
     if (!order) {
-        alert('No se encontró la orden.');
+        AllfixUI.notify('No se encontró la orden.');
         return;
     }
     if (normalizeText(order.estado_pago) === 'pagado' || ['Entregado', 'Cancelado'].includes(order.status)) {
-        alert('No se puede cambiar el precio de una orden pagada, entregada o cancelada.');
+        AllfixUI.notify('No se puede cambiar el precio de una orden pagada, entregada o cancelada.');
         return;
     }
 
@@ -2460,17 +2477,17 @@ document.getElementById('btn-add-additional-repair-part')?.addEventListener('cli
     const cantidad = Number(getInputValue('additional-repair-part-qty'));
     const product = APP_STATE.inventario.find(item => Number(item.id) === productId);
     if (!product) {
-        alert('Selecciona una refacción del inventario.');
+        AllfixUI.notify('Selecciona una refacción del inventario.');
         return;
     }
     if (!Number.isInteger(cantidad) || cantidad <= 0) {
-        alert('Indica una cantidad válida.');
+        AllfixUI.notify('Indica una cantidad válida.');
         return;
     }
     const existing = ADDITIONAL_REPAIR_PARTS.find(part => Number(part.producto_id) === productId);
     const nextQuantity = cantidad + Number(existing?.cantidad || 0);
     if (nextQuantity > Number(product.stock || 0)) {
-        alert(`Stock insuficiente. Disponible: ${Number(product.stock || 0)} pz.`);
+        AllfixUI.notify(`Stock insuficiente. Disponible: ${Number(product.stock || 0)} pz.`);
         return;
     }
     if (existing) {
@@ -2493,14 +2510,14 @@ document.getElementById('btn-cancel-additional-repair')?.addEventListener('click
 document.getElementById('additional-repair-modal')?.addEventListener('click', event => {
     if (event.target.id === 'additional-repair-modal') closeAdditionalRepairModal();
 });
-document.getElementById('additional-repair-form')?.addEventListener('submit', async event => {
+document.getElementById('additional-repair-form')?.addEventListener('submit', withFormFeedback(async event => {
     event.preventDefault();
     const orderId = Number(getInputValue('additional-repair-order-id'));
     const descripcion = getInputValue('additional-repair-description').trim();
     const precio = Number(getInputValue('additional-repair-price'));
     const partsTotal = getAdditionalRepairPartsTotal();
     if (!orderId || !descripcion || !Number.isFinite(precio) || precio < 0 || (precio + partsTotal) <= 0) {
-        alert('Escribe la reparación y agrega un precio de servicio o una refacción.');
+        AllfixUI.notify('Escribe la reparación y agrega un precio de servicio o una refacción.');
         return;
     }
 
@@ -2528,16 +2545,16 @@ document.getElementById('additional-repair-form')?.addEventListener('submit', as
 
         closeAdditionalRepairModal();
         await loadAllData();
-        alert(`Reparación agregada a ${result.folio}. Nuevo total: ${formatCurrency(result.costo_real)}.`);
+        AllfixUI.notify(`Reparación agregada a ${result.folio}. Nuevo total: ${formatCurrency(result.costo_real)}.`);
     } catch (error) {
-        alert(error.message || 'No se pudo agregar la reparación.');
+        AllfixUI.notify(error.message || 'No se pudo agregar la reparación.');
     } finally {
         if (saveButton) {
             saveButton.disabled = false;
             saveButton.innerHTML = '<i class="fa-solid fa-check"></i> Confirmar reparación';
         }
     }
-});
+}));
 
 function closeQuickWarrantyModal() {
     document.getElementById('quick-warranty-modal')?.classList.add('hidden');
@@ -2546,11 +2563,11 @@ function closeQuickWarrantyModal() {
 window.openQuickWarrantyModal = function(orderId) {
     const order = APP_STATE.ordenes.find(item => Number(item.id) === Number(orderId));
     if (!order) {
-        alert('No se encontró la orden.');
+        AllfixUI.notify('No se encontró la orden.');
         return;
     }
     if (order.status !== 'Entregado') {
-        alert('La garantía solo puede agregarse cuando la orden esté Entregada.');
+        AllfixUI.notify('La garantía solo puede agregarse cuando la orden esté Entregada.');
         return;
     }
 
@@ -2583,7 +2600,7 @@ document.getElementById('btn-cancel-quick-warranty')?.addEventListener('click', 
 document.getElementById('quick-warranty-modal')?.addEventListener('click', event => {
     if (event.target.id === 'quick-warranty-modal') closeQuickWarrantyModal();
 });
-document.getElementById('quick-warranty-form')?.addEventListener('submit', async event => {
+document.getElementById('quick-warranty-form')?.addEventListener('submit', withFormFeedback(async event => {
     event.preventDefault();
     const saveButton = document.getElementById('btn-save-quick-warranty');
     const orderId = Number(getInputValue('quick-warranty-order-id'));
@@ -2597,7 +2614,7 @@ document.getElementById('quick-warranty-form')?.addEventListener('submit', async
     };
 
     if (!payload.orden_id || !payload.duracion_dias || !payload.fecha_inicio || !payload.servicio_cubierto) {
-        alert('Completa la duración, fecha de inicio y servicio cubierto.');
+        AllfixUI.notify('Completa la duración, fecha de inicio y servicio cubierto.');
         return;
     }
 
@@ -2618,16 +2635,16 @@ document.getElementById('quick-warranty-form')?.addEventListener('submit', async
         await loadGarantias();
         renderOrdenes();
         renderGarantias();
-        alert(`Garantía agregada correctamente a la orden ${result.folio || result.folio_orden || ''}.`);
+        AllfixUI.notify(`Garantía agregada correctamente a la orden ${result.folio || result.folio_orden || ''}.`);
     } catch (error) {
-        alert(error.message || 'No se pudo guardar la garantía.');
+        AllfixUI.notify(error.message || 'No se pudo guardar la garantía.');
     } finally {
         if (saveButton) {
             saveButton.disabled = false;
             saveButton.innerHTML = '<i class="fa-solid fa-shield-halved"></i> Guardar garantía';
         }
     }
-});
+}));
 
 function getWarrantyBadgeClass(status = '') {
     const normalized = normalizeText(status);
@@ -2745,7 +2762,7 @@ window.viewWarrantyDetail = async function(id) {
         renderWarrantyDetail(garantia);
         document.getElementById('warranty-detail-modal')?.classList.remove('hidden');
     } catch (error) {
-        alert(error.message);
+        AllfixUI.notify(error.message);
     }
 };
 
@@ -2904,7 +2921,7 @@ document.getElementById('btn-cancel-warranty-cost')?.addEventListener('click', (
 document.getElementById('btn-close-warranty-close')?.addEventListener('click', () => closeWarrantyModal('warranty-close-modal'));
 document.getElementById('btn-cancel-warranty-close')?.addEventListener('click', () => closeWarrantyModal('warranty-close-modal'));
 
-document.getElementById('warranty-ingress-form')?.addEventListener('submit', async (event) => {
+document.getElementById('warranty-ingress-form')?.addEventListener('submit', withFormFeedback(async (event) => {
     event.preventDefault();
     const garantiaId = getInputValue('warranty-ingress-garantia-id');
     try {
@@ -2929,11 +2946,11 @@ document.getElementById('warranty-ingress-form')?.addEventListener('submit', asy
         closeWarrantyModal('warranty-ingress-modal');
         await refreshWarrantyModule();
         await viewWarrantyDetail(garantiaId);
-        alert('Ingreso por garantía registrado correctamente.');
+        AllfixUI.notify('Ingreso por garantía registrado correctamente.');
     } catch (error) {
-        alert(error.message);
+        AllfixUI.notify(error.message);
     }
-});
+}));
 
 window.openWarrantyValidationModal = function(ingressId) {
     document.getElementById('warranty-validation-form')?.reset();
@@ -2949,7 +2966,7 @@ document.getElementById('warranty-validation-state')?.addEventListener('change',
     if (reason) reason.required = rejected;
 });
 
-document.getElementById('warranty-validation-form')?.addEventListener('submit', async (event) => {
+document.getElementById('warranty-validation-form')?.addEventListener('submit', withFormFeedback(async (event) => {
     event.preventDefault();
     const ingressId = getInputValue('warranty-validation-ingress-id');
     try {
@@ -2968,11 +2985,11 @@ document.getElementById('warranty-validation-form')?.addEventListener('submit', 
         closeWarrantyModal('warranty-validation-modal');
         await refreshWarrantyModule();
         await viewWarrantyDetail(result.id);
-        alert('Validación registrada correctamente.');
+        AllfixUI.notify('Validación registrada correctamente.');
     } catch (error) {
-        alert(error.message);
+        AllfixUI.notify(error.message);
     }
-});
+}));
 
 window.openWarrantyCostModal = function(garantiaId, ingresoId = '') {
     document.getElementById('warranty-cost-form')?.reset();
@@ -3024,7 +3041,7 @@ document.getElementById('btn-add-warranty-cost-part')?.addEventListener('click',
     const product = APP_STATE.inventario.find(item => Number(item.id) === productId);
     if (!product || qty <= 0) return;
     if (Number(product.stock || 0) < qty) {
-        alert(`Stock insuficiente para ${product.nombre}.`);
+        AllfixUI.notify(`Stock insuficiente para ${product.nombre}.`);
         return;
     }
     const existing = APP_STATE.currentWarrantyCostParts.find(part => Number(part.producto_id) === productId);
@@ -3047,7 +3064,7 @@ window.removeWarrantyCostPart = function(index) {
 document.getElementById('warranty-labor-cost')?.addEventListener('input', updateWarrantyCostTotal);
 document.getElementById('warranty-other-cost')?.addEventListener('input', updateWarrantyCostTotal);
 
-document.getElementById('warranty-cost-form')?.addEventListener('submit', async (event) => {
+document.getElementById('warranty-cost-form')?.addEventListener('submit', withFormFeedback(async (event) => {
     event.preventDefault();
     const garantiaId = getInputValue('warranty-cost-garantia-id');
     const other = Number(getInputValue('warranty-other-cost') || 0);
@@ -3063,14 +3080,14 @@ document.getElementById('warranty-cost-form')?.addEventListener('submit', async 
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) {
-        alert(result.error || 'No se pudieron registrar costos.');
+        AllfixUI.notify(result.error || 'No se pudieron registrar costos.');
         return;
     }
     closeWarrantyModal('warranty-cost-modal');
     await refreshWarrantyModule();
     await viewWarrantyDetail(result.id);
-    alert('Costos de garantía registrados correctamente.');
-});
+    AllfixUI.notify('Costos de garantía registrados correctamente.');
+}));
 
 window.openWarrantyCloseModal = function(ingressId) {
     document.getElementById('warranty-close-form')?.reset();
@@ -3081,7 +3098,7 @@ window.openWarrantyCloseModal = function(ingressId) {
     document.getElementById('warranty-close-modal')?.classList.remove('hidden');
 };
 
-document.getElementById('warranty-close-form')?.addEventListener('submit', async (event) => {
+document.getElementById('warranty-close-form')?.addEventListener('submit', withFormFeedback(async (event) => {
     event.preventDefault();
     const ingressId = getInputValue('warranty-close-ingress-id');
     const response = await fetch(`${BASE_API_URL}/garantias/ingresos/${ingressId}/cerrar`, {
@@ -3094,14 +3111,14 @@ document.getElementById('warranty-close-form')?.addEventListener('submit', async
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) {
-        alert(result.error || 'No se pudo cerrar el ingreso.');
+        AllfixUI.notify(result.error || 'No se pudo cerrar el ingreso.');
         return;
     }
     closeWarrantyModal('warranty-close-modal');
     await refreshWarrantyModule();
     await viewWarrantyDetail(result.id);
-    alert('Ingreso de garantía cerrado correctamente.');
-});
+    AllfixUI.notify('Ingreso de garantía cerrado correctamente.');
+}));
 
 document.getElementById('order-search').addEventListener('input', renderOrdenes);
 document.getElementById('filter-order-status').addEventListener('change', renderOrdenes);
@@ -3119,21 +3136,21 @@ document.getElementById('warranty-date-to')?.addEventListener('change', renderGa
 window.deleteOrder = async function(id) {
     const order = APP_STATE.ordenes.find(o => Number(o.id) === Number(id));
     if (!order) return;
-    if (!confirm(`¿Eliminar la orden ${order.folio}? Si tiene refacciones utilizadas, se devolverán al inventario.`)) return;
+    if (!await AllfixUI.confirm(`¿Eliminar la orden ${order.folio}? Si tiene refacciones utilizadas, se devolverán al inventario.`)) return;
 
     try {
         const response = await fetch(`${BASE_API_URL}/ordenes/${id}`, { method: 'DELETE' });
         const result = await response.json().catch(() => ({}));
         if (!response.ok) {
-            alert('Error: ' + (result.error || 'No se pudo eliminar la orden.'));
+            AllfixUI.notify('Error: ' + (result.error || 'No se pudo eliminar la orden.'));
             return;
         }
 
-        alert('Orden eliminada correctamente.');
+        AllfixUI.notify('Orden eliminada correctamente.');
         await loadAllData();
     } catch (err) {
         console.error(err);
-        alert('No se pudo eliminar la orden por un error de red.');
+        AllfixUI.notify('No se pudo eliminar la orden por un error de red.');
     }
 };
 
@@ -3182,7 +3199,7 @@ document.querySelector('#orders-main-table tbody').addEventListener('change', as
         renderDashboard();
         renderCalendario();
     } catch (error) {
-        alert(error.message || 'No se pudo actualizar el estado.');
+        AllfixUI.notify(error.message || 'No se pudo actualizar el estado.');
         select.value = previousStatus;
     }
 });
@@ -3689,12 +3706,12 @@ function addSelectedOrderPart() {
     const cantidad = parseInt(qtyInput?.value, 10) || 0;
 
     if (!selected) {
-        alert('Selecciona una refacción del inventario.');
+        AllfixUI.notify('Selecciona una refacción del inventario.');
         searchInput?.focus();
         return;
     }
     if (cantidad <= 0) {
-        alert('La cantidad debe ser mayor a cero.');
+        AllfixUI.notify('La cantidad debe ser mayor a cero.');
         qtyInput?.focus();
         return;
     }
@@ -3704,7 +3721,7 @@ function addSelectedOrderPart() {
         const maxQty = getOrderPartMaxQuantity(existing);
         const nextQty = Number(existing.cantidad || 0) + cantidad;
         if (nextQty > maxQty) {
-            alert(`Stock insuficiente para "${existing.nombre}". Disponible: ${maxQty} pz.`);
+            AllfixUI.notify(`Stock insuficiente para "${existing.nombre}". Disponible: ${maxQty} pz.`);
             return;
         }
         existing.cantidad = nextQty;
@@ -3713,7 +3730,7 @@ function addSelectedOrderPart() {
         const part = normalizeOrderPart(selected, { cantidad, originalCantidad: 0 });
         const maxQty = getOrderPartMaxQuantity(part);
         if (cantidad > maxQty) {
-            alert(`Stock insuficiente para "${part.nombre}". Disponible: ${maxQty} pz.`);
+            AllfixUI.notify(`Stock insuficiente para "${part.nombre}". Disponible: ${maxQty} pz.`);
             return;
         }
         APP_STATE.currentOrderParts.push(part);
@@ -3731,12 +3748,12 @@ function updateOrderPartQuantity(productoId, cantidad) {
     const nextQty = parseInt(cantidad, 10) || 0;
     const maxQty = getOrderPartMaxQuantity(part);
     if (nextQty <= 0) {
-        alert('La cantidad debe ser mayor a cero.');
+        AllfixUI.notify('La cantidad debe ser mayor a cero.');
         renderOrderPartsTable();
         return;
     }
     if (nextQty > maxQty) {
-        alert(`Stock insuficiente para "${part.nombre}". Disponible: ${maxQty} pz.`);
+        AllfixUI.notify(`Stock insuficiente para "${part.nombre}". Disponible: ${maxQty} pz.`);
         renderOrderPartsTable();
         return;
     }
@@ -3855,30 +3872,30 @@ function validateOrderMinimums() {
     const service = getInputValue('form-servicio-solicitado').trim();
 
     if (!clientId && !clientName) {
-        alert('Escribe el nombre del cliente o selecciona un cliente existente.');
+        AllfixUI.notify('Escribe el nombre del cliente o selecciona un cliente existente.');
         document.getElementById('form-client-name')?.focus();
         return false;
     }
     const duplicateMatch = checkClientDuplicateState();
     if (duplicateMatch) {
-        alert(duplicateMatch.type === 'strong'
+        AllfixUI.notify(duplicateMatch.type === 'strong'
             ? 'Ya existe un cliente registrado con este telefono. Usa el cliente existente.'
             : 'Revisa la posible coincidencia de cliente antes de guardar.');
         document.getElementById('form-client-name')?.focus();
         return false;
     }
     if (!deviceType) {
-        alert('Selecciona el tipo de equipo.');
+        AllfixUI.notify('Selecciona el tipo de equipo.');
         document.getElementById('form-device-type')?.focus();
         return false;
     }
     if (!(brand && model) && !deviceDescription) {
-        alert('Escribe marca y modelo, o una descripción clara del equipo.');
+        AllfixUI.notify('Escribe marca y modelo, o una descripción clara del equipo.');
         document.getElementById('form-device-brand')?.focus();
         return false;
     }
     if (!falla && !service) {
-        alert('Describe la falla reportada o el servicio solicitado.');
+        AllfixUI.notify('Describe la falla reportada o el servicio solicitado.');
         document.getElementById('form-falla-reportada')?.focus();
         return false;
     }
@@ -4215,16 +4232,16 @@ function validateOrderLock() {
     const lockType = selectedLock?.value || 'Ninguno';
 
     if (lockType === 'Ninguno') {
-        alert('Selecciona el tipo de bloqueo: PIN, Contraseña o Patrón.');
+        AllfixUI.notify('Selecciona el tipo de bloqueo: PIN, Contraseña o Patrón.');
         return false;
     }
     if (lockType === 'PIN' && !document.getElementById('form-lock-pin').value.trim()) {
-        alert('Escribe el PIN del equipo.');
+        AllfixUI.notify('Escribe el PIN del equipo.');
         document.getElementById('form-lock-pin').focus();
         return false;
     }
     if (lockType === 'Contraseña' && !document.getElementById('form-lock-pass').value.trim()) {
-        alert('Escribe la contraseña del equipo.');
+        AllfixUI.notify('Escribe la contraseña del equipo.');
         document.getElementById('form-lock-pass').focus();
         return false;
     }
@@ -4234,7 +4251,7 @@ function validateOrderLock() {
             .filter(Boolean);
         const patternDescription = document.getElementById('form-lock-pattern-description')?.value.trim();
         if (sequence.length < 4 && !patternDescription) {
-            alert('Dibuja mínimo 4 puntos o describe el patrón.');
+            AllfixUI.notify('Dibuja mínimo 4 puntos o describe el patrón.');
             return false;
         }
     }
@@ -4875,7 +4892,7 @@ function initOrderRegistration() {
         updateEvidenceStateUI();
     });
 
-    orderForm.addEventListener('submit', async (e) => {
+    orderForm.addEventListener('submit', withFormFeedback(async (e) => {
         e.preventDefault();
 
         if (getOrderWizardStep() !== 5) {
@@ -5013,28 +5030,28 @@ function initOrderRegistration() {
 
             if (response.ok) {
                 const finalOrder = await response.json();
-                alert(isEditing ? 'Orden actualizada correctamente.' : 'Orden creada con éxito.');
+                AllfixUI.notify(isEditing ? 'Orden actualizada correctamente.' : 'Orden creada con éxito.');
                 orderModal.classList.add('hidden');
                 loadAllData();
 
                 if (!isEditing) {
                     // Previsualizar Ticket inmediatamente al crear una nueva orden
-                    await viewOrderDetails(finalOrder.id);
+                    await viewOrderDetails(finalOrder.id, { openPreview: !window.printerService?.isNative() });
                     if (ESTABLISHMENT_CONFIG.autoPrintTicket !== false) {
                         const printed = await printReceipt(null, { silent: true });
                         if (!printed) {
-                            alert('Orden creada correctamente.\n\nNo fue posible imprimir el ticket. Puedes reintentar desde la vista previa o usar la impresión normal.');
+                            AllfixUI.notify('Orden creada correctamente.\n\nNo fue posible imprimir el ticket. Puedes reintentar desde la vista previa o usar la impresión normal.');
                         }
                     }
                 }
             } else {
                 const err = await response.json();
-                alert('Error al registrar orden: ' + err.error);
+                AllfixUI.notify('Error al registrar orden: ' + err.error);
             }
         } catch (err) {
             console.error('Error de red:', err);
         }
-    });
+    }));
 
     // Cambiar ganancia automáticamente al ingresar costos reales y refacciones (Admin Only)
     const costoRealInput = document.getElementById('form-costo-real');
@@ -5056,7 +5073,7 @@ function initOrderRegistration() {
 async function editOrderDetails(id) {
     const response = await fetch(`${BASE_API_URL}/ordenes/${id}`);
     if (!response.ok) {
-        alert('No se pudo cargar la orden.');
+        AllfixUI.notify('No se pudo cargar la orden.');
         return;
     }
 
@@ -5219,7 +5236,7 @@ const saleSuccessCloseButton = document.getElementById('btn-sale-success-close')
 let AVAILABLE_TICKET_PRINTERS = [];
 const THERMAL_PRINT_DOTS = {
     '80mm': 576,
-    '58mm': 360
+    '58mm': 384
 };
 const THERMAL_PRINT_DPI = 203;
 const THERMAL_CAPTURE_SCALE = 5;
@@ -5718,9 +5735,9 @@ function setReceiptPrintBusy(isBusy) {
 }
 
 async function printReceipt(size, options = {}) {
-    if (!window.qzPrinterService) {
+    if (!window.printerService) {
         if (!options.silent) {
-            alert('QZ Tray no está disponible. Puedes utilizar la impresión normal del navegador.');
+            AllfixUI.notify('Servicio de impresion no está disponible. Puedes utilizar la impresión normal del navegador.');
         }
         return false;
     }
@@ -5730,7 +5747,7 @@ async function printReceipt(size, options = {}) {
         refreshReceiptOptionalSections(activeReceiptElement);
     }
     const detectedPaper = normalizeTicketPaper(
-        size || (activeReceiptElement?.id === 'ticket-corte-container' ? '58mm' : detectConfiguredTicketPaper())
+        size || detectConfiguredTicketPaper()
     );
 
     setReceiptPrintBusy(true);
@@ -5741,20 +5758,20 @@ async function printReceipt(size, options = {}) {
             throw new Error('No hay un ticket listo para imprimir.');
         }
 
-        if (typeof html2canvas !== 'function') {
+        if (window.printerService.isNative() && typeof html2canvas !== 'function') {
             throw new Error('No se pudo cargar el generador de imagen del ticket. Recarga el sistema e intenta de nuevo.');
         }
 
         const result = await sendReceiptPreviewToPrinter(receiptElement, detectedPaper);
         if (!options.silent) {
-            alert(`Ticket enviado a ${result.printerName}.`);
+            AllfixUI.notify(`Ticket enviado a ${result.printerName}.`);
         }
         return true;
     } catch (err) {
         console.error('Error de impresion:', err);
-        if (!options.silent) {
+        {
             const message = err.userMessage || err.message || 'No se pudo enviar el ticket a la impresora.';
-            alert(`${message}\n\nPuedes utilizar la impresión normal del navegador.`);
+            AllfixUI.notify(`${message}\n\nPuedes utilizar la impresión normal del navegador.`);
         }
         return false;
     } finally {
@@ -5849,9 +5866,10 @@ function normalizeReceiptCanvasForThermalPrint(sourceCanvas, targetWidthPx) {
 
 async function sendReceiptPreviewToPrinter(receiptElement, paper) {
     const detectedPaper = normalizeTicketPaper(paper);
+    if (!window.printerService.isNative()) return window.printerService.printTicket({ paperWidth: detectedPaper });
     const capture = await captureReceiptPreviewImage(receiptElement, detectedPaper);
-    const preferences = window.qzPrinterService.readPreferences();
-    return window.qzPrinterService.printImageTicket({
+    const preferences = window.printerService.readPreferences();
+    return window.printerService.printImageTicket({
         imageData: capture.imageData,
         pixelWidth: capture.pixelWidth,
         pixelHeight: capture.pixelHeight,
@@ -5865,12 +5883,12 @@ async function sendReceiptPreviewToPrinter(receiptElement, paper) {
 function printReceiptBrowser(size) {
     const activeReceiptElement = getActiveReceiptElement();
     if (!activeReceiptElement) {
-        alert('No hay un ticket listo para imprimir.');
+        AllfixUI.notify('No hay un ticket listo para imprimir.');
         return false;
     }
 
     const detectedPaper = normalizeTicketPaper(
-        size || (activeReceiptElement.id === 'ticket-corte-container' ? '58mm' : detectConfiguredTicketPaper())
+        size || detectConfiguredTicketPaper()
     );
     refreshReceiptOptionalSections(activeReceiptElement);
     setReceiptPrintSize(detectedPaper);
@@ -5925,13 +5943,13 @@ function getConfiguredTicketPaper() {
     return detectConfiguredTicketPaper();
 }
 
-async function viewOrderDetails(id) {
+async function viewOrderDetails(id, options = {}) {
     receiptModal.classList.remove('sale-ticket-only');
     setReceiptPrintLabels('Ticket Térmico');
 
     const response = await fetch(`${BASE_API_URL}/ordenes/${id}`);
     if (!response.ok) {
-        alert('No se pudo obtener información de la orden.');
+        AllfixUI.notify('No se pudo obtener información de la orden.');
         return false;
     }
 
@@ -6020,7 +6038,7 @@ async function viewOrderDetails(id) {
     // Toggle de pestañas en visualización
     document.getElementById('btn-show-ticket-recepcion').click();
 
-    receiptModal.classList.remove('hidden');
+    if (options.openPreview !== false) receiptModal.classList.remove('hidden');
 }
 
 document.getElementById('btn-show-ticket-recepcion').addEventListener('click', () => {
@@ -6225,7 +6243,7 @@ document.getElementById('inv-foto-file')?.addEventListener('change', (event) => 
     reader.readAsDataURL(file);
 });
 
-document.getElementById('inventory-form').addEventListener('submit', async (e) => {
+document.getElementById('inventory-form').addEventListener('submit', withFormFeedback(async (e) => {
     e.preventDefault();
     const id = document.getElementById('inv-id').value;
     const isEditing = id !== '';
@@ -6247,7 +6265,7 @@ document.getElementById('inventory-form').addEventListener('submit', async (e) =
                 const uploadData = await uploadRes.json();
                 uploadedFotoUrl = uploadData.url;
             } else {
-                alert('No se pudo subir la foto del producto. Continuando sin foto.');
+                AllfixUI.notify('No se pudo subir la foto del producto. Continuando sin foto.');
             }
         } catch (err) {
             console.error('Error subiendo foto:', err);
@@ -6282,17 +6300,17 @@ document.getElementById('inventory-form').addEventListener('submit', async (e) =
         });
 
         if (response.ok) {
-            alert(isEditing ? 'Producto actualizado correctamente.' : 'Producto registrado en el catálogo.');
+            AllfixUI.notify(isEditing ? 'Producto actualizado correctamente.' : 'Producto registrado en el catálogo.');
             inventoryModal.classList.add('hidden');
             loadAllData();
         } else {
             const err = await response.json();
-            alert('Error al guardar producto: ' + err.error);
+            AllfixUI.notify('Error al guardar producto: ' + err.error);
         }
     } catch (err) {
         console.error('Error de red:', err);
     }
-});
+}));
 
 window.openEditInventoryModal = function(id) {
     const item = APP_STATE.inventario.find(p => p.id === id);
@@ -6321,17 +6339,17 @@ window.openEditInventoryModal = function(id) {
 };
 
 window.deleteInventoryItem = async function(id) {
-    if (confirm('¿Está seguro de eliminar este producto del inventario?')) {
+    if (await AllfixUI.confirm('¿Está seguro de eliminar este producto del inventario?')) {
         try {
             const response = await fetch(`${BASE_API_URL}/inventario/${id}`, {
                 method: 'DELETE'
             });
             if (response.ok) {
-                alert('Producto eliminado del inventario.');
+                AllfixUI.notify('Producto eliminado del inventario.');
                 loadAllData();
             } else {
                 const err = await response.json();
-                alert('Error al eliminar producto: ' + err.error);
+                AllfixUI.notify('Error al eliminar producto: ' + err.error);
             }
         } catch (err) {
             console.error(err);
@@ -6353,11 +6371,11 @@ async function editStockItem(id) {
                 body: JSON.stringify(updatedItem)
             });
             if (response.ok) {
-                alert('Stock actualizado con éxito.');
+                AllfixUI.notify('Stock actualizado con éxito.');
                 loadAllData();
             } else {
                 const err = await response.json();
-                alert('Error al actualizar stock: ' + err.error);
+                AllfixUI.notify('Error al actualizar stock: ' + err.error);
             }
         } catch (err) {
             console.error(err);
@@ -6369,7 +6387,7 @@ async function editStockItem(id) {
 // RENDER: CAJA
 // ==========================================
 function initCaja() {
-    document.getElementById('caja-open-form')?.addEventListener('submit', async (event) => {
+    document.getElementById('caja-open-form')?.addEventListener('submit', withFormFeedback(async (event) => {
         event.preventDefault();
         const monto = Number(document.getElementById('caja-monto-inicial')?.value || 0);
         try {
@@ -6379,19 +6397,19 @@ function initCaja() {
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
-                alert(data.error || 'No se pudo abrir caja.');
+                AllfixUI.notify(data.error || 'No se pudo abrir caja.');
                 return;
             }
             APP_STATE.cajaActiva = data.caja || null;
             await loadCaja();
             renderCaja();
             document.getElementById('caja-monto-inicial').value = '';
-            if (data.alreadyOpen) alert('Ya existe una caja activa. Se mostrara la caja abierta.');
+            if (data.alreadyOpen) AllfixUI.notify('Ya existe una caja activa. Se mostrara la caja abierta.');
         } catch (error) {
             console.error(error);
-            alert('No se pudo abrir caja por un error de red.');
+            AllfixUI.notify('No se pudo abrir caja por un error de red.');
         }
-    });
+    }));
 
     document.getElementById('btn-caja-entrada')?.addEventListener('click', () => openCajaMovementModal('entrada_manual'));
     document.getElementById('btn-caja-salida')?.addEventListener('click', () => openCajaMovementModal('salida_manual'));
@@ -6404,8 +6422,8 @@ function initCaja() {
     document.getElementById('btn-close-caja-detail-footer')?.addEventListener('click', closeCajaDetailModal);
     document.getElementById('btn-print-caja-corte')?.addEventListener('click', printSelectedCajaCorte);
     document.getElementById('caja-close-counted')?.addEventListener('input', updateCajaCloseDifference);
-    document.getElementById('caja-movement-form')?.addEventListener('submit', saveCajaManualMovement);
-    document.getElementById('caja-close-form')?.addEventListener('submit', closeCajaFromModal);
+    document.getElementById('caja-movement-form')?.addEventListener('submit', withFormFeedback(saveCajaManualMovement));
+    document.getElementById('caja-close-form')?.addEventListener('submit', withFormFeedback(closeCajaFromModal));
     document.getElementById('caja-movement-date-filter')?.addEventListener('change', () => renderCajaMovimientos());
 }
 
@@ -6619,7 +6637,7 @@ function renderCajaHistorySummary() {
 
 function openCajaMovementModal(type) {
     if (!APP_STATE.cajaActiva) {
-        alert('No hay caja abierta.');
+        AllfixUI.notify('No hay caja abierta.');
         return;
     }
     const isEntrada = type === 'entrada_manual';
@@ -6648,7 +6666,7 @@ async function saveCajaManualMovement(event) {
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
-            alert(data.error || 'No se pudo guardar el movimiento.');
+            AllfixUI.notify(data.error || 'No se pudo guardar el movimiento.');
             return;
         }
         APP_STATE.cajaActiva = data;
@@ -6657,13 +6675,13 @@ async function saveCajaManualMovement(event) {
         closeCajaMovementModal();
     } catch (error) {
         console.error(error);
-        alert('No se pudo guardar el movimiento por un error de red.');
+        AllfixUI.notify('No se pudo guardar el movimiento por un error de red.');
     }
 }
 
 function openCajaCloseModal() {
     if (!APP_STATE.cajaActiva) {
-        alert('No hay caja abierta para cerrar.');
+        AllfixUI.notify('No hay caja abierta para cerrar.');
         return;
     }
     const expected = Number(getCajaSummary().total_esperado || 0);
@@ -6688,7 +6706,7 @@ async function closeCajaFromModal(event) {
     event.preventDefault();
     const monto_contado = Number(document.getElementById('caja-close-counted')?.value || 0);
     const observaciones = document.getElementById('caja-close-observations')?.value.trim();
-    if (!confirm('¿Cerrar caja? Después del corte no se podrán registrar más movimientos en esta caja.')) return;
+    if (!await AllfixUI.confirm('¿Cerrar caja? Después del corte no se podrán registrar más movimientos en esta caja.')) return;
 
     try {
         const response = await fetch(`${BASE_API_URL}/caja/cerrar`, {
@@ -6697,7 +6715,7 @@ async function closeCajaFromModal(event) {
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
-            alert(data.error || 'No se pudo cerrar caja.');
+            AllfixUI.notify(data.error || 'No se pudo cerrar caja.');
             return;
         }
         closeCajaCloseModal();
@@ -6707,7 +6725,7 @@ async function closeCajaFromModal(event) {
         await viewCajaDetalle(data.id);
     } catch (error) {
         console.error(error);
-        alert('No se pudo cerrar caja por un error de red.');
+        AllfixUI.notify('No se pudo cerrar caja por un error de red.');
     }
 }
 
@@ -6716,7 +6734,7 @@ window.viewCajaDetalle = async function(id) {
         const response = await fetch(`${BASE_API_URL}/caja/${id}`);
         const caja = await response.json().catch(() => ({}));
         if (!response.ok) {
-            alert(caja.error || 'No se pudo abrir el corte.');
+            AllfixUI.notify(caja.error || 'No se pudo abrir el corte.');
             return;
         }
         APP_STATE.selectedCajaForReceipt = caja;
@@ -6724,7 +6742,7 @@ window.viewCajaDetalle = async function(id) {
         document.getElementById('caja-detail-modal')?.classList.remove('hidden');
     } catch (error) {
         console.error(error);
-        alert('No se pudo abrir el corte por un error de red.');
+        AllfixUI.notify('No se pudo abrir el corte por un error de red.');
     }
 };
 
@@ -6780,7 +6798,7 @@ function populateCajaCorteTicket(caja) {
 async function printSelectedCajaCorte() {
     const caja = APP_STATE.selectedCajaForReceipt;
     if (!caja) {
-        alert('No hay corte seleccionado.');
+        AllfixUI.notify('No hay corte seleccionado.');
         return;
     }
     populateCajaCorteTicket(caja);
@@ -6789,7 +6807,8 @@ async function printSelectedCajaCorte() {
     document.getElementById('btn-show-ticket-corte')?.click();
     receiptModal?.classList.remove('sale-ticket-only');
     setReceiptPrintLabels('Corte de Caja');
-    receiptModal?.classList.remove('hidden');
+    if (window.printerService?.isNative()) await printReceipt();
+    else receiptModal?.classList.remove('hidden');
 }
 
 // ==========================================
@@ -6992,7 +7011,7 @@ function initPOS() {
             }
 
             if (!lastSale) {
-                alert('Aún no hay un ticket de venta para imprimir.');
+                AllfixUI.notify('Aún no hay un ticket de venta para imprimir.');
                 return;
             }
 
@@ -7005,7 +7024,7 @@ function initPOS() {
 
     payButton.addEventListener('click', async () => {
         if (APP_STATE.cart.length === 0) {
-            alert('El carrito de compras está vacío.');
+            AllfixUI.notify('El carrito de compras está vacío.');
             return;
         }
 
@@ -7016,21 +7035,21 @@ function initPOS() {
         const payment = getPOSPaymentState();
 
         if (payment.cashApplied > 0 && !APP_STATE.cajaActiva) {
-            alert('No hay caja abierta. Abre caja antes de cobrar en efectivo.');
+            AllfixUI.notify('No hay caja abierta. Abre caja antes de cobrar en efectivo.');
             switchView('caja');
             return;
         }
         
         if (metodo === 'Efectivo' && payment.cashReceived < total) {
-            alert('El efectivo recibido es menor al total a cobrar.');
+            AllfixUI.notify('El efectivo recibido es menor al total a cobrar.');
             return;
         }
         if (metodo === 'Transferencia' && payment.transferReceived < total) {
-            alert('La transferencia recibida es menor al total a cobrar.');
+            AllfixUI.notify('La transferencia recibida es menor al total a cobrar.');
             return;
         }
         if (metodo === 'Mixto' && payment.cashReceived + payment.transferReceived < total) {
-            alert('El pago mixto no cubre el total a cobrar.');
+            AllfixUI.notify('El pago mixto no cubre el total a cobrar.');
             return;
         }
 
@@ -7083,7 +7102,7 @@ function initPOS() {
                 await handleCompletedSale(completedVenta);
             } else {
                 const err = await response.json();
-                alert('Error al procesar cobro: ' + err.error);
+                AllfixUI.notify('Error al procesar cobro: ' + err.error);
             }
         } catch (err) {
             console.error('Error de red:', err);
@@ -7098,25 +7117,25 @@ async function addRepairOrderToCart(folio) {
     try {
         const response = await fetch(`${BASE_API_URL}/pos/order/${encodeURIComponent(folio)}`);
         if (!response.ok) {
-            alert('No se encontro producto ni orden con ese codigo.');
+            AllfixUI.notify('No se encontro producto ni orden con ese codigo.');
             return;
         }
 
         const order = await response.json();
         const paid = normalizeText(order.estado_pago) === 'pagado';
         if (paid || (normalizeText(order.estado) === 'entregado' && paid)) {
-            alert('Esta orden ya fue pagada');
+            AllfixUI.notify('Esta orden ya fue pagada');
             return;
         }
 
         const balance = Number(order.saldo_pendiente || 0);
         if (balance <= 0) {
-            alert('La orden no tiene saldo pendiente.');
+            AllfixUI.notify('La orden no tiene saldo pendiente.');
             return;
         }
 
         if (APP_STATE.cart.some(item => item.type === 'repair' && item.folio === order.folio)) {
-            alert('Esta orden ya esta agregada al carrito.');
+            AllfixUI.notify('Esta orden ya esta agregada al carrito.');
             return;
         }
 
@@ -7137,7 +7156,7 @@ async function addRepairOrderToCart(folio) {
         });
         updateCartUI();
     } catch (error) {
-        alert(error.message || 'No se pudo consultar la orden.');
+        AllfixUI.notify(error.message || 'No se pudo consultar la orden.');
     }
 }
 
@@ -7268,6 +7287,7 @@ window.viewVentaDetails = function(venta, options = {}) {
         return;
     }
 
+    if (window.printerService?.isNative()) return printReceipt();
     receiptModal.classList.remove('hidden');
 };
 
@@ -7338,7 +7358,7 @@ function addToCart(id) {
         if (existing.qty < p.stock) {
             existing.qty++;
         } else {
-            alert('Límite de stock disponible alcanzado.');
+            AllfixUI.notify('Límite de stock disponible alcanzado.');
         }
     } else {
         APP_STATE.cart.push({
@@ -7450,7 +7470,7 @@ window.changeCartQty = function(id, delta) {
     if (delta > 0) {
         const p = APP_STATE.inventario.find(prod => prod.id === id);
         if (p && item.qty >= p.stock) {
-            alert('Límite de stock disponible alcanzado.');
+            AllfixUI.notify('Límite de stock disponible alcanzado.');
             return;
         }
     }
@@ -8610,7 +8630,7 @@ function getPrintableReportStyles() {
 function openPrintableReport(report) {
     const printWindow = window.open('', '_blank', 'width=1100,height=800');
     if (!printWindow) {
-        alert('El navegador bloqueó la ventana de impresión. Permite ventanas emergentes para exportar el reporte.');
+        AllfixUI.notify('El navegador bloqueó la ventana de impresión. Permite ventanas emergentes para exportar el reporte.');
         return;
     }
     const baseHref = `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}`;
@@ -9048,7 +9068,7 @@ function addFinancialPdfFinalPage(doc, report) {
 async function generateFinancialReportPDF(report) {
     const { jsPDF } = getFinancialPdfLibraries();
     if (!jsPDF) {
-        alert('No se pudo cargar jsPDF. Revisa que /vendor/jspdf esté disponible.');
+        AllfixUI.notify('No se pudo cargar jsPDF. Revisa que /vendor/jspdf esté disponible.');
         return;
     }
 
@@ -9157,7 +9177,7 @@ async function generateFinancialReportPDF(report) {
 async function exportCurrentReport() {
     const report = buildReportData();
     if (!report.operations.length && !report.movements.length && !report.cashCuts.length) {
-        alert('No hay operaciones para exportar en el rango seleccionado.');
+        AllfixUI.notify('No hay operaciones para exportar en el rango seleccionado.');
         return;
     }
 
@@ -9165,7 +9185,7 @@ async function exportCurrentReport() {
         await generateFinancialReportPDF(report);
     } catch (error) {
         console.error('Error al generar PDF financiero:', error);
-        alert('No se pudo generar el PDF financiero. Revisa la consola para más detalles.');
+        AllfixUI.notify('No se pudo generar el PDF financiero. Revisa la consola para más detalles.');
     }
 }
 
@@ -9231,18 +9251,18 @@ function renderUserCreationSetting() {
 
 window.toggleUsuarioStatus = async function(id, activo) {
     const action = activo ? 'activar' : 'desactivar';
-    if (!confirm(`¿Deseas ${action} este usuario?`)) return;
+    if (!await AllfixUI.confirm(`¿Deseas ${action} este usuario?`)) return;
     try {
         const response = await fetch(`${BASE_API_URL}/users/${id}/status`, {
             method: 'PATCH',
             body: JSON.stringify({ activo })
         });
         if (response.ok) {
-            alert(`Usuario ${activo ? 'activado' : 'desactivado'} correctamente.`);
+            AllfixUI.notify(`Usuario ${activo ? 'activado' : 'desactivado'} correctamente.`);
             await loadAllData();
         } else {
             const err = await response.json();
-            alert('Error: ' + err.error);
+            AllfixUI.notify('Error: ' + err.error);
         }
     } catch (err) {
         console.error(err);
@@ -9278,17 +9298,17 @@ function openUserModal(user = null) {
 }
 
 window.deleteUsuario = async function(id) {
-    if (!confirm('¿Está seguro de eliminar este operador?')) return;
+    if (!await AllfixUI.confirm('¿Está seguro de eliminar este operador?')) return;
     try {
         const response = await fetch(`${BASE_API_URL}/configuracion/usuarios/${id}`, {
             method: 'DELETE'
         });
         if (response.ok) {
-            alert('Operador eliminado con éxito.');
+            AllfixUI.notify('Operador eliminado con éxito.');
             await loadAllData();
         } else {
             const err = await response.json();
-            alert('Error: ' + err.error);
+            AllfixUI.notify('Error: ' + err.error);
         }
     } catch (err) {
         console.error(err);
@@ -9316,7 +9336,7 @@ function initUsuarios() {
     }
     
     if (userForm) {
-        userForm.addEventListener('submit', async (e) => {
+        userForm.addEventListener('submit', withFormFeedback(async (e) => {
             e.preventDefault();
             const userId = document.getElementById('user-id').value;
             const data = {
@@ -9336,17 +9356,17 @@ function initUsuarios() {
                 });
                 
                 if (response.ok) {
-                    alert(userId ? 'Usuario actualizado correctamente.' : 'Operador registrado con exito.');
+                    AllfixUI.notify(userId ? 'Usuario actualizado correctamente.' : 'Operador registrado con exito.');
                     userModal.classList.add('hidden');
                     await loadAllData();
                 } else {
                     const err = await response.json();
-                    alert('Error: ' + err.error);
+                    AllfixUI.notify('Error: ' + err.error);
                 }
             } catch (err) {
                 console.error(err);
             }
-        });
+        }));
     }
 
     allowSwitch?.addEventListener('change', async () => {
@@ -9357,7 +9377,7 @@ function initUsuarios() {
             });
             if (!response.ok) {
                 const err = await response.json().catch(() => ({}));
-                alert(err.error || 'No se pudo actualizar la configuracion.');
+                AllfixUI.notify(err.error || 'No se pudo actualizar la configuracion.');
                 allowSwitch.checked = !allowSwitch.checked;
                 return;
             }
@@ -9388,7 +9408,7 @@ function initProfileModal() {
     });
     closeButton?.addEventListener('click', () => modal?.classList.add('hidden'));
 
-    profileForm?.addEventListener('submit', async (e) => {
+    profileForm?.addEventListener('submit', withFormFeedback(async (e) => {
         e.preventDefault();
         const data = {
             nombre: document.getElementById('profile-nombre').value.trim(),
@@ -9401,22 +9421,22 @@ function initProfileModal() {
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
-            alert(payload.error || 'No se pudo actualizar el perfil.');
+            AllfixUI.notify(payload.error || 'No se pudo actualizar el perfil.');
             return;
         }
         APP_STATE.currentUser = { ...APP_STATE.currentUser, ...payload };
         persistSession({ ...getStoredSession(), user: APP_STATE.currentUser, token: getAuthToken() });
         updateSidebarProfile(APP_STATE.currentUser);
-        alert('Perfil actualizado correctamente.');
-    });
+        AllfixUI.notify('Perfil actualizado correctamente.');
+    }));
 
-    passwordForm?.addEventListener('submit', async (e) => {
+    passwordForm?.addEventListener('submit', withFormFeedback(async (e) => {
         e.preventDefault();
         const currentPassword = document.getElementById('profile-current-password').value;
         const newPassword = document.getElementById('profile-new-password').value;
         const confirmPassword = document.getElementById('profile-confirm-password').value;
         if (newPassword !== confirmPassword) {
-            alert('Las contrasenas no coinciden.');
+            AllfixUI.notify('Las contrasenas no coinciden.');
             return;
         }
         const response = await fetch(`${BASE_API_URL}/users/me/password`, {
@@ -9425,12 +9445,12 @@ function initProfileModal() {
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
-            alert(payload.error || 'No se pudo actualizar la contrasena.');
+            AllfixUI.notify(payload.error || 'No se pudo actualizar la contrasena.');
             return;
         }
         passwordForm.reset();
-        alert(payload.message || 'Contrasena actualizada correctamente.');
-    });
+        AllfixUI.notify(payload.message || 'Contrasena actualizada correctamente.');
+    }));
 }
 
 // ==========================================
@@ -9720,8 +9740,8 @@ async function loadEstablishmentConfig() {
         console.warn('No se pudo cargar la configuración del establecimiento desde el backend:', err);
     }
 
-    if (window.qzPrinterService) {
-        const localPrintPreferences = window.qzPrinterService.readPreferences();
+    if (window.printerService) {
+        const localPrintPreferences = window.printerService.readPreferences();
         ESTABLISHMENT_CONFIG.ticketPrinter = localPrintPreferences.printerName;
         ESTABLISHMENT_CONFIG.ticketPaper = localPrintPreferences.paperWidth;
         ESTABLISHMENT_CONFIG.autoPrintTicket = localPrintPreferences.autoPrint;
@@ -9798,7 +9818,6 @@ function syncConfigForms() {
     if (instagramInput) instagramInput.value = socials.instagram || '';
     if (addressInput) addressInput.value = ESTABLISHMENT_CONFIG.address;
     if (termsTextarea) termsTextarea.value = ESTABLISHMENT_CONFIG.terms;
-    if (printerInput) populatePrinterOptions([], ESTABLISHMENT_CONFIG.ticketPrinter || '');
     if (paperDetected) paperDetected.textContent = getDetectedPaperLabel();
     if (printModeSelect) printModeSelect.value = ESTABLISHMENT_CONFIG.autoPrintTicket !== false ? 'direct' : 'ask';
     setBusinessLogoPreview();
@@ -9835,7 +9854,7 @@ function initEstablishmentConfigForm() {
 
         const reader = new FileReader();
         reader.onload = () => setBusinessLogoPreview(reader.result, file.name);
-        reader.onerror = () => alert('No se pudo leer el logo seleccionado.');
+        reader.onerror = () => AllfixUI.notify('No se pudo leer el logo seleccionado.');
         reader.readAsDataURL(file);
     });
 
@@ -9846,7 +9865,7 @@ function initEstablishmentConfigForm() {
         applyBusinessBranding();
     });
     
-    form.addEventListener('submit', async (e) => {
+    form.addEventListener('submit', withFormFeedback(async (e) => {
         e.preventDefault();
         try {
             const logoUrl = await uploadBusinessLogoIfNeeded();
@@ -9865,27 +9884,15 @@ function initEstablishmentConfigForm() {
             });
             if (logoInput) logoInput.value = '';
             setBusinessLogoPreview();
-            alert('Configuración del establecimiento guardada con éxito.');
+            AllfixUI.notify('Configuración del establecimiento guardada con éxito.');
         } catch (err) {
-            alert(err.message || 'No se pudo guardar la configuración del establecimiento.');
+            AllfixUI.notify(err.message || 'No se pudo guardar la configuración del establecimiento.');
         }
-    });
+    }));
 }
 
 async function detectAvailablePrinters() {
-    if (!window.qzPrinterService) {
-        throw new Error('No se pudo cargar la integración con QZ Tray.');
-    }
-    const [printerNames, defaultPrinter] = await Promise.all([
-        window.qzPrinterService.getPrinters(),
-        window.qzPrinterService.getDefaultPrinter().catch(() => '')
-    ]);
-    return printerNames.map(name => ({
-        name,
-        isDefault: name === defaultPrinter,
-        paperMm: null,
-        ticketPaper: null
-    }));
+    return window.printerService.getPrinters();
 }
 
 function applyOrderTicketHeaderContactInfo() {
@@ -9948,280 +9955,6 @@ function populatePrinterOptions(printers = [], selectedPrinter = ESTABLISHMENT_C
 
     printerSelect.value = selectedPrinter || '';
     refreshDetectedPaperLabel();
-}
-
-function initPrinterConfigForm() {
-    const form = document.getElementById('config-printer-form');
-    if (!form) return;
-
-    const printerInput = document.getElementById('cfg-ticket-printer');
-    const paperDetected = document.getElementById('cfg-ticket-paper-detected');
-    const printModeSelect = document.getElementById('cfg-ticket-print-mode');
-    const detectButton = document.getElementById('btn-detect-printers');
-    const status = document.getElementById('printer-config-status');
-    const ticketLogoInput = document.getElementById('cfg-ticket-logo');
-    const selectTicketLogoButton = document.getElementById('btn-select-ticket-logo');
-    const removeTicketLogoButton = document.getElementById('btn-remove-ticket-logo');
-
-    populatePrinterOptions([], ESTABLISHMENT_CONFIG.ticketPrinter || '');
-    if (paperDetected) paperDetected.textContent = getDetectedPaperLabel();
-    if (printModeSelect) printModeSelect.value = ESTABLISHMENT_CONFIG.autoPrintTicket !== false ? 'direct' : 'ask';
-    setTicketLogoPreview();
-
-    selectTicketLogoButton?.addEventListener('click', () => ticketLogoInput?.click());
-
-    ticketLogoInput?.addEventListener('change', () => {
-        const file = ticketLogoInput.files?.[0];
-        if (!file) {
-            setTicketLogoPreview();
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = () => setTicketLogoPreview(reader.result, file.name);
-        reader.onerror = () => alert('No se pudo leer el logo seleccionado para el ticket.');
-        reader.readAsDataURL(file);
-    });
-
-    removeTicketLogoButton?.addEventListener('click', () => {
-        ESTABLISHMENT_CONFIG.ticketLogoUrl = '';
-        if (ticketLogoInput) ticketLogoInput.value = '';
-        setTicketLogoPreview(DEFAULT_TICKET_LOGO, 'Se usará el logo base al guardar');
-        applyTicketLogoSource();
-    });
-
-    printerInput?.addEventListener('change', () => {
-        ESTABLISHMENT_CONFIG.ticketPrinter = printerInput.value.trim();
-        ESTABLISHMENT_CONFIG.ticketPaper = detectConfiguredTicketPaper();
-        refreshDetectedPaperLabel();
-    });
-
-    async function refreshAvailablePrinters(showStatus = false) {
-        if (showStatus && status) status.innerText = 'Buscando impresoras disponibles...';
-
-        try {
-            const printers = await detectAvailablePrinters();
-            populatePrinterOptions(printers, printerInput.value);
-
-            if (printers.length) {
-                if (!printerInput.value) printerInput.value = printers[0].name || '';
-                ESTABLISHMENT_CONFIG.ticketPrinter = printerInput.value.trim();
-                ESTABLISHMENT_CONFIG.ticketPaper = detectConfiguredTicketPaper();
-                refreshDetectedPaperLabel();
-                if (status) status.innerText = `${printers.length} impresora(s) disponible(s). Tamaño: ${getDetectedPaperLabel()}.`;
-            } else if (showStatus && status) {
-                status.innerText = 'No se detectaron impresoras disponibles en este equipo.';
-            }
-        } catch (err) {
-            if (showStatus && status) status.innerText = 'No se pudieron detectar impresoras en este equipo.';
-        }
-    }
-
-    detectButton?.addEventListener('click', () => refreshAvailablePrinters(true));
-    refreshAvailablePrinters(false);
-
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        try {
-            const ticketLogoUrl = await uploadTicketLogoIfNeeded();
-            await saveEstablishmentConfig({
-                ticketPrinter: printerInput.value.trim(),
-                ticketPaper: detectConfiguredTicketPaper(),
-                autoPrintTicket: (printModeSelect?.value || 'direct') === 'direct',
-                ticketLogoUrl
-            });
-            if (ticketLogoInput) ticketLogoInput.value = '';
-            setTicketLogoPreview();
-            if (status) status.innerText = 'Configuración de impresión guardada.';
-            alert('Configuración de impresión guardada con éxito.');
-        } catch (err) {
-            alert(err.message || 'No se pudo guardar la configuración de impresión.');
-        }
-    });
-}
-
-function initQZPrinterConfigForm() {
-    const form = document.getElementById('config-printer-form');
-    if (!form) return;
-
-    const printerInput = document.getElementById('cfg-ticket-printer');
-    const paperSelect = document.getElementById('cfg-ticket-paper');
-    const printModeSelect = document.getElementById('cfg-ticket-print-mode');
-    const detectButton = document.getElementById('btn-detect-printers');
-    const testButton = document.getElementById('btn-test-printer');
-    const browserPrintButton = document.getElementById('btn-browser-print-test');
-    const status = document.getElementById('printer-config-status');
-    const connectionStatus = document.getElementById('qz-connection-status');
-    const ticketLogoInput = document.getElementById('cfg-ticket-logo');
-    const selectTicketLogoButton = document.getElementById('btn-select-ticket-logo');
-    const removeTicketLogoButton = document.getElementById('btn-remove-ticket-logo');
-    const preferences = window.qzPrinterService?.readPreferences() || {
-        printerName: '',
-        paperWidth: '58mm',
-        autoPrint: true
-    };
-
-    Object.assign(ESTABLISHMENT_CONFIG, {
-        ticketPrinter: preferences.printerName,
-        ticketPaper: preferences.paperWidth,
-        autoPrintTicket: preferences.autoPrint
-    });
-    if (paperSelect) paperSelect.value = preferences.paperWidth;
-    if (printModeSelect) printModeSelect.value = preferences.autoPrint ? 'direct' : 'ask';
-    setTicketLogoPreview();
-
-    const setQZStatus = (state, label, description) => {
-        if (connectionStatus) {
-            connectionStatus.textContent = label;
-            connectionStatus.className = `qz-status qz-status-${state}`;
-        }
-        if (description && status) status.textContent = description;
-    };
-
-    const renderPrinters = (printers, selectedPrinter) => {
-        AVAILABLE_TICKET_PRINTERS = printers.map(normalizePrinterInfo).filter(printer => printer.name);
-        const names = AVAILABLE_TICKET_PRINTERS.map(printer => printer.name);
-        const selectedMissing = Boolean(selectedPrinter && !names.includes(selectedPrinter));
-        const options = ['<option value="">Selecciona una impresora</option>'];
-
-        if (selectedMissing) {
-            options.push(`<option value="${escapeHtml(selectedPrinter)}">${escapeHtml(selectedPrinter)} (no disponible)</option>`);
-        }
-        AVAILABLE_TICKET_PRINTERS.forEach(printer => {
-            const suffix = printer.isDefault ? ' (predeterminada de Windows)' : '';
-            options.push(`<option value="${escapeHtml(printer.name)}">${escapeHtml(printer.name + suffix)}</option>`);
-        });
-        printerInput.innerHTML = options.join('');
-        printerInput.value = selectedPrinter || '';
-        return selectedMissing;
-    };
-
-    renderPrinters([], preferences.printerName);
-
-    selectTicketLogoButton?.addEventListener('click', () => ticketLogoInput?.click());
-    ticketLogoInput?.addEventListener('change', () => {
-        const file = ticketLogoInput.files?.[0];
-        if (!file) return setTicketLogoPreview();
-        const reader = new FileReader();
-        reader.onload = () => setTicketLogoPreview(reader.result, file.name);
-        reader.onerror = () => alert('No se pudo leer el logo seleccionado para el ticket.');
-        reader.readAsDataURL(file);
-    });
-    removeTicketLogoButton?.addEventListener('click', () => {
-        ESTABLISHMENT_CONFIG.ticketLogoUrl = '';
-        if (ticketLogoInput) ticketLogoInput.value = '';
-        setTicketLogoPreview(DEFAULT_TICKET_LOGO, 'Se usará el logo base al guardar');
-        applyTicketLogoSource();
-    });
-
-    printerInput?.addEventListener('change', () => {
-        ESTABLISHMENT_CONFIG.ticketPrinter = printerInput.value.trim();
-        window.qzPrinterService?.savePreferences({ printerName: ESTABLISHMENT_CONFIG.ticketPrinter });
-    });
-    paperSelect?.addEventListener('change', () => {
-        ESTABLISHMENT_CONFIG.ticketPaper = paperSelect.value === '80mm' ? '80mm' : '58mm';
-        window.qzPrinterService?.savePreferences({ paperWidth: ESTABLISHMENT_CONFIG.ticketPaper });
-    });
-    printModeSelect?.addEventListener('change', () => {
-        ESTABLISHMENT_CONFIG.autoPrintTicket = printModeSelect.value === 'direct';
-        window.qzPrinterService?.savePreferences({ autoPrint: ESTABLISHMENT_CONFIG.autoPrintTicket });
-    });
-
-    let detectingPrinters = false;
-    async function refreshQZPrinters() {
-        if (detectingPrinters) return;
-        detectingPrinters = true;
-        setQZStatus('connecting', 'Conectando...', 'Conectando con QZ Tray...');
-        if (detectButton) detectButton.disabled = true;
-        try {
-            const printers = await detectAvailablePrinters();
-            const selectedPrinter = window.qzPrinterService.readPreferences().printerName;
-            const selectedMissing = renderPrinters(printers, selectedPrinter);
-            if (!printers.length) {
-                setQZStatus(
-                    'connected',
-                    'Conectado',
-                    'QZ Tray está conectado, pero no se encontraron impresoras. Verifica que estén instaladas en el sistema operativo; si son Bluetooth, comprueba también que estén emparejadas.'
-                );
-            } else if (selectedMissing) {
-                setQZStatus(
-                    'connected',
-                    'Conectado',
-                    'La impresora configurada ya no está disponible. Selecciona otra impresora y guarda los cambios.'
-                );
-            } else {
-                setQZStatus(
-                    'connected',
-                    'Conectado',
-                    `Conectado con QZ Tray. Se encontraron ${printers.length} impresora(s).`
-                );
-            }
-        } catch (error) {
-            setQZStatus(
-                'unavailable',
-                'No disponible',
-                `${error.userMessage || error.message || 'No fue posible conectar con QZ Tray.'} Puedes utilizar la impresión normal del navegador.`
-            );
-        } finally {
-            detectingPrinters = false;
-            if (detectButton) detectButton.disabled = false;
-        }
-    }
-
-    detectButton?.addEventListener('click', refreshQZPrinters);
-    document.querySelector('[data-view="configuracion"]')?.addEventListener('click', refreshQZPrinters);
-
-    testButton?.addEventListener('click', async () => {
-        if (!printerInput.value) {
-            alert('Selecciona una impresora antes de imprimir la prueba.');
-            return;
-        }
-        testButton.disabled = true;
-        testButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando prueba...';
-        try {
-            const result = await window.qzPrinterService.printTestTicket({
-                printerName: printerInput.value,
-                paperWidth: paperSelect?.value || '58mm'
-            });
-            setQZStatus('connected', 'Conectado', `Ticket de prueba enviado a ${result.printerName}.`);
-            alert(`Ticket de prueba enviado a ${result.printerName}.`);
-        } catch (error) {
-            setQZStatus('unavailable', 'No disponible', error.userMessage || error.message);
-            alert(`${error.userMessage || error.message || 'No fue posible imprimir la prueba.'}\n\nPuedes utilizar la impresión normal del navegador.`);
-        } finally {
-            testButton.disabled = false;
-            testButton.innerHTML = '<i class="fa-solid fa-print"></i> Imprimir prueba';
-        }
-    });
-
-    browserPrintButton?.addEventListener('click', () => {
-        alert('Abre la vista previa de un ticket y utiliza el botón “Impresión normal”.');
-    });
-
-    form.addEventListener('submit', async event => {
-        event.preventDefault();
-        try {
-            const localPreferences = window.qzPrinterService.savePreferences({
-                printerName: printerInput.value.trim(),
-                paperWidth: paperSelect?.value || '58mm',
-                autoPrint: (printModeSelect?.value || 'direct') === 'direct'
-            });
-            Object.assign(ESTABLISHMENT_CONFIG, {
-                ticketPrinter: localPreferences.printerName,
-                ticketPaper: localPreferences.paperWidth,
-                autoPrintTicket: localPreferences.autoPrint
-            });
-            const ticketLogoUrl = await uploadTicketLogoIfNeeded();
-            await saveEstablishmentConfig({ ticketLogoUrl });
-            if (ticketLogoInput) ticketLogoInput.value = '';
-            setTicketLogoPreview();
-            if (status) status.textContent = 'Configuración de impresión guardada en esta computadora.';
-            alert('Configuración de impresión guardada con éxito en esta computadora.');
-        } catch (error) {
-            alert(error.message || 'No se pudo guardar la configuración de impresión.');
-        }
-    });
 }
 
 // ==========================================
@@ -10323,7 +10056,7 @@ function initCotizaciones() {
     document.getElementById('quote-status-filter').addEventListener('change', renderCotizaciones);
     document.getElementById('quote-sort').addEventListener('change', renderCotizaciones);
     
-    document.getElementById('quote-action-form').addEventListener('submit', async (e) => {
+    document.getElementById('quote-action-form').addEventListener('submit', withFormFeedback(async (e) => {
         e.preventDefault();
         const id = document.getElementById('quote-detail-id').value;
         const estado = document.getElementById('quote-detail-status').value;
@@ -10336,32 +10069,32 @@ function initCotizaciones() {
                 body: JSON.stringify({ estado, observaciones_internas: observaciones })
             });
             if (response.ok) {
-                alert('Cotización actualizada.');
+                AllfixUI.notify('Cotización actualizada.');
                 quoteModal.classList.add('hidden');
                 loadAllData();
             } else {
                 const err = await response.json();
-                alert('Error al actualizar: ' + err.error);
+                AllfixUI.notify('Error al actualizar: ' + err.error);
             }
         } catch (err) {
             console.error(err);
         }
-    });
+    }));
 
     document.getElementById('btn-delete-quote').addEventListener('click', async () => {
         const id = document.getElementById('quote-detail-id').value;
-        if (confirm('¿Está seguro de eliminar esta cotización?')) {
+        if (await AllfixUI.confirm('¿Está seguro de eliminar esta cotización?')) {
             try {
                 const response = await fetch(`${BASE_API_URL}/cotizaciones/${id}`, {
                     method: 'DELETE'
                 });
                 if (response.ok) {
-                    alert('Cotización eliminada.');
+                    AllfixUI.notify('Cotización eliminada.');
                     quoteModal.classList.add('hidden');
                     loadAllData();
                 } else {
                     const err = await response.json();
-                    alert('Error al eliminar: ' + err.error);
+                    AllfixUI.notify('Error al eliminar: ' + err.error);
                 }
             } catch (err) {
                 console.error(err);
@@ -10371,20 +10104,20 @@ function initCotizaciones() {
 
     document.getElementById('btn-convert-quote').addEventListener('click', async () => {
         const id = document.getElementById('quote-detail-id').value;
-        if (confirm('¿Desea convertir esta cotización en una Orden de Servicio activa? Se creará el cliente y la orden automáticamente.')) {
+        if (await AllfixUI.confirm('¿Desea convertir esta cotización en una Orden de Servicio activa? Se creará el cliente y la orden automáticamente.')) {
             try {
                 const response = await fetch(`${BASE_API_URL}/cotizaciones/${id}/convertir`, {
                     method: 'POST'
                 });
                 if (response.ok) {
                     const result = await response.json();
-                    alert(`Orden de Servicio creada con éxito. Folio generado: ${result.folio}`);
+                    AllfixUI.notify(`Orden de Servicio creada con éxito. Folio generado: ${result.folio}`);
                     quoteModal.classList.add('hidden');
                     loadAllData();
                     editOrderDetails(result.ordenId);
                 } else {
                     const err = await response.json();
-                    alert('Error al convertir cotización: ' + err.error);
+                    AllfixUI.notify('Error al convertir cotización: ' + err.error);
                 }
             } catch (err) {
                 console.error(err);
@@ -10632,7 +10365,7 @@ function initCalendarioEvents() {
         setEventColorSelection(getManualEventColor({ categoria: event.target.value }));
     });
 
-    eventForm.addEventListener('submit', async (e) => {
+    eventForm.addEventListener('submit', withFormFeedback(async (e) => {
         e.preventDefault();
         const id = document.getElementById('event-id').value;
         const isEditing = id !== '';
@@ -10662,32 +10395,32 @@ function initCalendarioEvents() {
             });
             
             if (response.ok) {
-                alert(isEditing ? 'Evento actualizado.' : 'Evento guardado.');
+                AllfixUI.notify(isEditing ? 'Evento actualizado.' : 'Evento guardado.');
                 eventModal.classList.add('hidden');
                 loadAllData();
             } else {
                 const err = await response.json();
-                alert('Error al guardar: ' + err.error);
+                AllfixUI.notify('Error al guardar: ' + err.error);
             }
         } catch (err) {
             console.error(err);
         }
-    });
+    }));
 
     document.getElementById('btn-delete-event').addEventListener('click', async () => {
         const id = document.getElementById('event-id').value;
-        if (confirm('¿Está seguro de eliminar este evento?')) {
+        if (await AllfixUI.confirm('¿Está seguro de eliminar este evento?')) {
             try {
                 const response = await fetch(`${BASE_API_URL}/eventos/${id}`, {
                     method: 'DELETE'
                 });
                 if (response.ok) {
-                    alert('Evento eliminado.');
+                    AllfixUI.notify('Evento eliminado.');
                     eventModal.classList.add('hidden');
                     loadAllData();
                 } else {
                     const err = await response.json();
-                    alert('Error al eliminar: ' + err.error);
+                    AllfixUI.notify('Error al eliminar: ' + err.error);
                 }
             } catch (err) {
                 console.error(err);
@@ -10846,4 +10579,9 @@ function openEditEventModal(eventId) {
     setEventColorSelection(getManualEventColor({ ...event, category: props.category }));
     document.getElementById('btn-delete-event').classList.remove('hidden');
     document.getElementById('event-modal').classList.remove('hidden');
+}
+
+async function printOrderTicket(id) {
+    await viewOrderDetails(id, { openPreview: !window.printerService?.isNative() });
+    if (window.printerService?.isNative()) await printReceipt();
 }

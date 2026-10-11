@@ -61,7 +61,7 @@ function searchQuickClients(event) {
     quickSearchTimer = setTimeout(async () => {
         quickSearchController = new AbortController();
         try {
-            const response = await fetch(`${BASE_API_URL}/clientes?search=${encodeURIComponent(query)}`, { signal: quickSearchController.signal });
+            const response = await fetch(`${BASE_API_URL}/clientes?search=${encodeURIComponent(query)}`, { signal: quickSearchController.signal, silent: true });
             if (!response.ok) throw new Error('No se pudo buscar clientes.');
             const clients = await response.json();
             if (version !== quickSearchVersion) return;
@@ -115,7 +115,7 @@ async function showQuickOrder(print = false, silent = false) {
     if (!quickCreatedOrder) return;
     const status = document.getElementById('quick-order-print-status');
     try {
-        const opened = await viewOrderDetails(quickCreatedOrder.id);
+        const opened = await viewOrderDetails(quickCreatedOrder.id, { openPreview: !print || !globalThis.printerService?.isNative() });
         if (opened === false) throw new Error('No se pudo abrir la orden.');
         if (print) {
             const printed = await printReceipt(null, { silent });
@@ -152,6 +152,7 @@ quickOrderForm.addEventListener('submit', async event => {
     globalThis.quickCatalog?.setBusy(true);
     stopQuickClientSearch();
     submit.disabled = true;
+    submit.setAttribute('aria-busy', 'true');
     submit.textContent = 'Guardando…';
     try {
         const response = await fetch(`${BASE_API_URL}/ordenes/rapida`, {
@@ -166,18 +167,20 @@ quickOrderForm.addEventListener('submit', async event => {
         document.getElementById('quick-order-print').focus();
     } catch (error) {
         errorBox.textContent = error.message || 'No se pudo crear la orden. Revisa la conexión.';
-        errorBox.classList.remove('hidden');
+        if (globalThis.AllfixUI) AllfixUI.notify(errorBox.textContent, 'error');
+        else errorBox.classList.remove('hidden');
     } finally {
         quickSaving = false;
         globalThis.quickOrderExtras?.setBusy(false);
         globalThis.quickCatalog?.setBusy(false);
         submit.disabled = false;
+        submit.removeAttribute('aria-busy');
         submit.textContent = 'Crear orden';
     }
     if (quickCreatedOrder) {
         // Post-save failures must never invite submitting an already saved order again.
-        Promise.resolve(loadAllData()).catch(() => {});
-        if (ESTABLISHMENT_CONFIG.autoPrintTicket !== false) await showQuickOrder(true, true);
+        const refresh = typeof refreshQuickOrderData === 'function' ? refreshQuickOrderData : loadAllData;
+        Promise.resolve(refresh(Number(data.anticipo) > 0)).catch(() => {});
     }
 });
 

@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="css/responsive.css?v=20260910-mobile">
     <link rel="stylesheet" href="css/quickOrder.css?v=20260926-redesign">
     <link rel="stylesheet" href="dist/order-catalog.css?v=20260926">
+    <link rel="stylesheet" href="css/design-system.css?v=20260929-repair">
 </head>
 <body class="light-theme">
 
@@ -444,6 +445,10 @@
                                 <div class="indicator-item">
                                     <span class="indicator-label">Reparaciones del Mes</span>
                                     <span class="indicator-value" id="dash-repairs-month">74</span>
+                                </div>
+                                <div class="indicator-item admin-only">
+                                    <span class="indicator-label">Caja</span>
+                                    <span class="indicator-value" id="dash-caja-state">—</span>
                                 </div>
                                 <div class="indicator-item text-danger">
                                     <span class="indicator-label">Inventario Bajo</span>
@@ -1525,7 +1530,7 @@
                                 <span class="config-nav-icon"><i class="fa-solid fa-print"></i></span>
                                 <span class="config-nav-copy">
                                     <strong>Impresión</strong>
-                                    <small>QZ Tray y tickets</small>
+                                    <small>Bluetooth y tickets</small>
                                 </span>
                                 <i class="fa-solid fa-chevron-right config-nav-arrow"></i>
                             </a>
@@ -1637,7 +1642,7 @@
                                     <span class="config-card-icon config-card-icon-violet"><i class="fa-solid fa-print"></i></span>
                                     <div>
                                         <h3>Impresión local</h3>
-                                        <p>Conecta esta computadora con su impresora térmica mediante QZ Tray.</p>
+                                        <p>Conecta esta computadora con su impresora térmica mediante Bluetooth.</p>
                                     </div>
                                 </div>
                             </div>
@@ -1661,8 +1666,8 @@
                                         </div>
                                     </div>
                                     <div class="printer-status-panel">
-                                        <span>Estado de QZ Tray</span>
-                                        <strong id="qz-connection-status" class="qz-status qz-status-disconnected">Desconectado</strong>
+                                        <span>Estado de Bluetooth</span>
+                                        <strong id="printer-connection-status" class="printer-status printer-status-disconnected">Desconectado</strong>
                                     </div>
                                     <div class="form-row-2">
                                         <div class="form-group">
@@ -1693,7 +1698,10 @@
                                             </button>
                                         </div>
                                     </div>
+                                    <label><input type="checkbox" id="cfg-ticket-cut"> Corte automático (si la impresora lo admite)</label>
                                     <div class="printer-config-actions">
+                                        <button type="button" class="btn btn-secondary" id="btn-connect-printer">Conectar</button>
+                                        <button type="button" class="btn btn-secondary" id="btn-disconnect-printer">Desconectar</button>
                                         <button type="button" class="btn btn-secondary" id="btn-test-printer">
                                             <i class="fa-solid fa-print"></i> Imprimir prueba
                                         </button>
@@ -1702,8 +1710,7 @@
                                         </button>
                                     </div>
                                     <p class="config-help-text" id="printer-config-status">
-                                        Abre QZ Tray y presiona “Actualizar impresoras” para consultar las impresoras de esta computadora.
-                                    </p>
+                                        En Android, busca una impresora Bluetooth. En web se utiliza el diálogo del navegador.</p>
                                     <div class="config-form-actions">
                                         <span><i class="fa-solid fa-computer"></i> Esta configuración se guarda solo en esta computadora.</span>
                                         <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Guardar impresión</button>
@@ -2166,8 +2173,8 @@
                                 <input id="quick-client-name" class="form-control" required maxlength="200" autocomplete="off" placeholder="Juan Pérez" aria-controls="quick-client-matches">
                             </div>
                             <div class="form-group">
-                                <label for="quick-client-phone">Contacto principal *</label>
-                                <input id="quick-client-phone" class="form-control" type="tel" required maxlength="20" autocomplete="off" placeholder="9831909656" aria-controls="quick-client-matches">
+                                <label for="quick-client-phone">Contacto principal (opcional)</label>
+                                <input id="quick-client-phone" class="form-control" type="tel" maxlength="20" autocomplete="off" placeholder="9831909656" aria-controls="quick-client-matches">
                             </div>
                             <div class="form-group">
                                 <label for="quick-client-alt">Contacto alternativo</label>
@@ -2203,25 +2210,8 @@
                             </div>
                         </div>
                     </fieldset>
-                    <fieldset>
-                        <legend><span class="quick-section-icon" aria-hidden="true">⌁</span> Servicio</legend>
-                        <div class="quick-order-grid">
-                            <div class="form-group quick-order-wide">
-                                <label for="quick-fault">Falla reportada *</label>
-                                <textarea id="quick-fault" class="form-control" rows="2" required maxlength="10000" placeholder="No carga"></textarea>
-                            </div>
-                            <div class="form-group quick-order-wide">
-                                <label for="quick-repair">Reparación a realizar *</label>
-                                <textarea id="quick-repair" class="form-control" rows="2" required maxlength="10000" placeholder="Cambio de centro de carga"></textarea>
-                            </div>
-                        </div>
-                    </fieldset>
-                    <fieldset id="quick-reception-section">
-                        <legend><span class="quick-section-icon" aria-hidden="true">☷</span> Recepción del equipo <small>Opcional</small></legend>
-                        <div id="quick-reception-fields"></div>
-                    </fieldset>
                     <fieldset id="quick-access-section">
-                        <legend><span class="quick-section-icon" aria-hidden="true">⌑</span> Acceso del equipo <small>Opcional</small></legend>
+                        <legend><span class="quick-section-icon" aria-hidden="true">⌑</span> Contraseña del equipo <small>Opcional</small></legend>
                         <div class="quick-order-grid">
                             <div class="form-group">
                                 <label for="quick-lock-type">Tipo de acceso</label>
@@ -2245,6 +2235,23 @@
                             <div><span id="quick-pattern-display" aria-live="polite"></span>
                                 <button type="button" class="btn btn-secondary btn-sm" id="quick-pattern-clear">Limpiar patrón</button></div>
                         </div>
+                    </fieldset>
+                    <fieldset>
+                        <legend><span class="quick-section-icon" aria-hidden="true">⌁</span> Servicio</legend>
+                        <div class="quick-order-grid">
+                            <div class="form-group quick-order-wide">
+                                <label for="quick-fault">Falla reportada *</label>
+                                <textarea id="quick-fault" class="form-control" rows="2" required maxlength="10000" placeholder="No carga"></textarea>
+                            </div>
+                            <div class="form-group quick-order-wide">
+                                <label for="quick-repair">Reparación a realizar *</label>
+                                <textarea id="quick-repair" class="form-control" rows="2" required maxlength="10000" placeholder="Cambio de centro de carga"></textarea>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <fieldset id="quick-reception-section">
+                        <legend><span class="quick-section-icon" aria-hidden="true">☷</span> Recepción del equipo <small>Opcional</small></legend>
+                        <div id="quick-reception-fields"></div>
                     </fieldset>
                     <fieldset id="quick-evidence-section">
                         <legend><span class="quick-section-icon" aria-hidden="true">▧</span> Evidencia fotográfica <small>Opcional</small></legend>
@@ -3725,6 +3732,9 @@
                 <button type="button" class="btn btn-primary" id="btn-print-action" onclick="window.printReceipt && window.printReceipt()">
                     <i class="fa-solid fa-print"></i> Imprimir ticket
                 </button>
+                <button type="button" class="btn btn-secondary" id="btn-download-receipt-png"><i class="fa-solid fa-download"></i> Descargar PNG</button>
+                <button type="button" class="btn btn-success" id="btn-share-receipt-whatsapp"><i class="fa-brands fa-whatsapp"></i> Enviar por WhatsApp</button>
+                <span id="receipt-share-status" role="status" aria-live="polite"></span>
                 <button type="button" class="btn btn-primary" id="btn-close-receipt">Cerrar</button>
             </div>
         </div>
@@ -3941,14 +3951,17 @@
     <script src="/vendor/dayjs/locale/es.js"></script>
     <script src="/vendor/jspdf/jspdf.umd.min.js"></script>
     <script src="/vendor/jspdf-autotable/jspdf.plugin.autotable.min.js"></script>
-    <script src="/vendor/qz-tray/qz-tray.js"></script>
-    <script src="js/qzPrinterService.js?v=20260909-print-quality"></script>
+    <script src="dist/printer-service.js"></script>
 
     <!-- Main System JavaScript Logic -->
-    <script src="js/app.js?v=20260926-quick-order"></script>
+    <script src="js/printerConfig.js"></script>
+    <script src="js/formFeedback.js?v=20260927"></script>
+    <script src="js/app.js?v=20260929-save"></script>
+    <script src="js/receiptShare.js?v=20261010"></script>
     <script src="js/quickOrderExtras.js?v=20260926-access"></script>
-    <script src="js/quickOrder.js?v=20260926-balance"></script>
-    <script defer src="dist/order-catalog.js?v=20260926"></script>
-    <script src="js/responsive.js?v=20260910-mobile"></script>
+    <script src="js/quickOrder.js?v=20260929-save"></script>
+    <script defer src="dist/order-catalog.js?v=20260927-autocomplete"></script>
+    <script src="js/responsive.js?v=20260927-nav2"></script>
+    <script src="js/ui.js?v=20260927-submit-fix"></script>
 </body>
 </html>

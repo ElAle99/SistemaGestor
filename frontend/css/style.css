@@ -1639,7 +1639,7 @@ a:hover {
     display: none !important;
 }
 
-/* Prioridad final del ticket de venta para vista previa, QZ Tray e impresión normal. */
+/* Prioridad final del ticket de venta para vista previa, ESC/POS e impresión normal. */
 #ticket-venta-container.ticket-sale-receipt {
     padding: 5mm 4mm 6mm !important;
     color: #000000 !important;
@@ -2255,7 +2255,7 @@ html.receipt-print-58mm #ticket-venta-container * {
     background: #f8fafc;
 }
 
-.qz-status {
+.printer-status {
     display: inline-flex;
     align-items: center;
     padding: 5px 10px;
@@ -2263,18 +2263,18 @@ html.receipt-print-58mm #ticket-venta-container * {
     font-size: 0.84rem;
 }
 
-.qz-status-connected {
+.printer-status-connected {
     color: #166534;
     background: #dcfce7;
 }
 
-.qz-status-connecting {
+.printer-status-connecting {
     color: #854d0e;
     background: #fef9c3;
 }
 
-.qz-status-disconnected,
-.qz-status-unavailable {
+.printer-status-disconnected,
+.printer-status-unavailable {
     color: #991b1b;
     background: #fee2e2;
 }
@@ -13967,7 +13967,7 @@ body {
     }
 }
 
-/* Prioridad definitiva del ticket de venta para 58 mm, 80 mm y QZ Tray. */
+/* Prioridad definitiva del ticket de venta para 58 mm, 80 mm y ESC/POS. */
 #ticket-venta-container.ticket-sale-receipt {
     padding: 5mm 4mm 6mm !important;
     color: #000000 !important;

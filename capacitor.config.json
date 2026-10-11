@@ -1,0 +1,8 @@
+{
+  "appId": "mx.allfix.gestor",
+  "appName": "Allfix",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  }
+}

@@ -1,7 +1,7 @@
 // No persistent/shared browser cache: a new reception reloads the current user's scope.
 export const normalize = text => String(text || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 export async function requestCatalog(path = '', signal) {
-  const response = await fetch(`/api/catalogos${path}`, { signal });
+  const response = await fetch(`/api/catalogos${path}`, { signal, silent: true });
   if (!response.ok) throw new Error('No se pudo cargar el catálogo. Puedes escribir manualmente.');
   return response.json();
 }

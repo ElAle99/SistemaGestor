@@ -61,7 +61,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto(origin);
   await page.waitForFunction(() => !!globalThis.quickCatalog);
   await page.evaluate(() => openQuickOrder());
-  await expect(page.getByText('Guardar nuevos valores en el catálogo de mi negocio')).toBeVisible();
+  await page.waitForFunction(() => globalThis.quickCatalog.payload().guardar_catalogo === true);
 });
 
 async function select(page, field, text) {
@@ -104,7 +104,7 @@ test('manual model and tags, parent reset, and mobile single column', async ({ p
   await select(page, 'deviceType', 'Celular');
   await select(page, 'brand', 'Samsung');
   await page.locator('#smart-model').fill('Red Magic 9 Pro');
-  await page.getByText('Agregar modelo “Red Magic 9 Pro”', { exact: true }).click();
+  await expect(page.locator('#quick-model')).toHaveValue('Red Magic 9 Pro');
   await page.locator('#smart-fallas').fill('Falla personalizada');
   await page.locator('#smart-fallas').press('Enter');
   await expect(page.locator('#quick-fault')).toHaveValue('Falla personalizada');
@@ -121,13 +121,17 @@ test('manual model and tags, parent reset, and mobile single column', async ({ p
   await page.screenshot({ path: 'test-results/catalog-mobile.png', fullPage: true });
 });
 
-test('manual type changes to an editable input and disables catalog learning on request', async ({ page }) => {
+test('manual type changes to an editable input and learns automatically', async ({ page }) => {
   await page.locator('#smart-deviceType').fill('Proyector');
-  await page.getByText('+ Otro / Escribir manualmente', { exact: true }).click();
-  await page.locator('#smart-deviceType').fill('Proyector');
+  await page.locator('#smart-brand').fill('Marca nueva');
+  await page.locator('#smart-model').fill('Modelo nuevo');
+  await page.locator('#quick-color').click();
+  await expect(page.locator('#smart-deviceType')).toHaveValue('Proyector');
+  await expect(page.locator('#quick-brand')).toHaveValue('Marca nueva');
+  await expect(page.locator('#quick-model')).toHaveValue('Modelo nuevo');
   await expect(page.locator('#quick-device')).toHaveValue('Proyector');
-  await page.getByRole('checkbox').uncheck();
-  expect(await page.evaluate(() => globalThis.quickCatalog.payload().guardar_catalogo)).toBe(false);
+  await expect(page.getByText('Guardar nuevos valores en el catálogo de mi negocio')).toHaveCount(0);
+  expect(await page.evaluate(() => globalThis.quickCatalog.payload().guardar_catalogo)).toBe(true);
 });
 
 test('optional access preserves PIN zeros, clears inactive secrets and draws a reusable pattern', async ({ page }) => {

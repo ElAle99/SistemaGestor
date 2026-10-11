@@ -17,7 +17,7 @@ function validateQuickOrder(data) {
     data[text] = data[list].join('\n');
   }
   const fields = {
-    clientName: ['Nombre del cliente', 200], clientPhone: ['Contacto principal', 20],
+    clientName: ['Nombre del cliente', 200],
     deviceType: ['Equipo', 50], brand: ['Marca', 100], model: ['Modelo', 100],
     falla_reportada: ['Falla reportada', 10000], servicio_solicitado: ['Reparación a realizar', 10000]
   };
@@ -60,7 +60,7 @@ function validateQuickOrder(data) {
     order[key] = data[key].trim();
     if (order[key].length > max) throw invalid(`${label}: máximo ${max} caracteres.`);
   }
-  for (const [key, max] of [['clientPhoneAlt1', 20], ['color', 50]]) {
+  for (const [key, max] of [['clientPhone', 20], ['clientPhoneAlt1', 20], ['color', 50]]) {
     if (data[key] != null && typeof data[key] !== 'string') throw invalid('Texto inválido.');
     order[key] = data[key]?.trim() || null;
     if (order[key]?.length > max) throw invalid(`Máximo ${max} caracteres.`);
@@ -101,7 +101,7 @@ async function createQuickOrder(data, usuarioId, negocioId = null) {
       const result = await db.query('SELECT * FROM clientes WHERE id = $1 AND activo = true FOR UPDATE', [order.clientId]);
       cliente = result.rows[0];
       if (!cliente) throw invalid('El cliente seleccionado ya no está disponible.');
-    } else {
+    } else if (order.clientPhone) {
       const phone = order.clientPhone.replace(/\D/g, '');
       const match = await db.query(`SELECT * FROM clientes WHERE activo = true AND (
         regexp_replace(COALESCE(telefono_principal, ''), '\\D', '', 'g') = $1
@@ -117,7 +117,7 @@ async function createQuickOrder(data, usuarioId, negocioId = null) {
     } else {
       // Keep separately stored surnames and every advanced customer field intact.
       const fullName = [cliente.nombre, cliente.apellido_paterno, cliente.apellido_materno].filter(Boolean).join(' ');
-      if (order.clientName !== fullName || order.clientPhone !== cliente.telefono_principal) {
+      if (order.clientName !== fullName || order.clientPhone !== (cliente.telefono_principal || null)) {
         throw invalid('Selecciona nuevamente el cliente o modifica sus datos desde Clientes.');
       }
       await db.query('UPDATE clientes SET telefono_alternativo_1 = $1 WHERE id = $2', [order.clientPhoneAlt1, cliente.id]);

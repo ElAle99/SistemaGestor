@@ -20,8 +20,7 @@
         <button type="button" data-mobile-view="dashboard"><i class="fa-solid fa-house" aria-hidden="true"></i><span>Inicio</span></button>
         <button type="button" data-mobile-view="ordenes"><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i><span>Órdenes</span></button>
         <button type="button" class="mobile-create-order"><i class="fa-solid fa-plus" aria-hidden="true"></i><span>Nueva orden</span></button>
-        <button type="button" data-mobile-view="clientes"><i class="fa-solid fa-user-group" aria-hidden="true"></i><span>Clientes</span></button>
-        <button type="button" class="mobile-more" aria-controls="app-navigation" aria-expanded="false"><i class="fa-solid fa-bars" aria-hidden="true"></i><span>Más</span></button>`;
+        <button type="button" data-mobile-view="clientes"><i class="fa-solid fa-user-group" aria-hidden="true"></i><span>Clientes</span></button>`;
     app.append(nav);
     let menuReturnFocus;
     function setMenu(open) {
@@ -29,7 +28,6 @@
         if (open) menuReturnFocus = document.activeElement;
         document.body.classList.toggle('mobile-menu-open', open);
         toggle.setAttribute('aria-expanded', String(open));
-        nav.querySelector('.mobile-more').setAttribute('aria-expanded', String(open));
         sidebar.inert = compact.matches && !open;
         main.inert = open;
         nav.inert = open;
@@ -40,7 +38,6 @@
         }
     }
     toggle.addEventListener('click', () => setMenu(true));
-    nav.querySelector('.mobile-more').addEventListener('click', () => setMenu(true));
     document.getElementById('mobile-menu-close').addEventListener('click', () => setMenu(false));
     shade.addEventListener('click', () => setMenu(false));
     sidebar.addEventListener('click', event => {
@@ -155,7 +152,7 @@
     const modalObserver = new MutationObserver(syncDialogs);
     document.querySelectorAll('.modal-overlay').forEach(modal => modalObserver.observe(modal, { attributes: true, attributeFilter: ['class'] }));
     document.addEventListener('keydown', event => {
-        if (!compact.matches) return;
+        if (!compact.matches || document.querySelector('.ant-modal-wrap:not([style*="display: none"])')) return;
         const menuOpen = document.body.classList.contains('mobile-menu-open');
         const clientHistory = document.getElementById('client-detail-panel');
         const container = menuOpen ? sidebar : activeDialog || (!clientHistory.classList.contains('hidden') ? clientHistory : null);

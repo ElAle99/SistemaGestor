@@ -9,6 +9,23 @@ const valid = extra => ({ clientName: 'Juan Pérez', clientPhone: '9831909656',
   color: 'Azul', falla_reportada: 'No carga', servicio_solicitado: 'Cambio de centro de carga',
   costo_estimado: '1200', anticipo: '500', ...extra });
 
+test('new customers without any phone save null contacts without matching other empty contacts', async () => {
+  const h = harness({ duplicate: true });
+  await h.createQuickOrder(valid({ clientPhone: '', clientPhoneAlt1: '', anticipo: 0 }), 7);
+  const insert = h.calls.find(call => call.sql.includes('INSERT INTO clientes'));
+  assert.equal(insert.params[1], null);
+  assert.equal(insert.params[2], null);
+  assert.ok(!h.calls.some(call => call.sql.includes('regexp_replace')));
+  assert.ok(h.calls.some(call => call.sql === 'COMMIT'));
+});
+
+test('existing customer with no phone remains selectable', async () => {
+  const h = harness({ existing: { id: 3, nombre: 'Juan Pérez', telefono_principal: null } });
+  await h.createQuickOrder(valid({ clientId: 3, clientPhone: '', anticipo: 0 }), 7);
+  assert.ok(!h.calls.some(call => call.sql.includes('INSERT INTO clientes')));
+  assert.ok(h.calls.some(call => call.sql === 'COMMIT'));
+});
+
 function harness({ failAt, existing, duplicate = false, closedCash = false } = {}) {
   const calls = [];
   const movements = [];
@@ -78,7 +95,7 @@ test('quick reception commits customer, alternate phone, order, history, cash an
   assert.equal(h.calls.at(-1).sql, 'RELEASE');
 });
 
-for (const field of ['clientName', 'clientPhone', 'deviceType', 'brand', 'model', 'falla_reportada', 'servicio_solicitado']) {
+for (const field of ['clientName', 'deviceType', 'brand', 'model', 'falla_reportada', 'servicio_solicitado']) {
   test(`rejects missing ${field} before touching the database`, async () => {
     const h = harness();
     await assert.rejects(h.createQuickOrder(valid({ [field]: ' ' }), 7), e => e.statusCode === 400);

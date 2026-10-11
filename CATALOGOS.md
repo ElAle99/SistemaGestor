@@ -11,9 +11,15 @@
 
 ## Uso
 
+En la recepción rápida ambos teléfonos son opcionales. Sin teléfono se crea un cliente
+independiente; no se agrupan clientes por contactos vacíos. Tras guardar se conserva
+la confirmación y el ticket se abre únicamente con «Imprimir ticket» o «Ver orden».
+La actualización posterior recarga clientes y órdenes, y caja si hubo anticipo,
+sin recargar inventario, usuarios, cotizaciones ni todos los demás módulos.
+
 Seleccionar Equipo → Marca → Modelo. Se puede buscar sin distinguir mayúsculas ni acentos. Los modelos se consultan por marca, con hasta 50 coincidencias por búsqueda. Fallas y reparaciones usan tags de Ant Design; Enter confirma texto personalizado. Las reparaciones asociadas a cualquiera de las fallas seleccionadas aparecen primero como «Sugerida»; no se seleccionan automáticamente.
 
-Cada selector permite «+ Otro / Escribir manualmente». Un modelo inexistente aparece como «Agregar modelo …» y se puede usar inmediatamente. Con **Guardar nuevos valores en el catálogo de mi negocio** marcado, los valores nuevos se guardan en la misma transacción de la orden. Si la orden falla, el aprendizaje también se revierte. Desmarcarlo permite usar texto únicamente en esa orden. Cambiar equipo limpia marca, modelo, fallas y reparaciones; cambiar marca limpia modelo.
+Equipo, Marca y Modelo son campos de texto con sugerencias de Ant Design AutoComplete. Lo escrito se conserva inmediatamente, sin pulsar «Agregar», Enter ni confirmar al salir. Se puede elegir una sugerencia o usar texto nuevo. Los valores nuevos se guardan automáticamente en el catálogo del negocio al crear la orden, dentro de la misma transacción. Si la orden falla, el aprendizaje también se revierte. Sin contexto de negocio autorizado se permite texto manual, pero no se guarda en el catálogo. Cambiar equipo limpia marca, modelo, fallas y reparaciones; cambiar marca limpia modelo.
 
 ## Instalación y compilación
 

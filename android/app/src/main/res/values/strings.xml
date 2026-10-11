@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Allfix</string>
+    <string name="title_activity_main">Allfix</string>
+    <string name="package_name">mx.allfix.gestor</string>
+    <string name="custom_url_scheme">mx.allfix.gestor</string>
+</resources>

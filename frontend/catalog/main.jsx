@@ -4,17 +4,17 @@ import { createPortal } from 'react-dom';
 import ConfigProvider from 'antd/es/config-provider';
 import Select from 'antd/es/select';
 import Input from 'antd/es/input';
-import Checkbox from 'antd/es/checkbox';
-import Alert from 'antd/es/alert';
+import AutoComplete from 'antd/es/auto-complete';
 import Button from 'antd/es/button';
 import esES from 'antd/locale/es_ES';
 import { normalize, requestCatalog, uniqueNames, optionsFor } from './catalogClient';
 import './style.css';
 import ReceptionFields from './ReceptionFields';
+import '../ui/feedback';
+import { allfixTheme } from '../ui/theme';
 
 const EMPTY_CATALOG = { tipos: [], marcas: [], fallas: [], reparaciones: [], relaciones: [], puede_guardar: false };
 const emptyValues = () => ({ deviceType: '', brand: '', model: '', fallas: [], reparaciones: [] });
-const manualValue = '__catalog_manual__';
 const fieldIds = { deviceType: 'quick-device', brand: 'quick-brand', model: 'quick-model', fallas: 'quick-fault', reparaciones: 'quick-repair' };
 const slots = {};
 for (const [field, id] of Object.entries(fieldIds)) {
@@ -33,26 +33,17 @@ const root = document.createElement('div');
 root.id = 'quick-catalog-root';
 document.getElementById('quick-order-submit').before(root);
 
-function SingleSelector({ field, value, rows, onChange, label, loading, disabled, onSearch }) {
-  const [search, setSearch] = useState('');
-  const [manual, setManual] = useState(false);
-  const names = uniqueNames(rows).map(row => ({ value: row.nombre, label: row.nombre }));
-  if (value && !names.some(option => normalize(option.value) === normalize(value))) names.unshift({ value, label: value });
-  const options = names.filter(option => normalize(option.label).includes(normalize(search)));
-  if (search.trim() && !names.some(option => normalize(option.value) === normalize(search))) {
-    options.push({ value: search.trim(), label: `Agregar ${label.toLowerCase()} “${search.trim()}”` });
-  }
-  options.push({ value: manualValue, label: '+ Otro / Escribir manualmente' });
-  return manual ? <div className="smart-manual">
-    <Input id={`smart-${field}`} autoFocus maxLength={field === 'deviceType' ? 50 : 100} value={value} disabled={disabled}
-      placeholder={`Escribir ${label.toLowerCase()}`} onChange={event => onChange(event.target.value)} />
-    <Button type="text" disabled={disabled} onClick={() => setManual(false)} aria-label={`Volver al selector de ${label.toLowerCase()}`}>Lista</Button>
-  </div> : <Select id={`smart-${field}`} value={value || undefined} showSearch searchValue={search} onSearch={text => { setSearch(text); onSearch?.(text); }}
-    options={options} filterOption={false} loading={loading} disabled={disabled} placeholder={`Seleccionar ${label.toLowerCase()}`}
-    onInputKeyDown={event => { if (event.key === 'Enter') event.stopPropagation(); }}
-    onChange={next => { setSearch(''); onSearch?.(''); if (next === manualValue) setManual(true); else onChange(next || ''); }}
-    onClear={() => { setSearch(''); onChange(''); }} allowClear
-    getPopupContainer={trigger => trigger.parentElement} />;
+function SingleSelector({ field, value, rows, onChange, label, disabled, onSearch }) {
+  const options = uniqueNames(rows).map(row => ({ value: row.nombre, label: row.nombre }));
+  return <AutoComplete id={`smart-${field}`} value={value} options={options} disabled={disabled} allowClear
+    defaultActiveFirstOption={false}
+    filterOption={(input, option) => normalize(option.value).includes(normalize(input))}
+    onChange={next => { onChange(next); onSearch?.(next); }}
+    getPopupContainer={trigger => trigger.parentElement}>
+    <Input id={`smart-${field}`} maxLength={field === 'deviceType' ? 50 : 100}
+      placeholder={`Buscar o escribir ${label.toLowerCase()}`}
+      onKeyDown={event => { if (event.key === 'Enter') event.preventDefault(); }} />
+  </AutoComplete>;
 }
 
 function MultiSelector({ field, value, rows, onChange, suggested, disabled }) {
@@ -80,8 +71,8 @@ function CatalogFields() {
   const [loading, setLoading] = useState(false);
   const [modelLoading, setModelLoading] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [save, setSave] = useState(true);
   const [message, setMessage] = useState('');
+  useEffect(() => { if (message) window.AllfixUI.notify(message, 'warning'); }, [message]);
   const [generation, setGeneration] = useState(0);
   const state = useRef();
   const reception = useRef({});
@@ -117,18 +108,24 @@ function CatalogFields() {
     return () => { clearTimeout(timer); controller.abort(); };
   }, [derived.brand?.id, modelSearch, generation]);
   useLayoutEffect(() => {
-    state.current = { values, save: save && catalog.puede_guardar };
+    state.current = { values, save: catalog.puede_guardar };
     for (const [field, id] of Object.entries(fieldIds)) document.getElementById(id).value = Array.isArray(values[field]) ? values[field].join('\n') : values[field];
-  }, [values, save, catalog.puede_guardar]);
+  }, [values, catalog.puede_guardar]);
   useLayoutEffect(() => {
     globalThis.quickCatalog = {
-      reset() { setValues(emptyValues()); setCatalog(EMPTY_CATALOG); setModels([]); setModelSearch(''); setSave(true); setMessage(''); setGeneration(value => value + 1); },
+      reset() { setValues(emptyValues()); setCatalog(EMPTY_CATALOG); setModels([]); setModelSearch(''); setMessage(''); setGeneration(value => value + 1); },
       setBusy,
       focusDevice() { document.getElementById('smart-deviceType')?.focus(); },
       validate() {
         const current = state.current.values;
+        const fail = (message, field) => {
+          window.AllfixUI.notify(message, 'warning');
+          const control = document.getElementById(`smart-${field}`);
+          control?.focus(); control?.scrollIntoView({ block: 'center' });
+          return false;
+        };
         const missing = Object.keys(fieldIds).find(field => Array.isArray(current[field]) ? !current[field].length : !current[field].trim());
-        if (missing) { setMessage('Selecciona equipo, marca, modelo, al menos una falla y una reparación.'); document.getElementById(`smart-${missing}`)?.focus(); return false; }
+        if (missing) return fail('Completa equipo, marca, modelo, al menos una falla y una reparación.', missing);
         if ([...current.fallas, ...current.reparaciones].some(text => text.length > 250)) { setMessage('Cada falla o reparación admite máximo 250 caracteres.'); return false; }
         if ([...(reception.current.inspeccion_visual || []), ...(reception.current.accesorios_entregados || [])].some(text => text.length > 250)) { setMessage('Cada detalle de recepción admite máximo 250 caracteres.'); return false; }
         return true;
@@ -140,7 +137,7 @@ function CatalogFields() {
   const single = (field, label, rows) => createPortal(<SingleSelector key={`${generation}-${field === 'brand' || field === 'model' ? values.deviceType : ''}-${field === 'model' ? values.brand : ''}`}
     field={field} label={label} value={values[field]} rows={rows} onChange={value => change(field, value)}
     loading={loading} disabled={busy || (field === 'brand' && !values.deviceType)} />, slots[field]);
-  return <ConfigProvider locale={esES} theme={{ token: { colorPrimary: '#2563eb', colorBorder: '#dce3ed', borderRadius: 9, controlHeight: 42 } }}>
+  return <ConfigProvider locale={esES} theme={allfixTheme}>
     {single('deviceType', 'Equipo', catalog.tipos)}
     {single('brand', 'Marca', derived.brands)}
     {createPortal(<ModelSelector key={`${generation}-${values.deviceType}-${values.brand}`} value={values.model} rows={models}
@@ -148,8 +145,6 @@ function CatalogFields() {
     {createPortal(<MultiSelector key={`${generation}-${values.deviceType}`} field="fallas" value={values.fallas} rows={derived.faults} onChange={value => change('fallas', value)} disabled={busy} />, slots.fallas)}
     {createPortal(<MultiSelector key={`${generation}-${values.deviceType}`} field="reparaciones" value={values.reparaciones} rows={derived.repairs} suggested={derived.suggested} onChange={value => change('reparaciones', value)} disabled={busy} />, slots.reparaciones)}
     {createPortal(<ReceptionFields key={generation} deviceType={values.deviceType} disabled={busy} onChange={receiveReception} MultiSelector={MultiSelector} />, document.getElementById('quick-reception-fields'))}
-    {message && <Alert type="warning" message={message} showIcon />}
-    {catalog.puede_guardar && <Checkbox checked={save} disabled={busy} onChange={event => setSave(event.target.checked)}>Guardar nuevos valores en el catálogo de mi negocio</Checkbox>}
   </ConfigProvider>;
 }
 
