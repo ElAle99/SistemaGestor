@@ -33,6 +33,7 @@ function ui({ failPrint = false, failSave = false, failPreview = false } = {}) {
     },
     async viewOrderDetails(id) { calls.push({ preview: id }); return !failPreview; },
     async printReceipt() { calls.push({ print: true }); if (failPrint) throw new Error('printer unavailable'); return true; },
+    openOrderPrintSelector() { calls.push({ selector: true }); if (failPrint) throw new Error('selector unavailable'); },
     async loadAllData() { calls.push({ refresh: true }); }
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../../frontend/js/quickOrder.js'), 'utf8'), context);
@@ -61,7 +62,8 @@ test('quick form sends only reception fields and blocks duplicate in-flight subm
   assert.ok(!h.calls.some(c => c.preview || c.print));
   await h.element('quick-order-print').events.click();
   assert.ok(h.calls.some(c => c.preview === 17));
-  assert.ok(h.calls.some(c => c.print));
+  assert.ok(h.calls.some(c => c.selector));
+  assert.ok(!h.calls.some(c => c.print));
 });
 
 test('client selection fills name and both contacts without surname splitting', () => {
@@ -81,7 +83,7 @@ test('failed save keeps captured fields and enables correction', async () => {
   assert.ok(!h.calls.some(c => c.print));
 });
 
-test('printer failure preserves success and never restores the creation form', async () => {
+test('selector failure preserves success and never restores the creation form', async () => {
   const h = ui({ failPrint: true });
   await h.submit();
   await h.element('quick-order-print').events.click();

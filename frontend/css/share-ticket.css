@@ -1,0 +1,18 @@
+#share-ticket-preview {
+    width: min(600px, calc(100vw - 24px));
+    max-height: calc(100dvh - 24px);
+    margin: auto;
+    padding: 0;
+    border: 1px solid #dce2e9;
+    border-radius: 14px;
+    background: #f0f2f5;
+    color: #171717;
+}
+#share-ticket-preview::backdrop { background: rgb(15 23 42 / 65%); }
+#share-ticket-preview[open] { display: flex; flex-direction: column; }
+#share-ticket-preview header, #share-ticket-preview footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; background: white; flex-shrink: 0; }
+#share-ticket-preview h3 { font-size: 18px; margin: 0; }
+#share-ticket-preview p { margin: 4px 0 0; font-size: 13px; }
+.share-ticket-image-wrap { min-height: 0; overflow: auto; padding: 16px; }
+#share-ticket-preview-image { display: block; width: 100%; height: auto; background: white; }
+#share-ticket-preview footer .btn { flex: 1 1 160px; white-space: normal; }

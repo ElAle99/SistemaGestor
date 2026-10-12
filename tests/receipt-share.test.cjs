@@ -10,7 +10,7 @@ function setup(native = false) {
     let warmup;
     const element = { outerHTML: 'first receipt', querySelector: () => ({ textContent: 'Venta #42' }) };
     const get = id => {
-        if (!elements.has(id)) elements.set(id, { innerHTML: 'WhatsApp', classList: { contains: () => false }, addEventListener(_, fn) { this.click = fn; } });
+        if (!elements.has(id)) elements.set(id, { innerHTML: 'WhatsApp', removeAttribute() {}, classList: { contains: () => false }, addEventListener(_, fn) { this.click = fn; } });
         return elements.get(id);
     };
     const navigator = native ? {
@@ -19,10 +19,13 @@ function setup(native = false) {
     } : {};
     vm.runInNewContext(fs.readFileSync('frontend/js/receiptShare.js', 'utf8'), {
         document: { getElementById: get, body: { appendChild() {} }, createElement: () => ({ click() { calls.downloads++; }, remove() {} }) },
-        navigator, window: { open() { calls.opens++; } },
+        navigator, window: { open() { calls.opens++; }, visualTickets: {
+            build: () => ({ folio: 'Venta #42', content: element.outerHTML }),
+            generateShareTicketImage: async () => { calls.captures++; return { blob: new Blob(['png'], { type: 'image/png' }) }; }
+        } },
+        APP_STATE: { selectedOrderForReceipt: {} }, ESTABLISHMENT_CONFIG: {},
         getActiveReceiptElement: () => element, detectConfiguredTicketPaper: () => '80mm',
-        html2canvas() {}, captureReceiptPreviewImage: async (_, __, options) => {
-            assert.equal(options.digital, true);
+        html2canvas() {}, captureReceiptPreviewImage: async () => {
             calls.captures++;
             return { blob: new Blob(['png'], { type: 'image/png' }) };
         },
@@ -44,6 +47,21 @@ test('downloads the active receipt and refreshes after content changes', async (
     await get('btn-download-receipt-png').click();
     assert.equal(calls.downloads, 2);
     assert.equal(calls.captures, 2);
+});
+
+test('visual templates use the safe allowlist for service and POS, with no invented QR', async () => {
+    const { buildShareTicket } = await import('../frontend/sharing/ShareTicketBuilder.mjs');
+    const privateFields = { lock_pin:'SECRET_PIN', imei:'SECRET_IMEI', clientPhone:'SECRET_PHONE', tracking_token:'SECRET_TOKEN', notas:'SECRET_NOTES', id:'SECRET_ID' };
+    const service = buildShareTicket('service', { ...privateFields, folio:'AFB-42', clientName:'José Muñoz', fecha_creacion:'2026-10-11T12:30:00', costo_estimado:1000, anticipo:200 });
+    assert.doesNotMatch(JSON.stringify(service), /SECRET_/);
+    assert.match(JSON.stringify(service), /800.00/);
+    assert.equal(service.blocks.some(block => block.kind === 'qr'), false);
+    const qr = buildShareTicket('service', { publicTrackingUrl:'https://example.com/seguimiento/real' });
+    assert.equal(qr.blocks.filter(block => block.kind === 'qr').length, 1);
+    assert.equal(qr.blocks.some(block => block.text?.includes('/seguimiento/real')), false);
+    const sale = buildShareTicket('sale', { ...privateFields, total:50, items:[{nombre:'Cable',cantidad:2,precio_unitario:25,orden:privateFields}] });
+    assert.doesNotMatch(JSON.stringify(sale), /SECRET_/);
+    assert.match(JSON.stringify(sale), /Cable/);
 });
 
 test('shares the PNG on a fresh click and handles cancellation', async () => {
@@ -86,7 +104,7 @@ test('a quick capture shares on the first click while user activation remains', 
 
 test('digital capture preserves resolution and skips thermal thresholding', async () => {
     const source = fs.readFileSync('frontend/js/app.js', 'utf8');
-    const captureFunction = source.slice(source.indexOf('async function captureReceiptPreviewImage('), source.indexOf('function normalizeReceiptCanvasForThermalPrint('));
+    const captureFunction = source.slice(source.indexOf('async function captureReceiptPreviewImage('), source.indexOf('function printReceiptBrowser('));
     let removed = false;
     const node = { classList: { remove() {} }, getBoundingClientRect: () => ({ width: 300 }) };
     const context = {

@@ -656,6 +656,7 @@ function formatOrderResponse(row, historial = [], evidencias = [], refacciones =
     status_reason: row.status_reason || null,
     publicRemarks: latestHistory ? latestHistory.comentario : 'Sin observaciones.',
     dateIn: dateIn,
+    fecha_creacion: row.fecha_creacion || null,
     estimatedDate: row.fecha_entrega_estimada || null,
     falla_reportada: row.falla_reportada || '',
     descripcion_falla: row.descripcion_falla || null,

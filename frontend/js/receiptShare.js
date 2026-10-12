@@ -1,7 +1,15 @@
 (() => {
     const downloadButton = document.getElementById('btn-download-receipt-png');
     const shareButton = document.getElementById('btn-share-receipt-whatsapp');
-    const status = document.getElementById('receipt-share-status');
+    const previewButton = document.getElementById('btn-preview-share-ticket');
+    const preview = document.getElementById('share-ticket-preview');
+    const previewImage = document.getElementById('share-ticket-preview-image');
+    let previewUrl = null;
+    const status = { set textContent(value) {
+        document.getElementById('receipt-share-status').textContent = value;
+        const previewStatus = document.getElementById('share-preview-status');
+        if (previewStatus) previewStatus.textContent = value;
+    } };
     const initialShareLabel = shareButton.innerHTML;
     let prepared = null;
     let pending = null;
@@ -10,16 +18,17 @@
     function currentReceipt() {
         const element = getActiveReceiptElement();
         if (!element) throw new Error('No hay un ticket listo para compartir.');
-        const paper = detectConfiguredTicketPaper();
-        return { element, paper, key: `${paper}:${element.outerHTML}` };
+        if (!window.visualTickets) throw new Error('No se pudo cargar el generador visual. Recarga el sistema.');
+        const type = element.id === 'ticket-venta-container' ? 'sale' : element.id === 'ticket-corte-container' ? 'cashClosing' : 'service';
+        const raw = type === 'sale' ? APP_STATE.selectedSaleForReceipt : type === 'cashClosing' ? APP_STATE.selectedCajaForReceipt : APP_STATE.selectedOrderForReceipt;
+        if (!raw) throw new Error('Abre una orden o venta para compartir su comprobante.');
+        const ticket = window.visualTickets.build(type, raw, ESTABLISHMENT_CONFIG);
+        return { ticket, key: JSON.stringify(ticket) };
     }
 
     async function prepare(receipt) {
-        if (typeof html2canvas !== 'function') {
-            throw new Error('No se pudo cargar el generador de imagen. Recarga el sistema.');
-        }
-        const capture = await captureReceiptPreviewImage(receipt.element, receipt.paper, { digital: true });
-        const folio = receipt.element.querySelector('.ticket-folio-number, #thermal-val-folio')?.textContent || 'ticket';
+        const capture = await window.visualTickets.generateShareTicketImage(receipt.ticket);
+        const folio = receipt.ticket.folio;
         const filename = `${folio.trim().replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 80) || 'ticket'}.png`;
         const file = new File([capture.blob], filename, { type: 'image/png' });
         return { key: receipt.key, file };
@@ -39,15 +48,28 @@
 
     // Prepare only the visible receipt, sharing the same work with button clicks.
     let warmupTimer;
+    function clearPreview() {
+        if (preview?.open) preview.close();
+        previewImage?.removeAttribute('src');
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = null;
+    }
     const observer = new MutationObserver(records => {
         if (records.every(record => record.target.closest?.('.modal-footer'))) return;
         clearTimeout(warmupTimer);
+        let receipt;
+        if (!modal.classList.contains('hidden')) {
+            try { receipt = currentReceipt(); } catch { /* No authorized receipt selected yet. */ }
+            // Layout changes (including mobile resize) must not close a valid preview.
+            if (receipt && (prepared?.key === receipt.key || pending?.key === receipt.key)) return;
+        }
         prepared = null;
+        clearPreview();
         status.textContent = '';
         shareButton.innerHTML = initialShareLabel;
-        if (modal.classList.contains('hidden')) return;
-        warmupTimer = setTimeout(() => {
-            ensurePrepared(currentReceipt()).catch(() => { /* Retry on explicit action. */ });
+        if (!receipt) return;
+        warmupTimer = setTimeout(async () => {
+            try { await ensurePrepared(receipt); } catch { /* Retry on explicit action. */ }
         }, 120);
     });
     observer.observe(modal, { attributes: true, childList: true, characterData: true, subtree: true });
@@ -63,7 +85,8 @@
         setTimeout(() => URL.revokeObjectURL(url), 60000);
     }
 
-    async function handleAction(share) {
+    async function handleAction(share, showPreview = false) {
+        if (downloadButton.disabled) return;
         downloadButton.disabled = shareButton.disabled = true;
         try {
             const receipt = currentReceipt();
@@ -82,6 +105,14 @@
                     status.textContent = 'Imagen lista. Pulsa Compartir PNG ahora para enviarla.';
                     return;
                 }
+            }
+            if (showPreview) {
+                clearPreview();
+                previewUrl = URL.createObjectURL(prepared.file);
+                previewImage.src = previewUrl;
+                document.getElementById('share-ticket-image-info').textContent = `PNG · 800 px · ${Math.round(prepared.file.size / 1024)} KB`;
+                preview.showModal();
+                return;
             }
             if (!share) {
                 download(prepared.file);
@@ -107,11 +138,19 @@
     }
 
     downloadButton.addEventListener('click', () => handleAction(false));
-    shareButton.addEventListener('click', () => handleAction(true));
+    previewButton?.addEventListener('click', () => handleAction(false, true));
+    document.getElementById('btn-close-share-preview')?.addEventListener('click', clearPreview);
+    document.getElementById('btn-download-share-preview')?.addEventListener('click', () => handleAction(false));
+    document.getElementById('btn-share-preview')?.addEventListener('click', () => handleAction(true));
+    preview?.addEventListener('cancel', () => clearPreview());
+    window.addEventListener?.('pagehide', () => { prepared = null; clearPreview(); clearTimeout(warmupTimer); });
+    function shareServiceTicket() { return handleAction(true); }
+    shareButton.addEventListener('click', shareServiceTicket);
     // Discard customer data and reset the prompt on close or ticket changes.
     document.getElementById('receipt-modal').addEventListener('click', event => {
         if (event.target.closest('#btn-close-receipt, #btn-close-receipt-modal, [id^="btn-show-"]')) {
             prepared = null;
+            clearPreview();
             status.textContent = '';
             shareButton.innerHTML = initialShareLabel;
         }

@@ -1,10 +1,10 @@
 {
   "scripts": {
     "dev": "npm run build:catalog && npm --prefix backend run dev",
-    "build:catalog": "vite build && vite build --config vite.printer.config.mjs",
+    "build:catalog": "vite build && vite build --config vite.printer.config.mjs && vite build --config vite.share.config.mjs",
     "build": "npm run build:catalog && npm --prefix backend run build",
     "start": "npm --prefix backend start",
-    "test": "npm --prefix backend test",
+    "test": "node --test tests/printing.test.mjs tests/receipt-share.test.cjs && npm --prefix backend test",
     "test:browser": "playwright test",
     "android:sync": "npm run build:catalog && node scripts/prepare-android.mjs && cap sync android",
     "android:open": "cap open android"
@@ -13,11 +13,14 @@
     "@capacitor/android": "8.5.2",
     "@capacitor/core": "8.5.2",
     "@delicity/capacitor-thermal-printer": "8.3.1",
+    "@point-of-sale/receipt-printer-encoder": "4.0.1",
     "antd": "^5.29.3",
     "dayjs": "^1.11.21",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
+    "qrcode": "1.5.4",
+    "qz-tray": "2.3.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "recharts": "^3.9.2"

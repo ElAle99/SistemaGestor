@@ -1,6 +1,6 @@
 # Impresión Allfix
 
-El frontend existente utiliza `printerService`. Android envía el ticket rasterizado por ESC/POS; web utiliza el diálogo del navegador. Órdenes, ventas, anticipos, liquidaciones y cortes conservan los formatos actuales, incluidos QR y códigos de barras. No se cambian endpoints ni tablas.
+El frontend utiliza `PrinterManager`: texto ESC/POS nativo por Web Serial, WebUSB compatible o el puente Android existente. WhatsApp conserva su PNG independiente. El diálogo del navegador es un fallback. Consulta la arquitectura, la auditoría y la validación física pendiente en [IMPRESION-ESCPOS.md](IMPRESION-ESCPOS.md).
 
 ## Generar Android (PowerShell)
 
@@ -32,6 +32,6 @@ La selección y preferencias se guardan en el dispositivo. La configuración del
 
 Versiones fijadas: Capacitor 8.5.2 y [`@delicity/capacitor-thermal-printer` 8.3.1](https://github.com/kevinfavv/CapacitorThermalPrinter). El plugin declara compatibilidad con Capacitor 8, Bluetooth Classic/SPP y BLE, y gestiona permisos de Android 12+ y anteriores. Su documentación advierte que sigue en desarrollo: validar cada modelo físico antes de producción. BLE depende de los servicios/características del modelo; no toda impresora Bluetooth implementa ESC/POS. La confirmación de envío no demuestra que el papel haya salido.
 
-QZ Tray ya no se carga ni se instala. Web/PC siempre requiere el diálogo del navegador y los controladores del sistema operativo.
+QZ Tray ya no se carga ni se instala. Web/PC ofrece impresión directa solo si las APIs, permisos y dispositivo son compatibles; conserva el diálogo del navegador como fallback.
 
-Verificación en este entorno: compilación web, 116 pruebas backend y 15 pruebas de interfaz aprobadas; sincronización Capacitor aprobada. No se generó APK: falta JDK/JAVA_HOME y no se encontró SDK Android instalado. Falta validar una impresora física. `npm audit --omit=dev` detectó una vulnerabilidad moderada en DOMPurify, dependencia existente del generador PDF; no se actualizó ese módulo fuera del alcance de impresión.
+Las verificaciones anteriores del APK no validan el nuevo envío de bytes en una impresora física. El estado y los pasos de validación actuales están documentados en IMPRESION-ESCPOS.md.

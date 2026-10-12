@@ -118,8 +118,7 @@ async function showQuickOrder(print = false, silent = false) {
         const opened = await viewOrderDetails(quickCreatedOrder.id, { openPreview: !print || !globalThis.printerService?.isNative() });
         if (opened === false) throw new Error('No se pudo abrir la orden.');
         if (print) {
-            const printed = await printReceipt(null, { silent });
-            if (printed === false) status.textContent = 'La orden está guardada. Puedes reintentar la impresión desde el ticket.';
+            globalThis.openOrderPrintSelector();
         }
     } catch (error) {
         status.textContent = 'La orden está guardada. No se pudo abrir o imprimir el ticket; vuelve a intentarlo.';
@@ -194,3 +193,4 @@ document.getElementById('quick-order-close').addEventListener('click', () => {
 document.getElementById('quick-order-new').addEventListener('click', openQuickOrder);
 document.getElementById('quick-order-view').addEventListener('click', () => showQuickOrder());
 document.getElementById('quick-order-print').addEventListener('click', () => showQuickOrder(true));
+

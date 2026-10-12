@@ -13,6 +13,7 @@
     <!-- Main Stylesheet -->
     <link rel="stylesheet" href="css/style.css?v=20260909-print-quality">
     <link rel="stylesheet" href="css/responsive.css?v=20260910-mobile">
+    <link rel="stylesheet" href="css/share-ticket.css?v=20261011-visual">
     <link rel="stylesheet" href="css/quickOrder.css?v=20260926-redesign">
     <link rel="stylesheet" href="dist/order-catalog.css?v=20260926">
     <link rel="stylesheet" href="css/design-system.css?v=20260929-repair">
@@ -25,7 +26,7 @@
     <!-- SECTION: LOGIN (SISTEMA GESTOR - ALLFIX BACALAR)                   -->
     <!-- ========================================================================== -->
     <div id="login-container" class="login-page">
-        
+
         <!-- PANEL IZQUIERDO: BRANDING, LOGO PERSONALIZADO Y HARDWARE -->
         <div class="login-left-panel">
             <div class="brand-header animate-fade-in">
@@ -37,13 +38,13 @@
                 <h1 class="brand-title">Sistema Gestor de</h1>
                 <h2 class="brand-subtitle">Ordenes de Servicio</h2>
             </div>
-            
+
             <!-- Imagen real de los celulares desarmados al ras inferior -->
             <div class="hardware-bg-image-container">
                 <img src="img/iphonedesarmadobanerlogin.png" alt="Hardware Componentes AllFix" class="hardware-illustration-img">
             </div>
         </div>
-        
+
         <!-- PANEL DERECHO: FORMULARIO DE ACCESO (CUADRO COMPACTO UI/UX) -->
         <div class="login-right-panel">
             <div class="login-card animate-slide-up">
@@ -52,7 +53,7 @@
                         <i class="fa-regular fa-circle-user"></i>
                     </div>
                 </div>
-                
+
                 <h3 class="login-card-title">INICIO DE SESIÓN</h3>
                 <p class="login-card-subtitle">Panel Operativo e Interno<br>Ingresa tus credenciales autorizadas</p>
 
@@ -135,7 +136,7 @@
                         </button>
                     </form>
                 </div>
-                
+
                 <form id="login-form">
                     <div class="form-group">
                         <label for="login-username">USUARIO</label>
@@ -144,7 +145,7 @@
                             <input type="text" id="login-username" placeholder="Ingresa tu usuario" required autocomplete="username">
                         </div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="login-password">CONTRASEÑA</label>
                         <div class="input-icon-wrapper setup-password-wrapper">
@@ -155,7 +156,7 @@
                             </button>
                         </div>
                     </div>
-                    
+
                     <div class="login-options-row">
                         <label class="checkbox-container-flat">
                             <input type="checkbox" id="login-remember" checked>
@@ -163,7 +164,7 @@
                         </label>
                         <button type="button" class="forgot-password-flat-link" id="btn-show-forgot-password">¿Olvidaste tu contraseña?</button>
                     </div>
-                    
+
                     <!-- Alerta de error real conectada a app.js -->
                     <div id="login-error-msg" class="error-banner hidden">
                         <i class="fa-solid fa-triangle-exclamation"></i>
@@ -225,12 +226,12 @@
                     <button type="submit" class="btn btn-primary-flat btn-block">Actualizar contraseña</button>
                     <button type="button" class="btn btn-secondary btn-block" id="btn-cancel-reset-password">Volver al login</button>
                 </form>
-                
+
                 <!-- Separador e indicador de seguridad interna -->
                 <div class="login-divider-text">
                     <span>Acceso de Personal Autorizado</span>
                 </div>
-                
+
                 <div class="login-system-notice">
                     <i class="fa-solid fa-shield-halved"></i>
                     <p>El registro de nuevos operadores se gestiona de forma estricta desde el módulo interno de <strong>Configuración</strong>.</p>
@@ -253,7 +254,7 @@
                     <span class="brand-location" id="sidebar-business-location">Bacalar</span>
                 </div>
             </div>
-            
+
             <nav class="sidebar-menu">
                 <a href="#dashboard" class="menu-item active" data-view="dashboard">
                     <i class="fa-solid fa-chart-pie"></i>
@@ -315,7 +316,7 @@
                     <span>Configuración</span>
                 </a>
             </nav>
-            
+
             <div class="sidebar-footer">
                 <button type="button" class="user-profile-badge" id="btn-open-profile-modal" title="Mi perfil">
                     <div class="user-avatar" id="sidebar-avatar">A</div>
@@ -1010,7 +1011,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div class="pos-products-grid" id="pos-products-grid">
                                 <!-- Lista de productos activos para hacer clic y añadir. -->
                             </div>
@@ -1032,7 +1033,7 @@
                                         <p>El carrito está vacío</p>
                                     </div>
                                 </div>
-                                
+
                                 <div class="pos-cart-footer">
                                     <div class="pos-totals">
                                         <div class="totals-row">
@@ -1642,13 +1643,49 @@
                                     <span class="config-card-icon config-card-icon-violet"><i class="fa-solid fa-print"></i></span>
                                     <div>
                                         <h3>Impresión local</h3>
-                                        <p>Conecta esta computadora con su impresora térmica mediante Bluetooth.</p>
+                                        <p>Conecta tu impresora y personaliza tus comprobantes.</p>
                                     </div>
                                 </div>
                             </div>
                             <div class="card-body">
-                                <form id="config-printer-form">
-                                    <div class="form-row-2">
+                                <form id="config-printer-form" class="printer-settings">
+    <div class="printer-status-panel"><span>Estado de la impresora</span><strong id="printer-connection-status" class="printer-status printer-status-disconnected">Desconectada</strong></div>
+    <p class="config-help-text" id="printer-config-status" role="status">Conecta tu impresora para comenzar. La configuración se ajusta automáticamente.</p>
+    <p class="config-help-text" id="printer-qz-help" hidden>QZ Tray debe estar abierto en esta computadora. Si no está instalado, <a href="https://qz.io/download/" target="_blank" rel="noopener noreferrer">descárgalo del sitio oficial</a> e instálalo manualmente. Si está cerrado, ábrelo desde Inicio. Impresión normal sigue disponible en Configuración avanzada.</p>
+    <div class="form-row-2">
+        <div class="form-group"><label for="cfg-ticket-printer">Impresora</label><select id="cfg-ticket-printer" class="form-select"><option value="">Selecciona una impresora</option></select></div>
+        <div class="form-group"><label for="cfg-ticket-paper">Tamaño de papel</label><select id="cfg-ticket-paper" class="form-select"><option value="58mm">58 mm</option><option value="80mm">80 mm</option></select></div>
+        <div class="form-group"><label for="cfg-print-copies">Copias</label><input id="cfg-print-copies" class="form-control" type="number" min="1" max="5"></div>
+        <div class="form-group"><label for="cfg-ticket-print-mode">Impresión automática</label><select id="cfg-ticket-print-mode" class="form-select"><option value="direct">Activada al cobrar</option><option value="ask">Desactivada</option></select></div>
+    </div>
+    <div class="printer-options"><label><input type="checkbox" id="cfg-print-logo"> Mostrar logo</label><label><input type="checkbox" id="cfg-print-qr"> Mostrar QR</label></div>
+    <div class="printer-config-actions"><button type="button" class="btn btn-secondary" id="btn-connect-printer">Conectar impresora</button>
+<button type="button" class="btn btn-secondary" id="btn-select-other-printer">Cambiar impresora</button>
+<button type="button" class="btn btn-secondary" id="btn-disconnect-printer">Desconectar</button>
+<button type="button" class="btn btn-secondary" id="btn-test-printer">
+                                            <i class="fa-solid fa-print"></i> Imprimir prueba
+                                        </button></div>
+    <details class="printer-advanced" id="printer-advanced"><summary>Configuración avanzada</summary>
+        <p class="config-help-text">Los ajustes automáticos son adecuados para la mayoría de impresoras. Cambia estos valores solo si tu equipo lo requiere.</p>
+        <div class="form-row-2">
+            <div class="form-group"><label for="cfg-print-connection">Método de conexión</label><select id="cfg-print-connection" class="form-select"><option value="auto">Automática (recomendado)</option><option value="qz">Impresora Windows (QZ Tray)</option><option value="usb">USB directo (WebUSB)</option><option value="serial">Puerto serie (Web Serial)</option><option value="native">Bluetooth Android (app)</option><option value="browser">Impresión normal (respaldo)</option></select></div>
+            <div class="form-group"><label for="cfg-print-mapping">Perfil de compatibilidad</label><select id="cfg-print-mapping" class="form-select"><option value="auto">Detectar automáticamente</option><option value="generic">Genérico ESC/POS</option><option value="pos-5890">POS-5890</option><option value="xprinter">Xprinter</option><option value="mpt">MPT</option></select></div>
+            <div class="form-group"><label for="cfg-print-dots">Ancho en dots</label><input id="cfg-print-dots" class="form-control" type="number" min="160" max="832" step="8"></div>
+<div class="form-group"><label for="cfg-print-mm">Ancho imprimible (mm)</label><input id="cfg-print-mm" class="form-control" type="number" min="20" max="80"></div>
+<div class="form-group"><label for="cfg-print-columns">Caracteres por línea</label><input id="cfg-print-columns" class="form-control" type="number" min="16" max="64"></div>
+<div class="form-group"><label for="cfg-print-dpi">Resolución (DPI)</label><input id="cfg-print-dpi" class="form-control" type="number" min="180" max="600"></div>
+<div class="form-group"><label for="cfg-print-feed">Avance final (líneas)</label><input id="cfg-print-feed" class="form-control" type="number" min="1" max="12"></div>
+<div class="form-group"><label for="cfg-print-baud">Velocidad serie (baudios)</label><select id="cfg-print-baud" class="form-select"><option>9600</option><option>19200</option><option>38400</option><option>57600</option><option>115200</option></select></div>
+<div class="form-group"><label for="cfg-print-codepage">Caracteres</label><select id="cfg-print-codepage" class="form-select"><option value="cp850">Español CP850</option><option value="cp858">CP858</option><option value="windows1252">Windows 1252</option><option value="ascii">ASCII (sin acentos)</option></select></div>
+        </div>
+        <label><input type="checkbox" id="cfg-ticket-cut"> Corte automático (si la impresora lo admite)</label>
+        <div class="printer-config-actions"><button type="button" class="btn btn-secondary" id="btn-detect-printers">
+                                                <i class="fa-solid fa-rotate"></i> Actualizar impresoras
+                                            </button><button type="button" class="btn btn-secondary" id="btn-browser-print-test">
+                                            <i class="fa-solid fa-window-restore"></i> Impresión normal
+                                        </button></div>
+        <p id="printer-capabilities" class="config-help-text"></p>
+        <div class="form-row-2">
                                         <div class="ticket-logo-settings">
                                             <div class="business-logo-preview-box ticket-logo-preview-box">
                                                 <img src="img/logoallfix-ticket.png" alt="Logo para tickets" id="cfg-ticket-logo-preview">
@@ -1665,57 +1702,11 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="printer-status-panel">
-                                        <span>Estado de Bluetooth</span>
-                                        <strong id="printer-connection-status" class="printer-status printer-status-disconnected">Desconectado</strong>
-                                    </div>
-                                    <div class="form-row-2">
-                                        <div class="form-group">
-                                            <label for="cfg-ticket-printer">Impresora térmica</label>
-                                            <select id="cfg-ticket-printer" class="form-select">
-                                                <option value="">Selecciona una impresora</option>
-                                            </select>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="cfg-ticket-paper">Papel</label>
-                                            <select id="cfg-ticket-paper" class="form-select">
-                                                <option value="58mm">58 mm</option>
-                                                <option value="80mm">80 mm</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="form-row-2">
-                                        <div class="form-group">
-                                            <label for="cfg-ticket-print-mode">Impresión automática</label>
-                                            <select id="cfg-ticket-print-mode" class="form-select">
-                                                <option value="direct">Activada</option>
-                                                <option value="ask">Preguntar antes de imprimir</option>
-                                            </select>
-                                        </div>
-                                        <div class="form-group">
-                                            <button type="button" class="btn btn-secondary" id="btn-detect-printers">
-                                                <i class="fa-solid fa-rotate"></i> Actualizar impresoras
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <label><input type="checkbox" id="cfg-ticket-cut"> Corte automático (si la impresora lo admite)</label>
-                                    <div class="printer-config-actions">
-                                        <button type="button" class="btn btn-secondary" id="btn-connect-printer">Conectar</button>
-                                        <button type="button" class="btn btn-secondary" id="btn-disconnect-printer">Desconectar</button>
-                                        <button type="button" class="btn btn-secondary" id="btn-test-printer">
-                                            <i class="fa-solid fa-print"></i> Imprimir prueba
-                                        </button>
-                                        <button type="button" class="btn btn-secondary" id="btn-browser-print-test">
-                                            <i class="fa-solid fa-window-restore"></i> Impresión normal
-                                        </button>
-                                    </div>
-                                    <p class="config-help-text" id="printer-config-status">
-                                        En Android, busca una impresora Bluetooth. En web se utiliza el diálogo del navegador.</p>
-                                    <div class="config-form-actions">
-                                        <span><i class="fa-solid fa-computer"></i> Esta configuración se guarda solo en esta computadora.</span>
-                                        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Guardar impresión</button>
-                                    </div>
-                                </form>
+
+        <h4>Diagnóstico de conexión</h4><pre id="printer-diagnostics" class="printer-diagnostics" role="status" aria-live="polite"></pre>
+    </details>
+    <div class="config-form-actions"><span>Preferencias guardadas en este dispositivo.</span><button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Guardar impresión</button></div>
+</form>
                             </div>
                         </div>
 
@@ -2300,7 +2291,7 @@
                     <span class="quick-success-icon" aria-hidden="true">✓</span><h4>¡Equipo recibido!</h4>
                     <p id="quick-order-success-message" role="status"></p>
                     <div class="quick-order-actions">
-                        <button type="button" id="quick-order-print" class="btn btn-primary">Imprimir ticket</button>
+                        <button type="button" id="quick-order-print" class="btn btn-primary">Imprimir orden</button>
                         <button type="button" id="quick-order-view" class="btn btn-secondary">Ver orden</button>
                         <button type="button" id="quick-order-new" class="btn btn-secondary">Nueva orden</button>
                     </div>
@@ -2330,7 +2321,7 @@
             <div class="modal-body">
                 <form id="order-form" novalidate>
                     <input type="hidden" id="form-order-id">
-                    
+
                     <div class="new-order-stepper" aria-label="Pasos de nueva orden">
                         <button type="button" class="new-order-stepper-item active" data-wizard-step="1">
                             <span class="step-index">1</span>
@@ -2373,7 +2364,7 @@
                                 Nuevo Cliente
                             </label>
                         </div>
-                        
+
                         <div id="existing-client-search-group" class="form-group">
                             <label for="order-client-search">Buscar cliente existente</label>
                             <div class="autocomplete-wrapper">
@@ -2965,7 +2956,7 @@
                                     <option value="Cancelado">Cancelado (Fuerza Motivo)</option>
                                 </select>
                             </div>
-                            
+
                             <!-- Motivo de retraso o cancelación (requerido dinámicamente) -->
                             <div class="form-group hidden" id="status-reason-group">
                                 <label id="status-reason-label" for="form-status-reason">Motivo *</label>
@@ -3496,8 +3487,9 @@
                     <i class="fa-solid fa-receipt"></i> Ver ticket
                 </button>
                 <button type="button" class="btn btn-primary" id="btn-sale-success-print">
-                    <i class="fa-solid fa-print"></i> Imprimir ticket
+                    <i class="fa-solid fa-print"></i> Imprimir ticket de venta
                 </button>
+                <button type="button" class="btn btn-secondary" id="btn-sale-retry-print" hidden>Reconectar y Reintentar</button>
             </div>
         </div>
     </div>
@@ -3505,7 +3497,7 @@
     <div id="receipt-modal" class="modal-overlay hidden">
         <div class="modal-container modal-large animate-slide-up">
             <div class="modal-header">
-                <h3>Previsualización de Ticket Impreso</h3>
+                <h3>Comprobante para compartir</h3>
                 <button class="btn-close-modal" id="btn-close-receipt-modal"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="modal-body">
@@ -3515,7 +3507,7 @@
                     <button class="btn btn-sm btn-secondary" id="btn-show-etiqueta-pequena">Etiqueta Térmica</button>
                     <button class="btn btn-sm btn-secondary hidden" id="btn-show-ticket-corte">Corte de Caja</button>
                 </div>
-                
+
                 <!-- Ticket de Venta -->
                 <div class="ticket-preview-box ticket-sale-receipt hidden" id="ticket-venta-container">
                     <div class="ticket-tear-edge"></div>
@@ -3619,7 +3611,7 @@
                     <div class="ticket-thanks">Corte guardado en historial</div>
                     <div class="ticket-tear-edge ticket-tear-edge-bottom"></div>
                 </div>
-                
+
                 <!-- Ticket principal de Recepción -->
                 <div class="ticket-preview-box ticket-service-receipt" id="ticket-recepcion-container">
                     <div class="ticket-tear-edge"></div>
@@ -3726,21 +3718,50 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" id="btn-browser-print-action" onclick="window.printReceiptBrowser && window.printReceiptBrowser()">
+                <button type="button" class="btn btn-secondary" id="btn-browser-print-action" onclick="window.requestReceiptPrint && window.requestReceiptPrint({ browser: true })">
                     <i class="fa-solid fa-window-restore"></i> Impresión normal
                 </button>
-                <button type="button" class="btn btn-primary" id="btn-print-action" onclick="window.printReceipt && window.printReceipt()">
+                <button type="button" class="btn btn-primary" id="btn-print-action" onclick="window.requestReceiptPrint && window.requestReceiptPrint()">
                     <i class="fa-solid fa-print"></i> Imprimir ticket
                 </button>
                 <button type="button" class="btn btn-secondary" id="btn-download-receipt-png"><i class="fa-solid fa-download"></i> Descargar PNG</button>
+                <button type="button" class="btn btn-secondary" id="btn-preview-share-ticket">Vista previa para compartir</button>
                 <button type="button" class="btn btn-success" id="btn-share-receipt-whatsapp"><i class="fa-brands fa-whatsapp"></i> Enviar por WhatsApp</button>
                 <span id="receipt-share-status" role="status" aria-live="polite"></span>
+                <button type="button" class="btn btn-secondary" id="btn-retry-receipt" hidden>Reconectar y Reintentar</button>
+                <button type="button" class="btn btn-secondary" id="btn-reprint-service">Reimprimir último servicio</button>
+                <span id="receipt-print-status" role="status" aria-live="polite"></span>
                 <button type="button" class="btn btn-primary" id="btn-close-receipt">Cerrar</button>
             </div>
         </div>
     </div>
 
     <!-- ========================================== -->
+    <dialog id="order-print-selector" aria-labelledby="order-print-selector-title">
+        <div class="modal-header">
+            <h3 id="order-print-selector-title">¿Qué deseas imprimir?</h3>
+            <button type="button" class="btn-close-modal" id="order-print-selector-close" aria-label="Cerrar selector de impresión"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+        </div>
+        <div class="order-print-options">
+            <button type="button" class="order-print-option" id="order-print-customer">
+                <i class="fa-solid fa-receipt" aria-hidden="true"></i>
+                <span><strong>Ticket para el cliente</strong><small>Comprobante que se entrega al cliente</small></span>
+            </button>
+            <button type="button" class="order-print-option" id="btn-print-equipment-label">
+                <i class="fa-solid fa-mobile-screen" aria-hidden="true"></i>
+                <span><strong>Etiqueta para el equipo</strong><small>Etiqueta interna para pegar al dispositivo</small></span>
+            </button>
+            <p id="order-print-selector-status" role="status" aria-live="polite"></p>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" id="order-print-selector-cancel">Cancelar</button></div>
+    </dialog>
+
+    <!-- Independent digital preview: never used by physical printing. -->
+    <dialog id="share-ticket-preview" aria-labelledby="share-ticket-preview-title">
+        <header><div><h3 id="share-ticket-preview-title">Comprobante para compartir</h3><p id="share-ticket-image-info"></p></div><button type="button" class="btn btn-secondary" id="btn-close-share-preview" aria-label="Cerrar vista previa">Cerrar</button></header>
+        <div class="share-ticket-image-wrap"><img id="share-ticket-preview-image" alt="Comprobante visual Allfix Bacalar"></div>
+        <footer><button type="button" class="btn btn-secondary" id="btn-download-share-preview">Descargar PNG</button><button type="button" class="btn btn-success" id="btn-share-preview">Compartir / WhatsApp</button><p id="share-preview-status" role="status" aria-live="polite"></p></footer>
+    </dialog>
     <!-- INTERACTIVE MODAL: QUOTE DETAIL           -->
     <!-- ========================================== -->
     <div id="quote-modal" class="modal-overlay hidden">
@@ -3951,13 +3972,14 @@
     <script src="/vendor/dayjs/locale/es.js"></script>
     <script src="/vendor/jspdf/jspdf.umd.min.js"></script>
     <script src="/vendor/jspdf-autotable/jspdf.plugin.autotable.min.js"></script>
-    <script src="dist/printer-service.js"></script>
+    <script src="dist/printer-service.js?v=20261011-escpos"></script>
 
     <!-- Main System JavaScript Logic -->
-    <script src="js/printerConfig.js"></script>
+    <script src="js/printerConfig.js?v=20261011-escpos"></script>
     <script src="js/formFeedback.js?v=20260927"></script>
-    <script src="js/app.js?v=20261010-png-hd"></script>
-    <script src="js/receiptShare.js?v=20261010-hd"></script>
+    <script src="js/app.js?v=20261011-escpos"></script>
+    <script src="dist/share-ticket.js?v=20261011-visual"></script>
+    <script src="js/receiptShare.js?v=20261011-visual"></script>
     <script src="js/quickOrderExtras.js?v=20260926-access"></script>
     <script src="js/quickOrder.js?v=20260929-save"></script>
     <script defer src="dist/order-catalog.js?v=20260927-autocomplete"></script>

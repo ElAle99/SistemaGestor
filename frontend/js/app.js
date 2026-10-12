@@ -375,6 +375,7 @@ function getAuthToken() {
 }
 
 function clearSessionState() {
+    window.printerManager?.clear();
     sessionStorage.removeItem('allfix_user');
     APP_STATE.currentUser = null;
     APP_STATE.currentRole = 'Administrador';
@@ -624,6 +625,7 @@ function initLogin() {
     const logoutButton = document.getElementById('btn-logout');
     if (logoutButton) {
         logoutButton.addEventListener('click', () => {
+            window.printerManager?.clear();
             stopCotizacionesPolling();
             sessionStorage.removeItem('allfix_user');
             showLoginContainer();
@@ -5037,12 +5039,7 @@ function initOrderRegistration() {
                 if (!isEditing) {
                     // Previsualizar Ticket inmediatamente al crear una nueva orden
                     await viewOrderDetails(finalOrder.id, { openPreview: !window.printerService?.isNative() });
-                    if (ESTABLISHMENT_CONFIG.autoPrintTicket !== false) {
-                        const printed = await printReceipt(null, { silent: true });
-                        if (!printed) {
-                            AllfixUI.notify('Orden creada correctamente.\n\nNo fue posible imprimir el ticket. Puedes reintentar desde la vista previa o usar la impresión normal.');
-                        }
-                    }
+                    window.openOrderPrintSelector();
                 }
             } else {
                 const err = await response.json();
@@ -5233,13 +5230,10 @@ const saleSuccessModal = document.getElementById('sale-success-modal');
 const saleSuccessPrintButton = document.getElementById('btn-sale-success-print');
 const saleSuccessPreviewButton = document.getElementById('btn-sale-success-preview');
 const saleSuccessCloseButton = document.getElementById('btn-sale-success-close');
-let AVAILABLE_TICKET_PRINTERS = [];
 const THERMAL_PRINT_DOTS = {
     '80mm': 576,
     '58mm': 384
 };
-const THERMAL_PRINT_DPI = 203;
-const THERMAL_CAPTURE_SCALE = 5;
 document.getElementById('btn-close-receipt-modal').addEventListener('click', () => receiptModal.classList.add('hidden'));
 document.getElementById('btn-close-receipt').addEventListener('click', () => receiptModal.classList.add('hidden'));
 saleSuccessCloseButton?.addEventListener('click', () => saleSuccessModal?.classList.add('hidden'));
@@ -5251,44 +5245,17 @@ saleSuccessPreviewButton?.addEventListener('click', () => {
     receiptModal.classList.remove('hidden');
 });
 saleSuccessPrintButton?.addEventListener('click', async () => {
-    const printed = await printReceipt(null, { silent: false });
+    const printed = await printReceipt(null, { silent: false, type: 'sale' });
     if (printed && APP_STATE.selectedSaleForReceipt) {
         showSaleSuccessModal(APP_STATE.selectedSaleForReceipt, { printed: true });
     }
 });
 
 function setReceiptPrintLabels(label = 'Ticket Térmico') {
+    const reprintButton = document.getElementById('btn-reprint-service');
+    if (reprintButton) reprintButton.hidden = label !== 'ticket del cliente';
     if (receiptPrint80Button) {
         receiptPrint80Button.innerHTML = `<i class="fa-solid fa-print"></i> Imprimir ${label}`;
-    }
-}
-
-function setReceiptPrintSize(paper) {
-    const detectedPaper = normalizeTicketPaper(paper);
-    clearReceiptPrintSize();
-    const widthMm = detectedPaper === '58mm' ? 58 : 80;
-    const className = detectedPaper === '58mm' ? 'receipt-print-58mm' : 'receipt-print-80mm';
-    document.documentElement.classList.add(className);
-    document.body.classList.add(className);
-
-    const pageSizeStyle = document.createElement('style');
-    pageSizeStyle.id = 'receipt-print-page-size';
-    pageSizeStyle.textContent = `
-@media print {
-  @page { size: ${widthMm}mm auto; margin: 0; }
-  html, body { width: ${widthMm}mm !important; min-width: ${widthMm}mm !important; }
-  #receipt-modal, #receipt-modal .modal-container { width: ${widthMm}mm !important; max-width: ${widthMm}mm !important; }
-}
-`;
-    document.head.appendChild(pageSizeStyle);
-}
-
-function clearReceiptPrintSize() {
-    document.documentElement.classList.remove('receipt-print-58mm', 'receipt-print-80mm');
-    document.body.classList.remove('receipt-print-58mm', 'receipt-print-80mm');
-    const pageSizeStyle = document.getElementById('receipt-print-page-size');
-    if (pageSizeStyle) {
-        pageSizeStyle.remove();
     }
 }
 
@@ -5300,28 +5267,12 @@ function normalizeTicketPaper(paper) {
     return '80mm';
 }
 
-function getSelectedPrinterMeta(printerName = ESTABLISHMENT_CONFIG.ticketPrinter || '') {
-    return AVAILABLE_TICKET_PRINTERS.find(printer => printer.name === printerName)
-        || AVAILABLE_TICKET_PRINTERS.find(printer => printer.isDefault)
-        || null;
-}
-
 function detectConfiguredTicketPaper() {
-    const printer = getSelectedPrinterMeta();
-    // The selected roll takes precedence over generic Windows driver defaults.
-    return normalizeTicketPaper(ESTABLISHMENT_CONFIG.ticketPaper || printer?.ticketPaper || printer?.paperMm);
+    return normalizeTicketPaper(window.printerService?.readPreferences().paperWidth || ESTABLISHMENT_CONFIG.ticketPaper || '58mm');
 }
 
 function getThermalPrintWidthPx(paper) {
     return THERMAL_PRINT_DOTS[normalizeTicketPaper(paper)] || THERMAL_PRINT_DOTS['80mm'];
-}
-
-function getReceiptTextWidth(size) {
-    return normalizeTicketPaper(size) === '58mm' ? 32 : 42;
-}
-
-function receiptText(id) {
-    return String(document.getElementById(id)?.textContent || '').trim();
 }
 
 function buildOrderLockLabel(order = {}) {
@@ -5435,105 +5386,6 @@ function renderFolioBarcodes(folio) {
     });
 }
 
-function receiptRepeat(char, width) {
-    return String(char).repeat(width);
-}
-
-function receiptLine(width) {
-    return receiptRepeat('_', width);
-}
-
-function receiptCenter(value, width) {
-    const text = String(value || '').trim();
-    if (text.length >= width) return text.slice(0, width);
-    const left = Math.floor((width - text.length) / 2);
-    return `${' '.repeat(left)}${text}`;
-}
-
-function receiptWrap(value, width) {
-    const words = String(value || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
-    const lines = [];
-    let current = '';
-
-    words.forEach(word => {
-        if (word.length > width) {
-            if (current) {
-                lines.push(current);
-                current = '';
-            }
-            for (let i = 0; i < word.length; i += width) {
-                lines.push(word.slice(i, i + width));
-            }
-            return;
-        }
-
-        const next = current ? `${current} ${word}` : word;
-        if (next.length > width) {
-            lines.push(current);
-            current = word;
-        } else {
-            current = next;
-        }
-    });
-
-    if (current) lines.push(current);
-    return lines.length ? lines : [''];
-}
-
-function receiptField(lines, label, value, width) {
-    const prefix = `${label}: `;
-    const wrapped = receiptWrap(value || '-', Math.max(8, width - prefix.length));
-    lines.push(`${prefix}${wrapped[0]}`.slice(0, width));
-    wrapped.slice(1).forEach(line => lines.push(`${' '.repeat(prefix.length)}${line}`.slice(0, width)));
-}
-
-function receiptOptionalField(lines, label, value, width, options = {}) {
-    if (!hasReceiptValue(value, options)) return false;
-    receiptField(lines, label, value, width);
-    return true;
-}
-
-function receiptOptionalSection(lines, title, fields, width) {
-    const sectionLines = [];
-    fields.forEach(field => receiptOptionalField(sectionLines, field.label, field.value, width, field.options));
-    if (!sectionLines.length) return false;
-
-    lines.push(receiptLine(width));
-    lines.push(receiptCenter(title, width));
-    lines.push(...sectionLines);
-    return true;
-}
-
-function receiptMoney(value) {
-    const numeric = Number(String(value || '').replace(/[^0-9.-]/g, ''));
-    return Number.isFinite(numeric) ? `$${numeric.toFixed(2)}` : String(value || '$0.00');
-}
-
-function receiptColumns(values, widths, aligns = []) {
-    return values.map((value, index) => {
-        const text = String(value || '');
-        const width = widths[index];
-        const truncated = text.length > width ? text.slice(0, width) : text;
-        if (aligns[index] === 'right') return truncated.padStart(width, ' ');
-        if (aligns[index] === 'center') return truncated.padStart(Math.floor((width + truncated.length) / 2), ' ').padEnd(width, ' ');
-        return truncated.padEnd(width, ' ');
-    }).join(' ');
-}
-
-function receiptHeader(lines, width, title, subtitle = '') {
-    lines.push(receiptCenter(ESTABLISHMENT_CONFIG.name.toUpperCase(), width));
-    if (subtitle) lines.push(receiptCenter(subtitle, width));
-    receiptWrap(`${ESTABLISHMENT_CONFIG.address} Tel: ${ESTABLISHMENT_CONFIG.phone}`, width)
-        .forEach(line => lines.push(receiptCenter(line, width)));
-    const contactLine = getTicketContactLine();
-    if (contactLine) {
-        receiptWrap(contactLine, width).forEach(line => lines.push(receiptCenter(line, width)));
-    }
-    lines.push(receiptLine(width));
-    lines.push(receiptCenter(title, width));
-    lines.push(receiptLine(width));
-}
-
 function getSaleReceiptKind(sale) {
     const items = sale?.items || [];
     const hasRepair = items.some(item => item.tipo_item === 'reparacion' || item.tipo === 'reparacion' || item.type === 'repair');
@@ -5565,162 +5417,6 @@ function getSaleReceiptKind(sale) {
     };
 }
 
-function buildSaleReceiptText(size) {
-    const width = getReceiptTextWidth(size);
-    const is58 = size === '58mm';
-    const qtyWidth = 4;
-    const priceWidth = is58 ? 6 : 8;
-    const totalWidth = is58 ? 7 : 8;
-    const conceptWidth = width - qtyWidth - priceWidth - totalWidth - 3;
-    const lines = [];
-    const saleKind = {
-        title: receiptText('ticket-venta-type-label').toUpperCase() || 'TICKET DE VENTA',
-        note: receiptText('ticket-venta-service-note') || 'Gracias por su preferencia'
-    };
-
-    receiptHeader(lines, width, saleKind.title);
-    receiptField(lines, 'Venta', receiptText('ticket-venta-id'), width);
-    receiptField(lines, 'Fecha', receiptText('ticket-venta-date').replace(/^Fecha:\s*/i, ''), width);
-    receiptField(lines, 'Pago', receiptText('ticket-venta-paymethod'), width);
-    lines.push(receiptLine(width));
-
-    const ticketRows = Array.from(document.querySelectorAll('#ticket-venta-items-table tbody tr'));
-    const hasProductRows = ticketRows.some(row => !row.classList.contains('ticket-sale-group-row') && !row.classList.contains('ticket-repair-detail-row'));
-    if (hasProductRows) {
-        lines.push(receiptColumns(['Cant', 'Concepto', 'P.U.', 'Total'], [qtyWidth, conceptWidth, priceWidth, totalWidth], ['center', 'left', 'right', 'right']));
-        lines.push(receiptLine(width));
-    }
-
-    ticketRows.forEach(row => {
-        if (row.classList.contains('ticket-sale-group-row')) {
-            const label = row.textContent.trim();
-            if (label) {
-                lines.push(receiptLine(width));
-                lines.push(receiptCenter(label.toUpperCase(), width));
-                lines.push(receiptLine(width));
-            }
-            return;
-        }
-
-        if (row.classList.contains('ticket-repair-detail-row')) {
-            row.querySelectorAll('.ticket-repair-detail p').forEach(paragraph => {
-                receiptWrap(paragraph.textContent.trim(), width).forEach(line => lines.push(line));
-            });
-            return;
-        }
-
-        const cells = Array.from(row.children).map(cell => cell.textContent.trim());
-        const conceptLines = receiptWrap(cells[1] || 'Producto', conceptWidth);
-        lines.push(receiptColumns([
-            cells[0] || '1',
-            conceptLines[0],
-            receiptMoney(cells[2]),
-            receiptMoney(cells[3])
-        ], [qtyWidth, conceptWidth, priceWidth, totalWidth], ['center', 'left', 'right', 'right']));
-        conceptLines.slice(1).forEach(line => {
-            lines.push(receiptColumns(['', line, '', ''], [qtyWidth, conceptWidth, priceWidth, totalWidth]));
-        });
-    });
-
-    lines.push(receiptLine(width));
-    receiptField(lines, 'Subtotal', receiptMoney(receiptText('ticket-venta-subtotal')), width);
-    receiptField(lines, 'Descuento', receiptMoney(receiptText('ticket-venta-discount')), width);
-    lines.push(receiptColumns(['TOTAL', receiptMoney(receiptText('ticket-venta-total'))], [width - 12, 11], ['left', 'right']));
-    receiptField(lines, 'Efectivo', receiptMoney(receiptText('ticket-venta-cash')), width);
-    receiptField(lines, 'Transfer.', receiptMoney(receiptText('ticket-venta-transfer')), width);
-    const transferReference = receiptText('ticket-venta-reference');
-    if (transferReference && transferReference !== '-') {
-        receiptField(lines, 'Ref.', transferReference, width);
-    }
-    receiptField(lines, 'Cambio', receiptMoney(receiptText('ticket-venta-change')), width);
-    const observations = receiptText('ticket-venta-observations');
-    if (observations && observations !== 'Sin observaciones') {
-        lines.push(receiptLine(width));
-        lines.push('Observaciones:');
-        receiptWrap(observations, width).forEach(line => lines.push(line));
-    }
-    lines.push(receiptLine(width));
-    lines.push(receiptCenter(saleKind.note, width));
-    lines.push('');
-    lines.push('');
-    return lines.join('\n');
-}
-
-function buildOrderReceiptText(size) {
-    const width = getReceiptTextWidth(size);
-    const lines = [];
-
-    receiptHeader(lines, width, 'FOLIO DE SERVICIO', 'Servicio Técnico Profesional');
-    lines.push(receiptCenter(receiptText('ticket-val-folio'), width));
-    lines.push(receiptCenter(receiptText('ticket-val-date'), width));
-
-    receiptOptionalSection(lines, 'DATOS DEL CLIENTE', [
-        { label: 'Nombre', value: receiptText('ticket-val-client-name') },
-        { label: 'Teléfono', value: receiptText('ticket-val-client-phone') },
-        { label: 'Correo', value: receiptText('ticket-val-client-email') }
-    ], width);
-
-    receiptOptionalSection(lines, 'DATOS DEL EQUIPO', [
-        { label: 'Equipo', value: receiptText('ticket-val-device') },
-        { label: 'Accesorios', value: receiptText('ticket-val-accessories') }
-    ], width);
-
-    receiptOptionalSection(lines, 'DETALLE TÉCNICO', [
-        { label: 'Falla Reportada', value: receiptText('ticket-val-falla') },
-        { label: 'Servicio a realizar', value: receiptText('ticket-val-desc') },
-        { label: 'Inspección', value: receiptText('ticket-val-inspection') }
-    ], width);
-
-    const moneyLines = [];
-    receiptOptionalField(moneyLines, 'Costo Estimado', receiptText('ticket-val-cost-est'), width);
-    receiptOptionalField(moneyLines, 'Anticipo Dejado', receiptText('ticket-val-advance'), width, { zeroIsEmpty: true });
-    if (hasReceiptValue(receiptText('ticket-val-pending'), { zeroIsEmpty: true })) {
-        moneyLines.push(receiptLine(width));
-        moneyLines.push(receiptCenter(`PAGAR AL ENTREGAR: ${receiptText('ticket-val-pending')}`, width));
-        moneyLines.push(receiptLine(width));
-    }
-    if (moneyLines.length) {
-        lines.push(receiptLine(width));
-        lines.push(receiptCenter('INFORMACIÓN ECONÓMICA', width));
-        lines.push(...moneyLines);
-    }
-
-    lines.push(receiptLine(width));
-    receiptWrap(receiptText('ticket-rec-legal-text'), width).forEach(line => lines.push(line));
-    lines.push(receiptLine(width));
-    lines.push(receiptCenter('Firma de Conformidad del Cliente', width));
-    lines.push('________________________________');
-    lines.push('');
-    lines.push('');
-    return lines.join('\n');
-}
-
-function buildLabelReceiptText(size) {
-    const width = getReceiptTextWidth(size);
-    const lines = [];
-    lines.push(receiptCenter(receiptText('thermal-business-name'), width));
-    lines.push(receiptCenter('||| | |||| | || ||| ||', width));
-    lines.push(receiptCenter(receiptText('thermal-val-folio'), width));
-    lines.push(receiptLine(width));
-    receiptField(lines, 'Cliente', receiptText('thermal-val-client'), width);
-    receiptOptionalField(lines, 'Tel', receiptText('thermal-val-phone'), width);
-    receiptField(lines, 'Equipo', receiptText('thermal-val-device'), width);
-    receiptOptionalField(lines, 'Bloqueo', receiptText('thermal-val-lock'), width);
-    receiptField(lines, 'Fecha', receiptText('thermal-val-date'), width);
-    lines.push('');
-    return lines.join('\n');
-}
-
-function buildDirectReceiptText(size) {
-    if (!document.getElementById('ticket-venta-container')?.classList.contains('hidden')) {
-        return buildSaleReceiptText(size);
-    }
-    if (!document.getElementById('etiqueta-pequena-container')?.classList.contains('hidden')) {
-        return buildLabelReceiptText(size);
-    }
-    return buildOrderReceiptText(size);
-}
-
 function setReceiptPrintBusy(isBusy) {
     [receiptPrint80Button, receiptBrowserPrintButton, saleSuccessPrintButton].forEach(button => {
         if (!button) return;
@@ -5730,53 +5426,40 @@ function setReceiptPrintBusy(isBusy) {
     if (receiptPrint80Button) {
         receiptPrint80Button.innerHTML = isBusy
             ? '<i class="fa-solid fa-spinner fa-spin"></i> Enviando ticket...'
-            : '<i class="fa-solid fa-print"></i> Imprimir ticket';
+            : '<i class="fa-solid fa-print"></i> ' + (getActiveReceiptElement()?.id === 'ticket-venta-container' ? 'Imprimir ticket de venta' : 'Imprimir ticket del cliente');
     }
 }
 
+function getAuthorizedPrintRequest(explicitType) {
+    const element = getActiveReceiptElement();
+    const type = explicitType || (element?.id === 'ticket-venta-container' ? 'sale'
+        : element?.id === 'ticket-corte-container' ? 'cashClosing' : 'service');
+    const raw = type === 'sale' ? APP_STATE.selectedSaleForReceipt
+        : type === 'cashClosing' ? APP_STATE.selectedCajaForReceipt : APP_STATE.selectedOrderForReceipt;
+    if (!raw || !window.authorizeTicketData) throw new Error('Abre una orden, venta o corte para imprimir.');
+    // Queue identity stays in memory only and is never part of the printable model.
+    return { type, jobKey: `${type}:${raw.id || raw.folio || ''}`, data: window.authorizeTicketData(type, raw, ESTABLISHMENT_CONFIG) };
+}
+
 async function printReceipt(size, options = {}) {
-    if (!window.printerService) {
-        if (!options.silent) {
-            AllfixUI.notify('Servicio de impresion no está disponible. Puedes utilizar la impresión normal del navegador.');
-        }
-        return false;
-    }
-
-    const activeReceiptElement = getActiveReceiptElement();
-    if (activeReceiptElement) {
-        refreshReceiptOptionalSections(activeReceiptElement);
-    }
-    const detectedPaper = normalizeTicketPaper(
-        size || detectConfiguredTicketPaper()
-    );
-
     setReceiptPrintBusy(true);
-
     try {
-        const receiptElement = activeReceiptElement;
-        if (!receiptElement) {
-            throw new Error('No hay un ticket listo para imprimir.');
+        if (!window.printerManager) throw new Error('El servicio de impresión no está disponible. Recarga la página.');
+        const request = getAuthorizedPrintRequest(options.type);
+        if (request.type === 'equipmentLabel' && window.printerManager.resolveMethod() === 'browser') {
+            throw new Error('La etiqueta requiere la impresora ESC/POS configurada. Conecta QZ Tray para imprimirla.');
         }
-
-        if (window.printerService.isNative() && typeof html2canvas !== 'function') {
-            throw new Error('No se pudo cargar el generador de imagen del ticket. Recarga el sistema e intenta de nuevo.');
-        }
-
-        const result = await sendReceiptPreviewToPrinter(receiptElement, detectedPaper);
-        if (!options.silent) {
-            AllfixUI.notify(`Ticket enviado a ${result.printerName}.`);
-        }
+        const result = await window.printerManager.print({ ...request, reprint: options.reprint === true,
+            printerConfig: { ...(size ? { paperWidth: normalizeTicketPaper(size) } : {}),
+                ...(options.browser ? { connection: 'browser' } : {}) } });
+        if (!options.silent) AllfixUI.notify(result.warning || ('Ticket enviado a ' + result.printerName + '.'));
         return true;
-    } catch (err) {
-        console.error('Error de impresion:', err);
-        {
-            const message = err.userMessage || err.message || 'No se pudo enviar el ticket a la impresora.';
-            AllfixUI.notify(`${message}\n\nPuedes utilizar la impresión normal del navegador.`);
-        }
+    } catch (error) {
+        const message = APP_STATE.selectedSaleForReceipt && getActiveReceiptElement()?.id === 'ticket-venta-container'
+            ? 'Venta completada, ticket pendiente de impresión' : 'Ticket pendiente de impresión';
+        AllfixUI.notify(message + '. ' + error.message);
         return false;
-    } finally {
-        setReceiptPrintBusy(false);
-    }
+    } finally { setReceiptPrintBusy(false); }
 }
 
 function getActiveReceiptElement() {
@@ -5789,7 +5472,7 @@ function getActiveReceiptElement() {
     return candidates.find(element => element && !element.classList.contains('hidden')) || null;
 }
 
-async function captureReceiptPreviewImage(receiptElement, paper, options = {}) {
+async function captureReceiptPreviewImage(receiptElement, paper) {
     const detectedPaper = normalizeTicketPaper(paper);
     const widthMm = detectedPaper === '58mm' ? 58 : 80;
     const targetWidthPx = getThermalPrintWidthPx(detectedPaper);
@@ -5807,9 +5490,7 @@ async function captureReceiptPreviewImage(receiptElement, paper, options = {}) {
 
     try {
         if (document.fonts?.ready) await document.fonts.ready;
-        const renderScale = options.digital
-            ? 1200 / Math.max(1, captureNode.getBoundingClientRect().width)
-            : Math.max(THERMAL_CAPTURE_SCALE, window.devicePixelRatio || 1);
+        const renderScale = 1200 / Math.max(1, captureNode.getBoundingClientRect().width);
         const sourceCanvas = await html2canvas(captureNode, {
             backgroundColor: '#ffffff',
             scale: renderScale,
@@ -5818,92 +5499,17 @@ async function captureReceiptPreviewImage(receiptElement, paper, options = {}) {
             logging: false,
             removeContainer: true
         });
-        if (options.digital) {
-            const blob = await new Promise((resolve, reject) => sourceCanvas.toBlob(
-                value => value ? resolve(value) : reject(new Error('No se pudo generar el PNG.')),
-                'image/png'
-            ));
-            return { blob, pixelWidth: sourceCanvas.width, pixelHeight: sourceCanvas.height };
-        }
-        const outputCanvas = normalizeReceiptCanvasForThermalPrint(sourceCanvas, targetWidthPx);
-
-        return {
-            imageData: outputCanvas.toDataURL('image/png'),
-            pixelWidth: outputCanvas.width,
-            pixelHeight: outputCanvas.height,
-            sourcePixelWidth: sourceCanvas.width,
-            sourcePixelHeight: sourceCanvas.height,
-            renderScale: Math.max(THERMAL_CAPTURE_SCALE, window.devicePixelRatio || 1)
-        };
+        const blob = await new Promise((resolve, reject) => sourceCanvas.toBlob(
+            value => value ? resolve(value) : reject(new Error('No se pudo generar el PNG.')), 'image/png'
+        ));
+        return { blob, pixelWidth: sourceCanvas.width, pixelHeight: sourceCanvas.height };
     } finally {
         captureStage.remove();
     }
 }
 
-function normalizeReceiptCanvasForThermalPrint(sourceCanvas, targetWidthPx) {
-    const outputCanvas = document.createElement('canvas');
-    const aspectRatio = sourceCanvas.height / Math.max(1, sourceCanvas.width);
-    outputCanvas.width = targetWidthPx;
-    outputCanvas.height = Math.max(1, Math.ceil(targetWidthPx * aspectRatio));
-
-    const context = outputCanvas.getContext('2d', { alpha: false });
-    context.fillStyle = '#ffffff';
-    context.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
-    // Average the high-resolution capture before thresholding. Nearest-neighbor
-    // downsampling can discard thin strokes entirely between sampled pixels.
-    context.imageSmoothingEnabled = true;
-    context.imageSmoothingQuality = 'high';
-    context.drawImage(sourceCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
-
-    // Las impresoras térmicas pierden contraste con grises y bordes suavizados.
-    // Convertir el ticket a blanco/negro puro mantiene letras y códigos definidos.
-    const imageData = context.getImageData(0, 0, outputCanvas.width, outputCanvas.height);
-    const pixels = imageData.data;
-    for (let index = 0; index < pixels.length; index += 4) {
-        const luminance = (pixels[index] * 0.299)
-            + (pixels[index + 1] * 0.587)
-            + (pixels[index + 2] * 0.114);
-        const thermalColor = luminance < 215 ? 0 : 255;
-        pixels[index] = thermalColor;
-        pixels[index + 1] = thermalColor;
-        pixels[index + 2] = thermalColor;
-        pixels[index + 3] = 255;
-    }
-    context.putImageData(imageData, 0, 0);
-
-    return outputCanvas;
-}
-
-async function sendReceiptPreviewToPrinter(receiptElement, paper) {
-    const detectedPaper = normalizeTicketPaper(paper);
-    if (!window.printerService.isNative()) return window.printerService.printTicket({ paperWidth: detectedPaper });
-    const capture = await captureReceiptPreviewImage(receiptElement, detectedPaper);
-    const preferences = window.printerService.readPreferences();
-    return window.printerService.printImageTicket({
-        imageData: capture.imageData,
-        pixelWidth: capture.pixelWidth,
-        pixelHeight: capture.pixelHeight,
-        density: THERMAL_PRINT_DPI,
-        printerName: preferences.printerName,
-        paperWidth: detectedPaper,
-        jobName: 'Allfix - Ticket térmico'
-    });
-}
-
 function printReceiptBrowser(size) {
-    const activeReceiptElement = getActiveReceiptElement();
-    if (!activeReceiptElement) {
-        AllfixUI.notify('No hay un ticket listo para imprimir.');
-        return false;
-    }
-
-    const detectedPaper = normalizeTicketPaper(
-        size || detectConfiguredTicketPaper()
-    );
-    refreshReceiptOptionalSections(activeReceiptElement);
-    setReceiptPrintSize(detectedPaper);
-    window.print();
-    return true;
+    return printReceipt(size, { browser: true });
 }
 
 function showSaleSuccessModal(sale, options = {}) {
@@ -5921,9 +5527,9 @@ function showSaleSuccessModal(sale, options = {}) {
     if (title) title.textContent = `${saleKind.label} confirmado`;
     if (message) {
         message.textContent = printed
-            ? 'El cobro se registró y el ticket se envió a imprimir con el mismo diseño de la previsualización.'
+            ? 'Venta completada. Ticket enviado a impresión.'
             : directMode
-                ? 'El cobro se registró. Revisa la impresora o imprime manualmente el ticket.'
+                ? 'Venta completada, ticket pendiente de impresión'
                 : 'El cobro se registró. Puedes imprimir el ticket ahora o revisarlo antes.';
     }
     if (total) total.textContent = `$${normalizedSale.total.toFixed(2)}`;
@@ -5945,9 +5551,75 @@ async function handleCompletedSale(completedVenta) {
     showSaleSuccessModal(completedVenta, { printed });
 }
 
+window.printEquipmentLabel = async () => {
+    const button = document.getElementById('btn-print-equipment-label');
+    if (button.disabled) return;
+    button.disabled = true;
+    try {
+        const id = APP_STATE.selectedOrderForReceipt?.id;
+        if (!id) throw new Error('Abre el detalle de la orden.');
+        // Reuse the authenticated detail endpoint and its existing access checks.
+        const response = await fetch(`${BASE_API_URL}/ordenes/${id}`);
+        if (!response.ok) throw new Error('No se pudo obtener el detalle autorizado de la orden.');
+        APP_STATE.selectedOrderForReceipt = await response.json();
+        return await printReceipt(null, { type: 'equipmentLabel' });
+    } catch (error) { AllfixUI.notify(error.message); return false; }
+    finally { button.disabled = false; }
+};
 window.printReceipt = printReceipt;
 window.printReceiptBrowser = printReceiptBrowser;
-window.addEventListener('afterprint', clearReceiptPrintSize);
+
+// UI selection only: all jobs continue through the existing print functions and queue.
+const orderPrintSelector = document.getElementById('order-print-selector');
+let orderPrintBusy = false;
+let orderPrintOptions = {};
+window.openOrderPrintSelector = (options = {}) => {
+    if (orderPrintBusy || orderPrintSelector.open) return;
+    if (!APP_STATE.selectedOrderForReceipt) { AllfixUI.notify('Abre el detalle de la orden.'); return; }
+    orderPrintOptions = options;
+    document.getElementById('order-print-selector-status').textContent = '';
+    orderPrintSelector.showModal();
+};
+window.requestReceiptPrint = (options = {}) => {
+    const element = getActiveReceiptElement();
+    if (['ticket-venta-container', 'ticket-corte-container'].includes(element?.id)) return printReceipt(null, options);
+    window.openOrderPrintSelector(options);
+};
+function closeOrderPrintSelector() {
+    if (!orderPrintBusy) orderPrintSelector.close();
+}
+for (const id of ['order-print-selector-close', 'order-print-selector-cancel']) {
+    document.getElementById(id).addEventListener('click', closeOrderPrintSelector);
+}
+orderPrintSelector.addEventListener('cancel', event => {
+    if (orderPrintBusy) event.preventDefault();
+});
+async function chooseOrderPrint(type) {
+    if (orderPrintBusy) return;
+    orderPrintBusy = true;
+    const status = document.getElementById('order-print-selector-status');
+    const controls = [...orderPrintSelector.querySelectorAll('button')];
+    // Equipment printing has its own existing click guard; invoke it before disabling controls.
+    const work = type === 'equipmentLabel' ? window.printEquipmentLabel()
+        : printReceipt(null, { ...orderPrintOptions, type: 'service' });
+    controls.forEach(button => { button.disabled = true; });
+    orderPrintSelector.setAttribute('aria-busy', 'true');
+    status.textContent = 'Enviando a impresión…';
+    try {
+        if (await work) orderPrintSelector.close();
+        else status.textContent = 'No se pudo imprimir. Selecciona la opción otra vez para reintentar el trabajo pendiente.';
+    } catch (error) {
+        status.textContent = error.message;
+    } finally {
+        orderPrintBusy = false;
+        controls.forEach(button => { button.disabled = false; });
+        orderPrintSelector.removeAttribute('aria-busy');
+    }
+}
+document.getElementById('order-print-customer').addEventListener('click', () => chooseOrderPrint('service'));
+document.getElementById('btn-print-equipment-label').addEventListener('click', () => chooseOrderPrint('equipmentLabel'));
+
+
 
 function getConfiguredTicketPaper() {
     return detectConfiguredTicketPaper();
@@ -5955,7 +5627,7 @@ function getConfiguredTicketPaper() {
 
 async function viewOrderDetails(id, options = {}) {
     receiptModal.classList.remove('sale-ticket-only');
-    setReceiptPrintLabels('Ticket Térmico');
+    setReceiptPrintLabels('ticket del cliente');
 
     const response = await fetch(`${BASE_API_URL}/ordenes/${id}`);
     if (!response.ok) {
@@ -6040,7 +5712,8 @@ async function viewOrderDetails(id, options = {}) {
     document.getElementById('thermal-val-client').innerText = o.clientName;
     setReceiptFieldText('thermal-val-phone', o.clientPhone);
     document.getElementById('thermal-val-device').innerText = deviceLabel;
-    setReceiptFieldText('thermal-val-lock', buildOrderLockLabel(o));
+    // Access secrets belong exclusively to the internal ESC/POS label.
+    setReceiptFieldText('thermal-val-lock', '');
     document.getElementById('thermal-val-date').innerText = o.dateIn;
 
     refreshReceiptOptionalSections(document.getElementById('ticket-recepcion-container'));
@@ -6817,8 +6490,7 @@ async function printSelectedCajaCorte() {
     document.getElementById('btn-show-ticket-corte')?.click();
     receiptModal?.classList.remove('sale-ticket-only');
     setReceiptPrintLabels('Corte de Caja');
-    if (window.printerService?.isNative()) await printReceipt();
-    else receiptModal?.classList.remove('hidden');
+    await printReceipt();
 }
 
 // ==========================================
@@ -7025,7 +6697,10 @@ function initPOS() {
                 return;
             }
 
-            viewVentaDetails(lastSale);
+            viewVentaDetails(lastSale, { openPreview: false });
+            await printReceipt(null, { reprint: true });
+        } catch (error) {
+            AllfixUI.notify(error.message || 'Ticket pendiente de impresión.');
         } finally {
             printLastTicketButton.disabled = false;
             printLastTicketButton.classList.remove('disabled');
@@ -7297,7 +6972,6 @@ window.viewVentaDetails = function(venta, options = {}) {
         return;
     }
 
-    if (window.printerService?.isNative()) return printReceipt();
     receiptModal.classList.remove('hidden');
 };
 
@@ -9751,6 +9425,7 @@ async function loadEstablishmentConfig() {
     }
 
     if (window.printerService) {
+        window.printerManager?.setScope([APP_STATE.currentUser?.negocio_id || 'default', APP_STATE.currentUser?.sucursal_id || 'default'].join('-'));
         const localPrintPreferences = window.printerService.readPreferences();
         ESTABLISHMENT_CONFIG.ticketPrinter = localPrintPreferences.printerName;
         ESTABLISHMENT_CONFIG.ticketPaper = localPrintPreferences.paperWidth;
@@ -9828,7 +9503,7 @@ function syncConfigForms() {
     if (instagramInput) instagramInput.value = socials.instagram || '';
     if (addressInput) addressInput.value = ESTABLISHMENT_CONFIG.address;
     if (termsTextarea) termsTextarea.value = ESTABLISHMENT_CONFIG.terms;
-    if (paperDetected) paperDetected.textContent = getDetectedPaperLabel();
+    if (paperDetected) paperDetected.textContent = detectConfiguredTicketPaper().replace('mm', ' mm');
     if (printModeSelect) printModeSelect.value = ESTABLISHMENT_CONFIG.autoPrintTicket !== false ? 'direct' : 'ask';
     setBusinessLogoPreview();
     setTicketLogoPreview();
@@ -9901,10 +9576,6 @@ function initEstablishmentConfigForm() {
     }));
 }
 
-async function detectAvailablePrinters() {
-    return window.printerService.getPrinters();
-}
-
 function applyOrderTicketHeaderContactInfo() {
     const socials = parseSocialProfiles();
     const socialHandle = socials.instagram || socials.tiktok || socials.facebook || socials.raw || '@allfixbacalar';
@@ -9921,55 +9592,6 @@ function applyOrderTicketHeaderContactInfo() {
     }
 }
 
-function normalizePrinterInfo(printer) {
-    if (typeof printer === 'string') {
-        return { name: printer, isDefault: false, paperMm: null, ticketPaper: null };
-    }
-
-    return {
-        name: printer?.name || printer?.displayName || printer?.printerName || '',
-        isDefault: Boolean(printer?.isDefault || printer?.default),
-        paperMm: printer?.paperMm || printer?.paperWidthMm || null,
-        ticketPaper: printer?.ticketPaper || normalizeTicketPaper(printer?.paperMm || printer?.paperWidthMm)
-    };
-}
-
-function getDetectedPaperLabel() {
-    const printer = getSelectedPrinterMeta();
-    const paper = detectConfiguredTicketPaper();
-    const details = printer?.paperMm ? ` (${Number(printer.paperMm).toFixed(0)} mm detectados)` : '';
-    return `${paper.replace('mm', ' mm')}${details}`;
-}
-
-function refreshDetectedPaperLabel() {
-    const paperDetected = document.getElementById('cfg-ticket-paper-detected');
-    if (paperDetected) paperDetected.textContent = getDetectedPaperLabel();
-}
-
-function populatePrinterOptions(printers = [], selectedPrinter = ESTABLISHMENT_CONFIG.ticketPrinter || '') {
-    const printerSelect = document.getElementById('cfg-ticket-printer');
-    if (!printerSelect) return;
-
-    AVAILABLE_TICKET_PRINTERS = printers.map(normalizePrinterInfo).filter(printer => printer.name);
-    const uniqueNames = [...new Set(AVAILABLE_TICKET_PRINTERS.map(printer => printer.name))];
-    if (selectedPrinter && !uniqueNames.includes(selectedPrinter)) {
-        uniqueNames.unshift(selectedPrinter);
-        AVAILABLE_TICKET_PRINTERS.unshift({ name: selectedPrinter, isDefault: false, paperMm: null, ticketPaper: ESTABLISHMENT_CONFIG.ticketPaper });
-    }
-
-    printerSelect.innerHTML = [
-        '<option value="">Impresora predeterminada del sistema</option>',
-        ...uniqueNames
-            .map(printer => `<option value="${escapeHtml(printer)}">${escapeHtml(printer)}</option>`)
-    ].join('');
-
-    printerSelect.value = selectedPrinter || '';
-    refreshDetectedPaperLabel();
-}
-
-// ==========================================
-// GRÁFICO SVG MENSUAL DINÁMICO (ÚLTIMOS 6 MESES)
-// ==========================================
 function updateDashboardChart() {
     const chart = document.querySelector('.dashboard-chart');
     if (!chart) return;
@@ -10592,6 +10214,6 @@ function openEditEventModal(eventId) {
 }
 
 async function printOrderTicket(id) {
-    await viewOrderDetails(id, { openPreview: !window.printerService?.isNative() });
-    if (window.printerService?.isNative()) await printReceipt();
+    const opened = await viewOrderDetails(id, { openPreview: false });
+    if (opened !== false) window.openOrderPrintSelector();
 }
