@@ -76,8 +76,8 @@ export class TicketBuilder {
     if (!template) throw new Error('Tipo de ticket no compatible.');
     // Templates select fields explicitly. Raw objects and internal identifiers never enter the queue.
     return { type, lines: [line('Allfix Bacalar', { align: 'center', bold: true, large: true }),
-      line('Servicio técnico y accesorios', { align: 'center' }),
-      ...field('Contacto', data.businessContact), separator, ...template(data)],
+      line('REPARACIÓN DE EQUIPOS MÓVILES', { align: 'center' }),
+      ...field('WhatsApp', data.businessContact), separator, ...template(data)],
       logoUrl: typeof data.logoUrl === 'string' ? data.logoUrl : '' };
   }
 }
