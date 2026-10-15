@@ -1,5 +1,9 @@
 # Corrección del aislamiento — 2026-10-14
 
+Para el aprovisionamiento de producción y las referencias exactas de Railway,
+consultar [RAILWAY_PRODUCTION.md](RAILWAY_PRODUCTION.md). No cambiar pgConfig.js
+para aceptar postgres como login del backend.
+
 Este documento sustituye la conclusión pendiente de RLS_AUDIT.md; ese informe
 se conserva como evidencia del estado anterior. Los resultados finales de la
 auditoría real se guardan localmente en db/backups/rls-approved-live.json.
