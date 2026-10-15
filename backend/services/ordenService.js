@@ -103,7 +103,7 @@ async function findDuplicateCliente(data = {}) {
   if (!fullName) return null;
 
   const nameResult = await pool.query(
-    'SELECT id, nombre, apellido_paterno, apellido_materno, telefono_principal FROM clientes WHERE activo = true'
+    'SELECT id, nombre, apellido_paterno, apellido_materno, telefono_principal FROM clientes WHERE negocio_id = app_tenant_id() AND activo = true'
   );
   const cliente = nameResult.rows.find(row => buildComparableClientFullNameFromRow(row) === fullName);
   return cliente ? { type: 'possible', reason: 'name', cliente } : null;
@@ -214,7 +214,7 @@ async function getEvidenciasOrden(ordenId, options = {}, db = pool) {
     `SELECT e.*, u.nombre as usuario_nombre
      FROM evidencias_orden e
      LEFT JOIN usuarios u ON e.usuario_id = u.id
-     WHERE e.orden_id = $1 ${visibleClause}
+     WHERE e.negocio_id=app_tenant_id() AND e.orden_id = $1 ${visibleClause}
      ORDER BY e.fecha_subida ASC, e.id ASC`,
     [ordenId]
   );
@@ -342,7 +342,7 @@ function buildOrderFinancials(data = {}) {
 async function validateNewOrderRefaccionesStock(refacciones) {
   for (const item of refacciones) {
     const prodRes = await pool.query(
-      'SELECT nombre, stock, activo FROM inventario WHERE id = $1',
+      'SELECT nombre, stock, activo FROM inventario WHERE negocio_id = app_tenant_id() AND id = $1',
       [item.producto_id]
     );
     if (prodRes.rows.length === 0 || !prodRes.rows[0].activo) {
@@ -361,7 +361,7 @@ async function validateNewOrderRefaccionesStock(refacciones) {
 
 async function validateEditedOrderRefaccionesStock(ordenId, refacciones) {
   const currentRes = await pool.query(
-    'SELECT producto_id, cantidad FROM orden_refacciones WHERE orden_id = $1',
+    'SELECT producto_id, cantidad FROM orden_refacciones WHERE negocio_id=app_tenant_id() AND orden_id = $1',
     [ordenId]
   );
   const currentByProduct = new Map(currentRes.rows.map(row => [Number(row.producto_id), Number(row.cantidad || 0)]));
@@ -373,7 +373,7 @@ async function validateEditedOrderRefaccionesStock(ordenId, refacciones) {
     if (delta <= 0) continue;
 
     const prodRes = await pool.query(
-      'SELECT nombre, stock, activo FROM inventario WHERE id = $1',
+      'SELECT nombre, stock, activo FROM inventario WHERE negocio_id = app_tenant_id() AND id = $1',
       [productoId]
     );
     if (prodRes.rows.length === 0 || !prodRes.rows[0].activo) {
@@ -398,7 +398,7 @@ async function getOrdenRefacciones(ordenId, db = pool) {
             i.descripcion, i.categoria, i.stock as stock_disponible, i.precio as precio_actual
      FROM orden_refacciones opr
      JOIN inventario i ON i.id = opr.producto_id
-     WHERE opr.orden_id = $1
+     WHERE opr.negocio_id=app_tenant_id() AND opr.orden_id = $1
      ORDER BY opr.id ASC`,
     [ordenId]
   );
@@ -434,7 +434,7 @@ async function syncOrdenRefacciones(ordenId, nextRefacciones, options = {}) {
   const currentRes = await client.query(
     `SELECT producto_id, cantidad, precio_unitario, subtotal
      FROM orden_refacciones
-     WHERE orden_id = $1
+     WHERE negocio_id=app_tenant_id() AND orden_id = $1
      FOR UPDATE`,
     [ordenId]
   );
@@ -449,7 +449,7 @@ async function syncOrdenRefacciones(ordenId, nextRefacciones, options = {}) {
     const delta = nextQty - currentQty;
 
     const productRes = await client.query(
-      'SELECT id, nombre, codigo, stock, precio, activo FROM inventario WHERE id = $1 FOR UPDATE',
+      'SELECT id, nombre, codigo, stock, precio, activo FROM inventario WHERE negocio_id = app_tenant_id() AND id = $1 FOR UPDATE',
       [productoId]
     );
     if (productRes.rows.length === 0 || (!productRes.rows[0].activo && nextQty > 0)) {
@@ -469,7 +469,7 @@ async function syncOrdenRefacciones(ordenId, nextRefacciones, options = {}) {
     if (delta !== 0) {
       const stockNuevo = delta > 0 ? stockAnterior - delta : stockAnterior + Math.abs(delta);
       await client.query(
-        'UPDATE inventario SET stock = $1 WHERE id = $2',
+        'UPDATE inventario SET stock = $1 WHERE negocio_id = app_tenant_id() AND id = $2',
         [stockNuevo, productoId]
       );
       await client.query(
@@ -512,7 +512,7 @@ async function syncOrdenRefacciones(ordenId, nextRefacciones, options = {}) {
       }
     } else if (current) {
       await client.query(
-        'DELETE FROM orden_refacciones WHERE orden_id = $1 AND producto_id = $2',
+        'DELETE FROM orden_refacciones WHERE negocio_id=app_tenant_id() AND orden_id = $1 AND producto_id = $2',
         [ordenId, productoId]
       );
       historyMessages.push(`Refaccion eliminada: ${product.nombre}. Se regresaron ${currentQty} pz al inventario.`);
@@ -520,12 +520,12 @@ async function syncOrdenRefacciones(ordenId, nextRefacciones, options = {}) {
   }
 
   const totalRes = await client.query(
-    'SELECT COALESCE(SUM(subtotal), 0) AS total FROM orden_refacciones WHERE orden_id = $1',
+    'SELECT COALESCE(SUM(subtotal), 0) AS total FROM orden_refacciones WHERE negocio_id=app_tenant_id() AND orden_id = $1',
     [ordenId]
   );
   const totalRefacciones = Number(totalRes.rows[0]?.total || 0);
   await client.query(
-    'UPDATE ordenes_servicio SET costo_refaccion = $1, fecha_actualizacion = CURRENT_TIMESTAMP WHERE id = $2',
+    'UPDATE ordenes_servicio SET costo_refaccion = $1, fecha_actualizacion = CURRENT_TIMESTAMP WHERE negocio_id = app_tenant_id() AND id = $2',
     [totalRefacciones, ordenId]
   );
 
@@ -550,7 +550,7 @@ function formatOrderResponse(row, historial = [], evidencias = [], refacciones =
   const legacyPhotos = normalizePhotoList(row.fotografias);
   const evidencePhotos = evidencias.map(e => e.url_imagen || e.url).filter(Boolean);
   const fotos = evidencePhotos.length > 0 ? evidencePhotos : legacyPhotos;
-  
+
   let dateIn;
   if (row.fecha_creacion instanceof Date) {
     dateIn = row.fecha_creacion.toISOString().split('T')[0];
@@ -562,9 +562,10 @@ function formatOrderResponse(row, historial = [], evidencias = [], refacciones =
 
   return {
     id: row.id,
+    negocio_id: row.negocio_id,
     folio: row.folio,
     clientId: row.cliente_id,
-    
+
     // Cliente
     clientName: buildStoredClientDisplayName(row),
     clientLastNamePaternal: row.apellido_paterno || null,
@@ -663,7 +664,7 @@ function formatOrderResponse(row, historial = [], evidencias = [], refacciones =
     servicio_solicitado: row.servicio_solicitado || null,
     tipo_orden: row.tipo_orden || 'Reparación directa',
     pendiente_presupuesto: Boolean(row.pendiente_presupuesto),
-    
+
     historial: historial.map(h => ({
       estado: h.estado,
       fecha: h.fecha,
@@ -694,7 +695,7 @@ async function validateUserLogin(email, password) {
 }
 
 async function getAllUsuarios() {
-  const res = await pool.query('SELECT id, nombre, username, rol, activo FROM usuarios ORDER BY id ASC');
+  const res = await pool.query('SELECT id, nombre, username, rol, activo FROM usuarios WHERE negocio_id = app_tenant_id() ORDER BY id ASC');
   return res.rows;
 }
 
@@ -716,7 +717,7 @@ async function deleteUsuario(id) {
   if (id === 1) {
     throw new Error('No se puede eliminar el administrador principal.');
   }
-  await pool.query('UPDATE usuarios SET activo = false, session_version = session_version + 1 WHERE id = $1', [id]);
+  await pool.query('UPDATE usuarios SET activo = false, session_version = session_version + 1 WHERE negocio_id = app_tenant_id() AND id = $1', [id]);
   return true;
 }
 
@@ -725,7 +726,7 @@ async function deleteUsuario(id) {
 // --------------------------------------------------------
 
 async function getAllClientes() {
-  const res = await pool.query('SELECT * FROM clientes WHERE activo = true ORDER BY id DESC');
+  const res = await pool.query('SELECT * FROM clientes WHERE negocio_id=app_tenant_id() AND activo = true ORDER BY id DESC');
   return res.rows.map(c => ({
     id: c.id,
     nombre: c.nombre,
@@ -780,9 +781,9 @@ async function createCliente(data) {
 }
 
 async function updateCliente(id, data) {
-  await pool.query(
+  const result = await pool.query(
     `UPDATE clientes SET nombre = $1, apellido_paterno = $2, apellido_materno = $3, telefono_principal = $4, telefono_alternativo_1 = $5, telefono_alternativo_2 = $6, telefono_alternativo_3 = $7, correo = $8, direccion = $9, contacto_preferido = COALESCE($10, contacto_preferido), notas = $11
-     WHERE id = $12`,
+     WHERE negocio_id = app_tenant_id() AND id = $12`,
     [
       data.nombre || data.clientName,
       data.apellido_paterno || data.clientLastNamePaternal || null,
@@ -798,7 +799,7 @@ async function updateCliente(id, data) {
       id
     ]
   );
-  return { id, ...data };
+  return result.rowCount ? { id, ...data } : null;
 }
 
 async function getClienteByTelefono(telefono) {
@@ -824,7 +825,8 @@ async function getAllOrdenes() {
            u.nombre as tecnico_nombre
     FROM ordenes_servicio o
     JOIN clientes c ON o.cliente_id = c.id
-    LEFT JOIN usuarios u ON o.tecnico_id = u.id
+    LEFT JOIN usuarios u ON o.tecnico_id = u.id AND o.negocio_id=u.negocio_id
+    WHERE o.negocio_id=app_tenant_id()
     ORDER BY o.id DESC
   `);
 
@@ -833,7 +835,7 @@ async function getAllOrdenes() {
   const additionalRepairsByOrder = new Map();
   if (orderIds.length > 0) {
     const histories = await pool.query(
-      'SELECT orden_id, estado, fecha, comentario FROM historial_estados WHERE orden_id = ANY($1::int[]) ORDER BY orden_id ASC, id ASC',
+      'SELECT orden_id, estado, fecha, comentario FROM historial_estados WHERE negocio_id=app_tenant_id() AND orden_id = ANY($1::int[]) ORDER BY orden_id ASC, id ASC',
       [orderIds]
     );
     histories.rows.forEach(history => {
@@ -843,7 +845,7 @@ async function getAllOrdenes() {
     const additionalRepairs = await pool.query(
       `SELECT id, orden_id, descripcion, precio, usuario_id, fecha_creacion
        FROM orden_reparaciones_adicionales
-       WHERE orden_id = ANY($1::int[])
+       WHERE negocio_id=app_tenant_id() AND orden_id = ANY($1::int[])
        ORDER BY orden_id ASC, id ASC`,
       [orderIds]
     );
@@ -881,13 +883,13 @@ async function getOrdenById(id) {
            c.nombre as clientName, c.apellido_paterno, c.apellido_materno, c.telefono_principal as clientPhone, c.telefono_alternativo_1, c.telefono_alternativo_2, c.telefono_alternativo_3, c.correo, c.direccion, c.contacto_preferido, c.notas as clientRemarks
     FROM ordenes_servicio o
     JOIN clientes c ON o.cliente_id = c.id
-    WHERE o.id = $1
+    WHERE o.negocio_id = app_tenant_id() AND o.id = $1
   `, [id]);
 
   if (order.rows.length === 0) return null;
 
   const historial = await pool.query(
-    'SELECT estado, fecha, comentario FROM historial_estados WHERE orden_id = $1 ORDER BY id ASC',
+    'SELECT estado, fecha, comentario FROM historial_estados WHERE negocio_id=app_tenant_id() AND orden_id = $1 ORDER BY id ASC',
     [id]
   );
 
@@ -895,7 +897,7 @@ async function getOrdenById(id) {
   const refacciones = await getOrdenRefacciones(id);
   const additionalRepairs = await pool.query(
     `SELECT id, orden_id, descripcion, precio, usuario_id, fecha_creacion
-     FROM orden_reparaciones_adicionales WHERE orden_id = $1 ORDER BY id ASC`,
+     FROM orden_reparaciones_adicionales WHERE negocio_id=app_tenant_id() AND orden_id = $1 ORDER BY id ASC`,
     [id]
   );
   const formatted = formatOrderResponse({
@@ -934,7 +936,7 @@ async function addReparacionAdicional(ordenId, data = {}, usuarioId = 1) {
     await client.query('BEGIN');
     const orderResult = await client.query(
       `SELECT id, folio, estado, estado_pago, costo_estimado, costo_real
-       FROM ordenes_servicio WHERE id = $1 FOR UPDATE`,
+       FROM ordenes_servicio WHERE negocio_id = app_tenant_id() AND id = $1 FOR UPDATE`,
       [ordenId]
     );
     if (orderResult.rows.length === 0) {
@@ -986,7 +988,7 @@ async function addReparacionAdicional(ordenId, data = {}, usuarioId = 1) {
            END,
            costo_estimado = COALESCE(costo_estimado, 0) + $1,
            fecha_actualizacion = CURRENT_TIMESTAMP
-       WHERE id = $2
+       WHERE negocio_id = app_tenant_id() AND id = $2
        RETURNING costo_estimado, costo_real`,
       [precio, ordenId]
     );
@@ -1028,14 +1030,14 @@ async function getOrdenByFolio(folio) {
     FROM ordenes_servicio o
     JOIN clientes c ON o.cliente_id = c.id
     LEFT JOIN usuarios u ON o.tecnico_id = u.id
-    WHERE UPPER(TRIM(o.folio)) = UPPER(TRIM($1))
+    WHERE o.negocio_id=app_tenant_id() AND UPPER(TRIM(o.folio)) = UPPER(TRIM($1))
   `, [normalizedFolio]);
 
   if (order.rows.length === 0) return null;
   const o = order.rows[0];
 
   const historial = await pool.query(
-    'SELECT estado, fecha, comentario FROM historial_estados WHERE orden_id = $1 ORDER BY id ASC',
+    'SELECT estado, fecha, comentario FROM historial_estados WHERE negocio_id=app_tenant_id() AND orden_id = $1 ORDER BY id ASC',
     [o.id]
   );
 
@@ -1084,22 +1086,14 @@ async function createOrden(data) {
         direccion = COALESCE($6, direccion),
         contacto_preferido = COALESCE($7, contacto_preferido),
         notas = COALESCE($8, notas)
-       WHERE id = $9`,
+       WHERE negocio_id = app_tenant_id() AND id = $9`,
       [nombreParaCliente, apellidoPaterno, apellidoMaterno, telefonoCliente, data.clientEmail || data.email || null, data.clientAddress || data.direccion || null, contactoPreferido, data.clientRemarks || data.observaciones || null, clienteId]
     );
   }
 
   const activeYear = new Date().getFullYear();
-  const lastOrder = await pool.query("SELECT folio FROM ordenes_servicio WHERE folio LIKE $1 ORDER BY id DESC LIMIT 1", [`AFB-${activeYear}-%`]);
-  let nextNum = 10000;
-  if (lastOrder.rows.length > 0 && lastOrder.rows[0].folio) {
-    const parts = lastOrder.rows[0].folio.split('-');
-    if (parts.length === 3) {
-      const lastNum = parseInt(parts[2], 10);
-      if (!isNaN(lastNum)) nextNum = lastNum + 1;
-    }
-  }
-  const folio = `AFB-${activeYear}-${nextNum}`;
+  const allocated = await pool.query('SELECT allocate_order_folio($1) AS folio', [activeYear]);
+  const folio = allocated.rows[0].folio;
 
   const estado = 'Recibido';
   const usuarioId = data.usuario_creador_id || data.usuario_id || data.userId || 1;
@@ -1163,7 +1157,7 @@ async function createOrden(data) {
   );
 
   const latestHistory = await pool.query(
-    'SELECT id FROM historial_estados WHERE orden_id = $1 ORDER BY id DESC LIMIT 1',
+    'SELECT id FROM historial_estados WHERE negocio_id=app_tenant_id() AND orden_id = $1 ORDER BY id DESC LIMIT 1',
     [ordenId]
   );
 
@@ -1199,7 +1193,7 @@ async function createOrden(data) {
 
 async function updateOrden(id, data) {
   const oldOrderRes = await pool.query(
-    'SELECT cliente_id, estado, otros_insp, costo_estimado, costo_refaccion, mano_obra, anticipo, folio FROM ordenes_servicio WHERE id = $1',
+    'SELECT cliente_id, estado, otros_insp, costo_estimado, costo_refaccion, mano_obra, anticipo, folio FROM ordenes_servicio WHERE negocio_id = app_tenant_id() AND id = $1',
     [id]
   );
   if (oldOrderRes.rows.length === 0) return null;
@@ -1240,7 +1234,7 @@ async function updateOrden(id, data) {
   if (nombreCliente || apellidoPaterno || apellidoMaterno || telefonoCliente || contactoPreferido || emailCliente || direccionCliente || observacionesCliente) {
     if (clienteId) {
       await pool.query(
-        `UPDATE clientes SET nombre = COALESCE($1, nombre), apellido_paterno = COALESCE($2, apellido_paterno), apellido_materno = COALESCE($3, apellido_materno), telefono_principal = COALESCE($4, telefono_principal), correo = COALESCE($5, correo), direccion = COALESCE($6, direccion), contacto_preferido = COALESCE($7, contacto_preferido), notas = COALESCE($8, notas) WHERE id = $9`,
+        `UPDATE clientes SET nombre = COALESCE($1, nombre), apellido_paterno = COALESCE($2, apellido_paterno), apellido_materno = COALESCE($3, apellido_materno), telefono_principal = COALESCE($4, telefono_principal), correo = COALESCE($5, correo), direccion = COALESCE($6, direccion), contacto_preferido = COALESCE($7, contacto_preferido), notas = COALESCE($8, notas) WHERE negocio_id = app_tenant_id() AND id = $9`,
         [nombresCliente, apellidoPaterno, apellidoMaterno, telefonoCliente, emailCliente, direccionCliente, contactoPreferido, observacionesCliente, clienteId]
       );
     } else if (telefonoCliente) {
@@ -1269,7 +1263,7 @@ async function updateOrden(id, data) {
   }
 
   if (clienteId) {
-    await pool.query('UPDATE ordenes_servicio SET cliente_id = $1 WHERE id = $2', [clienteId, id]);
+    await pool.query('UPDATE ordenes_servicio SET cliente_id = $1 WHERE negocio_id = app_tenant_id() AND id = $2', [clienteId, id]);
   }
 
   const pendientePresupuesto = Boolean(data.pendiente_presupuesto)
@@ -1338,7 +1332,7 @@ async function updateOrden(id, data) {
   const updateEntries = Object.entries(updates);
   const setClause = updateEntries.map(([key], index) => `${key} = $${index + 1}`).join(', ');
   await pool.query(
-    `UPDATE ordenes_servicio SET ${setClause} WHERE id = $${updateEntries.length + 1}`,
+    `UPDATE ordenes_servicio SET ${setClause} WHERE negocio_id = app_tenant_id() AND id = $${updateEntries.length + 1}`,
     [...updateEntries.map(([, value]) => value), id]
   );
 
@@ -1376,7 +1370,7 @@ async function updateOrden(id, data) {
       historialEstadoId = historialRes.rows[0]?.id || null;
     } else {
       const latestHistory = await pool.query(
-        'SELECT id FROM historial_estados WHERE orden_id = $1 ORDER BY id DESC LIMIT 1',
+        'SELECT id FROM historial_estados WHERE negocio_id=app_tenant_id() AND orden_id = $1 ORDER BY id DESC LIMIT 1',
         [id]
       );
       historialEstadoId = latestHistory.rows[0]?.id || null;
@@ -1422,11 +1416,11 @@ async function updateOrden(id, data) {
 }
 
 async function updateOrdenEstado(id, estado, comentario, usuarioId = 1, evidencias = [], options = {}) {
-  const orderExists = await pool.query('SELECT id FROM ordenes_servicio WHERE id = $1', [id]);
+  const orderExists = await pool.query('SELECT id FROM ordenes_servicio WHERE negocio_id = app_tenant_id() AND id = $1', [id]);
   if (orderExists.rows.length === 0) return null;
 
   await pool.query(
-    'UPDATE ordenes_servicio SET estado = $1 WHERE id = $2',
+    'UPDATE ordenes_servicio SET estado = $1 WHERE negocio_id = app_tenant_id() AND id = $2',
     [estado, id]
   );
 
@@ -1464,7 +1458,7 @@ async function checkOverdueOrders(usuarioId = 1) {
     await pool.query(
       `UPDATE ordenes_servicio
        SET estado = 'Retrasado', status_reason = COALESCE(status_reason, 'Fecha de entrega vencida'), fecha_actualizacion = CURRENT_TIMESTAMP
-       WHERE id = $1`,
+       WHERE negocio_id = app_tenant_id() AND id = $1`,
       [order.id]
     );
     await pool.query(
@@ -1496,7 +1490,7 @@ function getOrderEventColor(estado) {
 }
 
 async function getCalendarEvents() {
-  const [orders, quotes, manualEvents] = await Promise.all([
+  const [orders, manualEvents] = await Promise.all([
     pool.query(`
       SELECT o.id, o.folio, o.tipo_equipo, o.marca, o.modelo, o.estado, o.fecha_entrega_estimada, o.fecha_creacion,
              o.estado_pago, c.nombre as cliente
@@ -1511,12 +1505,7 @@ async function getCalendarEvents() {
         o.fecha_creacion::date
       ) ASC
     `),
-    pool.query(`
-      SELECT id, nombre, equipo, marca, modelo, estado, fecha_creacion
-      FROM cotizaciones
-      WHERE estado = 'Pendiente'
-      ORDER BY fecha_creacion ASC
-    `),
+
     pool.query(`
       SELECT c.*, o.folio, o.estado as orden_estado
       FROM eventos_calendario c
@@ -1548,22 +1537,7 @@ async function getCalendarEvents() {
     };
   });
 
-  const quoteEvents = quotes.rows.map(quote => ({
-    id: `quote-${quote.id}`,
-    source: 'quote',
-    title: `Cotizacion pendiente · ${quote.nombre}`,
-    start: quote.fecha_creacion,
-    allDay: true,
-    color: '#1e3a8a',
-    extendedProps: {
-      type: 'quote',
-      quoteId: quote.id,
-      folio: `COT-${String(quote.id).padStart(4, '0')}`,
-      cliente: quote.nombre,
-      equipo: `${quote.equipo || 'Equipo'} ${quote.marca || ''} ${quote.modelo || ''}`.trim(),
-      estado: quote.estado
-    }
-  }));
+
 
   const manual = manualEvents.rows.map(event => ({
     id: `event-${event.id}`,
@@ -1585,7 +1559,7 @@ async function getCalendarEvents() {
     }
   }));
 
-  return [...orderEvents, ...quoteEvents, ...manual];
+  return [...orderEvents,  ...manual];
 }
 
 async function getPosOrderByFolio(folio) {
@@ -1626,7 +1600,7 @@ async function payOrderBalance({
       SELECT o.*, c.nombre as cliente
       FROM ordenes_servicio o
       JOIN clientes c ON c.id = o.cliente_id
-      WHERE UPPER(TRIM(o.folio)) = UPPER(TRIM($1))
+      WHERE o.negocio_id=app_tenant_id() AND UPPER(TRIM(o.folio)) = UPPER(TRIM($1))
       FOR UPDATE
     `, [normalizedFolio]);
     if (orderRes.rows.length === 0) throw new Error('Orden no encontrada.');
@@ -1674,7 +1648,7 @@ async function payOrderBalance({
           fecha_entrega_real = CURRENT_TIMESTAMP,
           pagado_en = CURRENT_TIMESTAMP,
           fecha_actualizacion = CURRENT_TIMESTAMP
-      WHERE id = $1
+      WHERE negocio_id = app_tenant_id() AND id = $1
     `, [order.id]);
 
     await client.query(
@@ -1742,7 +1716,7 @@ async function payOrderBalance({
 
 async function deleteEvidenciaOrden(ordenId, evidenciaId) {
   const result = await pool.query(
-    'DELETE FROM evidencias_orden WHERE id = $1 AND orden_id = $2 RETURNING id',
+    'DELETE FROM evidencias_orden WHERE negocio_id = app_tenant_id() AND id = $1 AND orden_id = $2 RETURNING id',
     [evidenciaId, ordenId]
   );
   return result.rows.length > 0;
@@ -1753,7 +1727,7 @@ async function returnOrdenRefaccionesStock(ordenId, usuarioId = 1, db = pool) {
     `SELECT opr.producto_id, opr.cantidad, i.nombre, i.stock
      FROM orden_refacciones opr
      JOIN inventario i ON i.id = opr.producto_id
-     WHERE opr.orden_id = $1
+     WHERE opr.negocio_id=app_tenant_id() AND opr.orden_id = $1
      FOR UPDATE OF opr, i`,
     [ordenId]
   );
@@ -1764,7 +1738,7 @@ async function returnOrdenRefaccionesStock(ordenId, usuarioId = 1, db = pool) {
     const stockNuevo = stockAnterior + cantidad;
 
     await db.query(
-      'UPDATE inventario SET stock = $1 WHERE id = $2',
+      'UPDATE inventario SET stock = $1 WHERE negocio_id = app_tenant_id() AND id = $2',
       [stockNuevo, item.producto_id]
     );
     await db.query(
@@ -1787,19 +1761,19 @@ async function returnOrdenRefaccionesStock(ordenId, usuarioId = 1, db = pool) {
 
 async function deleteOrdenInTransaction(id, usuarioId = 1, db = pool) {
   const orderRes = await db.query(
-    'SELECT id FROM ordenes_servicio WHERE id = $1 FOR UPDATE',
+    'SELECT id FROM ordenes_servicio WHERE negocio_id = app_tenant_id() AND id = $1 FOR UPDATE',
     [id]
   );
   if (orderRes.rows.length === 0) return false;
 
   await returnOrdenRefaccionesStock(id, usuarioId, db);
-  await db.query('UPDATE ventas_detalle SET orden_id = NULL WHERE orden_id = $1', [id]);
-  await db.query('UPDATE eventos_calendario SET orden_id = NULL WHERE orden_id = $1', [id]);
-  await db.query('UPDATE cotizaciones SET orden_id = NULL WHERE orden_id = $1', [id]);
-  await db.query('DELETE FROM orden_refacciones WHERE orden_id = $1', [id]);
-  await db.query('DELETE FROM evidencias_orden WHERE orden_id = $1', [id]);
-  await db.query('DELETE FROM historial_estados WHERE orden_id = $1', [id]);
-  await db.query('DELETE FROM ordenes_servicio WHERE id = $1', [id]);
+  await db.query('UPDATE ventas_detalle SET orden_id = NULL WHERE negocio_id=app_tenant_id() AND orden_id = $1', [id]);
+  await db.query('UPDATE eventos_calendario SET orden_id = NULL WHERE negocio_id=app_tenant_id() AND orden_id = $1', [id]);
+  await db.query('UPDATE cotizaciones SET orden_id = NULL WHERE negocio_id=app_tenant_id() AND orden_id = $1', [id]);
+  await db.query('DELETE FROM orden_refacciones WHERE negocio_id=app_tenant_id() AND orden_id = $1', [id]);
+  await db.query('DELETE FROM evidencias_orden WHERE negocio_id=app_tenant_id() AND orden_id = $1', [id]);
+  await db.query('DELETE FROM historial_estados WHERE negocio_id=app_tenant_id() AND orden_id = $1', [id]);
+  await db.query('DELETE FROM ordenes_servicio WHERE negocio_id = app_tenant_id() AND id = $1', [id]);
   return true;
 }
 
@@ -1823,7 +1797,7 @@ async function deleteCliente(id, usuarioId = 1) {
   try {
     await client.query('BEGIN');
     const clienteRes = await client.query(
-      'SELECT id FROM clientes WHERE id = $1 AND activo = true FOR UPDATE',
+      'SELECT id FROM clientes WHERE negocio_id = app_tenant_id() AND id = $1 AND activo = true FOR UPDATE',
       [id]
     );
     if (clienteRes.rows.length === 0) {
@@ -1839,7 +1813,7 @@ async function deleteCliente(id, usuarioId = 1) {
       await deleteOrdenInTransaction(order.id, usuarioId, client);
     }
 
-    await client.query('UPDATE clientes SET activo = false WHERE id = $1', [id]);
+    await client.query('UPDATE clientes SET activo = false WHERE negocio_id = app_tenant_id() AND id = $1', [id]);
     await client.query('COMMIT');
     return {
       deleted: true,
@@ -1858,7 +1832,7 @@ async function deleteCliente(id, usuarioId = 1) {
 }
 
 async function addFotoOrden(ordenId, urlFoto, etapa) {
-  const orderExists = await pool.query('SELECT id FROM ordenes_servicio WHERE id = $1', [ordenId]);
+  const orderExists = await pool.query('SELECT id FROM ordenes_servicio WHERE negocio_id = app_tenant_id() AND id = $1', [ordenId]);
   if (orderExists.rows.length === 0) return null;
 
   const inserted = await addEvidenciasOrden(ordenId, [urlFoto], {
@@ -1880,7 +1854,7 @@ async function addFotoOrden(ordenId, urlFoto, etapa) {
 // --------------------------------------------------------
 
 async function getAllInventario() {
-  const res = await pool.query('SELECT * FROM inventario WHERE activo = true ORDER BY id DESC');
+  const res = await pool.query('SELECT * FROM inventario WHERE negocio_id=app_tenant_id() AND activo = true ORDER BY id DESC');
   return res.rows.map(item => ({
     ...item,
     costo: parseFloat(item.costo),
@@ -1910,7 +1884,7 @@ async function createInventarioItem(data) {
 async function updateInventarioItem(id, data) {
   await pool.query(
     `UPDATE inventario SET codigo = $1, nombre = $2, categoria = $3, descripcion = $4, costo = $5, precio = $6, stock = $7, stock_minimo = $8, foto_url = $9
-     WHERE id = $10`,
+     WHERE negocio_id = app_tenant_id() AND id = $10`,
     [
       data.codigo,
       data.nombre,
@@ -1928,7 +1902,7 @@ async function updateInventarioItem(id, data) {
 }
 
 async function deleteInventarioItem(id) {
-  await pool.query('UPDATE inventario SET activo = false WHERE id = $1', [id]);
+  await pool.query('UPDATE inventario SET activo = false WHERE negocio_id = app_tenant_id() AND id = $1', [id]);
   return true;
 }
 
@@ -2047,7 +2021,7 @@ async function createVenta(data) {
           SELECT o.*, c.nombre as cliente
           FROM ordenes_servicio o
           JOIN clientes c ON c.id = o.cliente_id
-          WHERE UPPER(TRIM(o.folio)) = UPPER(TRIM($1))
+          WHERE o.negocio_id=app_tenant_id() AND UPPER(TRIM(o.folio)) = UPPER(TRIM($1))
           FOR UPDATE
         `, [folio]);
         if (orderRes.rows.length === 0) throw new Error(`Orden ${folio} no encontrada.`);
@@ -2082,7 +2056,7 @@ async function createVenta(data) {
         if (productIds.has(productoId)) throw new Error('El producto esta duplicado en el carrito. Agrupa sus cantidades.');
         productIds.add(productoId);
 
-        const prodRes = await client.query('SELECT id, stock, nombre, precio FROM inventario WHERE id = $1 AND activo = true FOR UPDATE', [productoId]);
+        const prodRes = await client.query('SELECT id, stock, nombre, precio FROM inventario WHERE negocio_id = app_tenant_id() AND id = $1 AND activo = true FOR UPDATE', [productoId]);
         if (prodRes.rows.length === 0) {
           throw new Error(`El producto con ID ${productoId} no existe en el inventario.`);
         }
@@ -2147,7 +2121,7 @@ async function createVenta(data) {
 
       if (item.tipo_item === 'producto') {
         await client.query(
-          `UPDATE inventario SET stock = stock - $1 WHERE id = $2`,
+          `UPDATE inventario SET stock = stock - $1 WHERE negocio_id = app_tenant_id() AND id = $2`,
           [item.cantidad, item.producto_id]
         );
       } else if (item.tipo_item === 'reparacion') {
@@ -2158,7 +2132,7 @@ async function createVenta(data) {
               fecha_entrega_real = CURRENT_TIMESTAMP,
               pagado_en = CURRENT_TIMESTAMP,
               fecha_actualizacion = CURRENT_TIMESTAMP
-          WHERE id = $1
+          WHERE negocio_id = app_tenant_id() AND id = $1
         `, [item.orden_id]);
         await client.query(
           `INSERT INTO historial_estados (orden_id, estado, usuario_id, comentario)
@@ -2204,7 +2178,7 @@ async function createVenta(data) {
       }
     }
 
-    const dbVentaRes = await client.query('SELECT * FROM ventas WHERE id = $1', [ventaId]);
+    const dbVentaRes = await client.query('SELECT * FROM ventas WHERE negocio_id = app_tenant_id() AND id = $1', [ventaId]);
     await client.query('COMMIT');
 
     const dbVenta = dbVentaRes.rows[0];
@@ -2226,7 +2200,7 @@ async function createVenta(data) {
 }
 
 async function getAllVentas() {
-  const salesRes = await pool.query('SELECT * FROM ventas ORDER BY id DESC');
+  const salesRes = await pool.query('SELECT * FROM ventas WHERE negocio_id=app_tenant_id() ORDER BY id DESC');
   const sales = salesRes.rows.map(s => ({
     ...s,
     subtotal: parseFloat(s.subtotal || s.total || 0),
@@ -2267,116 +2241,37 @@ async function getDashboardStats() {
     if (counts[o.estado] !== undefined) counts[o.estado]++;
   });
 
-  const sales = await pool.query('SELECT total FROM ventas');
+  const sales = await pool.query('SELECT total FROM ventas WHERE negocio_id=app_tenant_id()');
   const totalSales = sales.rows.reduce((sum, s) => sum + parseFloat(s.total || 0), 0);
 
   const completedRepairs = await pool.query("SELECT costo_real, costo_refaccion FROM ordenes_servicio WHERE estado = 'Entregado'");
   const repairsProfit = completedRepairs.rows.reduce((sum, r) => sum + (parseFloat(r.costo_real || 0) - parseFloat(r.costo_refaccion || 0)), 0);
 
-  const lowStockResult = await pool.query('SELECT COUNT(*) as count FROM inventario WHERE stock <= stock_minimo AND activo = true');
+  const lowStockResult = await pool.query('SELECT COUNT(*) as count FROM inventario WHERE negocio_id=app_tenant_id() AND stock <= stock_minimo AND activo = true');
   const lowStockCount = parseInt(lowStockResult.rows[0].count, 10);
 
   return { orderStatusCounts: counts, totalSales, repairsProfit, lowStockCount };
 }
 
 // --------------------------------------------------------
-// SERVICIOS DE COTIZACIONES (DESDE LA WEB PÚBLICA)
 // --------------------------------------------------------
 
-async function getAllCotizaciones() {
-  const res = await pool.query('SELECT * FROM cotizaciones ORDER BY id DESC');
-  return res.rows;
-}
 
-async function createCotizacion(data) {
-  const photosJson = data.photos ? JSON.stringify(data.photos) : '[]';
-  const result = await pool.query(
-    `INSERT INTO cotizaciones (nombre, telefono, equipo, marca, modelo, problema, fotografias, estado)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-    [
-      data.clientName || data.nombre,
-      data.clientPhone || data.telefono,
-      data.deviceType || data.equipo,
-      data.brand || data.marca,
-      data.model || data.modelo,
-      data.description || data.problema,
-      photosJson,
-      data.estado || 'Pendiente'
-    ]
-  );
-  return { id: result.rows[0].id, ...data };
-}
 
-async function updateCotizacion(id, data) {
-  await pool.query(
-    `UPDATE cotizaciones SET estado = $1 WHERE id = $2`,
-    [data.estado, id]
-  );
-  return { id, ...data };
-}
 
-async function deleteCotizacion(id) {
-  await pool.query('DELETE FROM cotizaciones WHERE id = $1', [id]);
-  return true;
-}
 
-async function convertirCotizacionAOrden(id) {
-  const quoteRes = await pool.query('SELECT * FROM cotizaciones WHERE id = $1', [id]);
-  if (quoteRes.rows.length === 0) {
-    throw new Error('Cotización no encontrada.');
-  }
-  const quote = quoteRes.rows[0];
 
-  let cliente = await pool.query('SELECT id FROM clientes WHERE telefono_principal = $1', [quote.telefono]);
-  let clienteId;
-  if (cliente.rows.length === 0) {
-    const newCl = await pool.query(
-      'INSERT INTO clientes (nombre, telefono_principal, notas) VALUES ($1, $2, $3) RETURNING id',
-      [quote.nombre, quote.telefono, 'Cliente creado desde cotización.']
-    );
-    clienteId = newCl.rows[0].id;
-  } else {
-    clienteId = cliente.rows[0].id;
-  }
 
-  const activeYear = new Date().getFullYear();
-  const lastOrder = await pool.query("SELECT folio FROM ordenes_servicio WHERE folio LIKE $1 ORDER BY id DESC LIMIT 1", [`AFB-${activeYear}-%`]);
-  let nextNum = 10000;
-  if (lastOrder.rows.length > 0 && lastOrder.rows[0].folio) {
-    const parts = lastOrder.rows[0].folio.split('-');
-    if (parts.length === 3) {
-      const lastNum = parseInt(parts[2], 10);
-      if (!isNaN(lastNum)) nextNum = lastNum + 1;
-    }
-  }
-  const folio = `AFB-${activeYear}-${nextNum}`;
 
-  const orderResult = await pool.query(
-    `INSERT INTO ordenes_servicio (folio, cliente_id, usuario_creador_id, tipo_equipo, marca, modelo, falla_reportada, estado)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, 'Recibido') RETURNING id`,
-    [folio, clienteId, 1, quote.equipo, quote.marca, quote.modelo, quote.problema]
-  );
-  const ordenId = orderResult.rows[0].id;
 
-  await pool.query(
-    'INSERT INTO historial_estados (orden_id, estado, usuario_id, comentario) VALUES ($1, $2, $3, $4)',
-    [ordenId, 'Recibido', 1, 'Orden generada a partir de cotización web.']
-  );
 
-  await pool.query(
-    "UPDATE cotizaciones SET estado = 'Aceptado', orden_id = $1 WHERE id = $2",
-    [ordenId, id]
-  );
-
-  return getOrdenById(ordenId);
-}
 
 // --------------------------------------------------------
 // SERVICIOS DE CALENDARIO DE EVENTOS
 // --------------------------------------------------------
 
 async function getAllEventos() {
-  const res = await pool.query('SELECT * FROM eventos_calendario ORDER BY fecha_inicio ASC');
+  const res = await pool.query('SELECT * FROM eventos_calendario WHERE negocio_id=app_tenant_id() ORDER BY fecha_inicio ASC');
   return res.rows;
 }
 
@@ -2400,7 +2295,7 @@ async function createEvento(data) {
 async function updateEvento(id, data) {
   await pool.query(
     `UPDATE eventos_calendario SET titulo = $1, descripcion = $2, fecha_inicio = $3, fecha_fin = $4, tipo_evento = $5, color = $6
-     WHERE id = $7`,
+     WHERE negocio_id = app_tenant_id() AND id = $7`,
     [
       data.titulo,
       data.descripcion || null,
@@ -2415,7 +2310,7 @@ async function updateEvento(id, data) {
 }
 
 async function deleteEvento(id) {
-  await pool.query('DELETE FROM eventos_calendario WHERE id = $1', [id]);
+  await pool.query('DELETE FROM eventos_calendario WHERE negocio_id = app_tenant_id() AND id = $1', [id]);
   return true;
 }
 
@@ -2424,13 +2319,13 @@ module.exports = {
   getAllUsuarios,
   createUsuario,
   deleteUsuario,
-  
+
   getAllClientes,
   createCliente,
   updateCliente,
   getClienteByTelefono,
   deleteCliente,
-  
+
   getAllOrdenes,
   getOrdenById,
   getOrdenByFolio,
@@ -2458,11 +2353,11 @@ module.exports = {
 
   getDashboardStats,
 
-  getAllCotizaciones,
-  createCotizacion,
-  updateCotizacion,
-  deleteCotizacion,
-  convertirCotizacionAOrden,
+
+
+
+
+
 
   getAllEventos,
   getCalendarEvents,

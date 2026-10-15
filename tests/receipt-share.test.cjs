@@ -57,7 +57,7 @@ test('visual templates use the safe allowlist for service and POS, with no inven
     assert.match(JSON.stringify(service), /800.00/);
     assert.equal(service.blocks.some(block => block.kind === 'qr'), false);
     const qr = buildShareTicket('service', { publicTrackingUrl:'https://example.com/seguimiento/real' });
-    assert.equal(qr.blocks.filter(block => block.kind === 'qr').length, 1);
+    assert.equal(qr.blocks.filter(block => block.kind === 'qr').length, 0);
     assert.equal(qr.blocks.some(block => block.text?.includes('/seguimiento/real')), false);
     const sale = buildShareTicket('sale', { ...privateFields, total:50, items:[{nombre:'Cable',cantidad:2,precio_unitario:25,orden:privateFields}] });
     assert.doesNotMatch(JSON.stringify(sale), /SECRET_/);

@@ -1,4 +1,5 @@
-import { publicTrackingUrl, safeText } from './TicketBuilder.mjs';
+import { safeText } from './TicketBuilder.mjs';
+import { businessIdentity } from './BusinessIdentity.mjs';
 const amount = value => Number.isFinite(Number(value)) ? Number(value) : 0;
 const date = value => {
   if (!value) return '';
@@ -8,7 +9,8 @@ const date = value => {
   return Number.isNaN(parsed.getTime()) ? safeText(value) : parsed.toLocaleString('es-MX');
 };
 export function authorizeTicketData(type, raw = {}, business = {}) {
-  const common = { businessContact: safeText(business.whatsapp || business.phone), logoUrl: business.ticketLogoUrl || 'img/logoallfix-ticket.png' };
+  const identity = businessIdentity(business, raw);
+  const common = { business: identity, businessContact: safeText(identity.whatsapp || identity.phone), logoUrl: identity.logoUrl };
   if (type === 'service') {
     const estimate = raw.pendiente_presupuesto || raw.costo_estimado == null ? null : amount(raw.costo_estimado);
     return { ...common, folio: safeText(raw.folio), date: date(raw.fecha_creacion || raw.dateIn),
@@ -16,9 +18,7 @@ export function authorizeTicketData(type, raw = {}, business = {}) {
       brand: safeText(raw.brand), model: safeText(raw.model), fault: safeText(raw.falla_reportada),
       service: safeText(raw.servicio_solicitado), estimate, advance: amount(raw.anticipo),
       pending: raw.estado_pago === 'Pagado' ? 0 : estimate == null ? null : Math.max(0, estimate - amount(raw.anticipo)),
-      estimatedDelivery: date(raw.estimatedDate),
-      // Only a public URL explicitly returned by the authorized API. Never construct an invented route.
-      publicTrackingUrl: publicTrackingUrl(raw.publicTrackingUrl || raw.tracking_url) };
+      estimatedDelivery: date(raw.estimatedDate) };
   }
   if (type === 'equipmentLabel') {
     const optional = value => {
@@ -29,7 +29,7 @@ export function authorizeTicketData(type, raw = {}, business = {}) {
     const total = value == null ? null : Math.max(0, amount(value));
     const advance = Math.max(0, amount(raw.anticipo));
     const lock = safeText(raw.lock_type).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    return { folio: safeText(raw.folio), customerName: optional(raw.clientName), phone: optional(raw.clientPhone),
+    return { business: { name: identity.name }, folio: safeText(raw.folio), customerName: optional(raw.clientName), phone: optional(raw.clientPhone),
       deviceType: optional(raw.deviceType), brand: optional(raw.brand), model: optional(raw.model),
       service: optional(raw.servicio_solicitado || raw.falla_reportada),
       secretLabel: lock === 'pin' ? 'PIN' : 'Contraseña',

@@ -3,8 +3,9 @@
 const express = require('express');
 const router = express.Router();
 const ordenService = require('../services/ordenService');
+const { authMiddleware } = require('../middleware/auth');
 
-router.get('/dashboard', async (req, res) => {
+router.get('/dashboard', authMiddleware, async (req, res) => {
   try {
     const stats = await ordenService.getDashboardStats();
     res.json(stats);

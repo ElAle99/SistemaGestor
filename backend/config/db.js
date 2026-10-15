@@ -2,14 +2,15 @@
 require('./env');
 const { getPgPoolConfig } = require('./pgConfig');
 
-const pool = new Pool(getPgPoolConfig());
+const { createTenantPool, withSystemContext } = require('./tenantContext');
+const pool = createTenantPool(new Pool(getPgPoolConfig()));
 
 function readBoolean(value, defaultValue = false) {
   if (value === undefined || value === null || value === '') return defaultValue;
   return ['1', 'true', 'yes', 'require'].includes(String(value).toLowerCase());
 }
 
-async function initDB() {
+async function initLegacySchema(pool) {
   try {
     await pool.query('SELECT 1');
     console.log('ConexiÃ³n a PostgreSQL exitosa');
@@ -529,15 +530,25 @@ async function initDB() {
     }
   }
 
-  await pool.query('INSERT INTO configuracion (id, nombre) VALUES (1, $1) ON CONFLICT (id) DO NOTHING', ['AllFix Bacalar']);
+  const migrated = await pool.query("SELECT to_regclass('public.tenant_migraciones') AS tenant_schema");
+  if (!migrated.rows[0]?.tenant_schema) {
+    await pool.query("INSERT INTO configuracion (nombre) SELECT $1 WHERE NOT EXISTS (SELECT 1 FROM configuracion)", [process.env.INITIAL_BUSINESS_NAME || 'Establecimiento']);
+    await pool.query("INSERT INTO configuracion_sistema (clave, valor) VALUES ('allow_user_creation', 'false') ON CONFLICT (clave) DO NOTHING");
+  }
   await require('../db/initCatalog').initCatalog(pool);
-  await pool.query(
-    `INSERT INTO configuracion_sistema (clave, valor)
-     VALUES ($1, $2)
-     ON CONFLICT (clave) DO NOTHING`,
-    ['allow_user_creation', 'false']
-  );
 }
 
-module.exports = { pool, initDB };
+async function initDB() {
+  const role = (await pool.query(`WITH RECURSIVE roles AS (
+    SELECT oid,rolname,rolsuper,rolbypassrls,rolcreaterole,rolcreatedb FROM pg_roles WHERE rolname=session_user
+    UNION SELECT p.oid,p.rolname,p.rolsuper,p.rolbypassrls,p.rolcreaterole,p.rolcreatedb
+    FROM pg_roles p JOIN pg_auth_members m ON m.roleid=p.oid JOIN roles r ON r.oid=m.member
+  ) SELECT EXISTS(SELECT 1 FROM roles WHERE rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb) unsafe,
+    EXISTS(SELECT 1 FROM pg_class c JOIN roles r ON r.oid=c.relowner WHERE c.relnamespace='public'::regnamespace AND c.relkind='r' AND c.relrowsecurity) owns_tables,
+    session_user,current_user`)).rows[0];
+  if (role.unsafe || role.owns_tables || role.session_user !== role.current_user) throw new Error('El login de runtime tiene privilegios inseguros.');
+  const schema = (await pool.query("SELECT runtime_schema_ready() AS ready")).rows[0];
+  if (!schema.ready) throw new Error('Ejecuta las migraciones administrativas antes de iniciar el servidor.');
+}
+module.exports = { pool, initDB, initLegacySchema };
 

@@ -74,7 +74,7 @@ async function getActiveCaja(db = pool, options = {}) {
     `SELECT c.*, u.nombre as usuario_nombre
      FROM cajas c
      LEFT JOIN usuarios u ON u.id = c.usuario_id
-     WHERE c.estado = 'abierta'
+     WHERE c.negocio_id=app_tenant_id() AND c.estado = 'abierta'
      ORDER BY c.fecha_apertura DESC
      LIMIT 1
      ${lockClause}`
@@ -87,7 +87,7 @@ async function getMovimientos(cajaId, db = pool) {
     `SELECT cm.*, u.nombre as usuario_nombre
      FROM caja_movimientos cm
      LEFT JOIN usuarios u ON u.id = cm.usuario_id
-     WHERE cm.caja_id = $1
+     WHERE cm.negocio_id=app_tenant_id() AND cm.caja_id = $1
      ORDER BY cm.created_at ASC, cm.id ASC`,
     [cajaId]
   );
@@ -181,7 +181,7 @@ async function getCajaConDetalle(cajaId, db = pool) {
     `SELECT c.*, u.nombre as usuario_nombre
      FROM cajas c
      LEFT JOIN usuarios u ON u.id = c.usuario_id
-     WHERE c.id = $1`,
+     WHERE c.negocio_id=app_tenant_id() AND c.id = $1`,
     [cajaId]
   );
   const caja = formatCaja(cajaResult.rows[0]);
@@ -348,7 +348,7 @@ async function closeCaja({ usuario_id, monto_contado, observaciones }) {
            estado = 'cerrada',
            observaciones = $4,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $5`,
+       WHERE negocio_id=app_tenant_id() AND id = $5`,
       [resumen.total_esperado, counted, diferencia, observaciones || null, active.id]
     );
     await client.query('COMMIT');

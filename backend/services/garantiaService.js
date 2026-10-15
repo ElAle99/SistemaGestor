@@ -114,14 +114,15 @@ function warrantySelect() {
       LEFT JOIN clientes c ON c.id = g.cliente_id
       LEFT JOIN (
         SELECT garantia_id, COUNT(*) AS ingresos_count
-        FROM ingresos_garantia
+        FROM ingresos_garantia WHERE negocio_id=app_tenant_id()
         GROUP BY garantia_id
       ) ing ON ing.garantia_id = g.id
       LEFT JOIN (
         SELECT garantia_id, COALESCE(SUM(subtotal), 0) AS costo_total
-        FROM costos_garantia
+        FROM costos_garantia WHERE negocio_id=app_tenant_id()
         GROUP BY garantia_id
       ) costos ON costos.garantia_id = g.id
+      WHERE g.negocio_id=app_tenant_id()
     ) garantia_base
   `;
 }
@@ -152,7 +153,7 @@ async function getOrderForWarranty(ordenId, db = pool) {
     `SELECT o.*, c.id AS current_cliente_id
      FROM ordenes_servicio o
      JOIN clientes c ON c.id = o.cliente_id
-     WHERE o.id = $1`,
+     WHERE o.negocio_id = app_tenant_id() AND o.id = $1`,
     [ordenId]
   );
   return res.rows[0] || null;
@@ -167,7 +168,7 @@ async function createOrUpdateGarantiaFromOrder(ordenId, payload = {}, usuarioId 
   if (!tieneGarantia) {
     if (existing && existing.activo) {
       await db.query(
-        'UPDATE garantias SET activo = false, actualizado_por = $1, fecha_actualizacion = CURRENT_TIMESTAMP WHERE id = $2',
+        'UPDATE garantias SET activo = false, actualizado_por = $1, fecha_actualizacion = CURRENT_TIMESTAMP WHERE negocio_id = app_tenant_id() AND id = $2',
         [usuarioId, existing.id]
       );
       await addGarantiaHistory(db, existing.id, null, usuarioId, 'Garantía desactivada', 'La garantía fue marcada como no aplicable desde la orden.', existing.estado, existing.estado);
@@ -308,7 +309,7 @@ async function getGarantias(filters = {}) {
 }
 
 async function getGarantiaById(id) {
-  const res = await pool.query(`${warrantySelect()} WHERE id = $1 LIMIT 1`, [id]);
+  const res = await pool.query(`${warrantySelect()} WHERE negocio_id = app_tenant_id() AND id = $1 LIMIT 1`, [id]);
   if (res.rows.length === 0) return null;
   const garantia = formatGarantia(res.rows[0]);
 
@@ -378,7 +379,7 @@ async function createGarantia(data, usuarioId) {
 }
 
 async function updateGarantia(id, data, usuarioId) {
-  const current = await pool.query('SELECT * FROM garantias WHERE id = $1', [id]);
+  const current = await pool.query('SELECT * FROM garantias WHERE negocio_id = app_tenant_id() AND id = $1', [id]);
   if (current.rows.length === 0) return null;
   const garantia = current.rows[0];
   const next = {
@@ -399,7 +400,7 @@ async function registrarIngreso(garantiaId, data, usuarioId) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const garantiaRes = await client.query('SELECT * FROM garantias WHERE id = $1 AND activo = true FOR UPDATE', [garantiaId]);
+    const garantiaRes = await client.query('SELECT * FROM garantias WHERE negocio_id = app_tenant_id() AND id = $1 AND activo = true FOR UPDATE', [garantiaId]);
     if (garantiaRes.rows.length === 0) {
       const err = new Error('Garantía no encontrada.');
       err.statusCode = 404;
@@ -442,7 +443,7 @@ async function registrarIngreso(garantiaId, data, usuarioId) {
     await client.query(
       `UPDATE garantias
        SET estado = 'En revisión', actualizado_por = $1, fecha_actualizacion = CURRENT_TIMESTAMP
-       WHERE id = $2`,
+       WHERE negocio_id = app_tenant_id() AND id = $2`,
       [usuarioId, garantiaId]
     );
     await addGarantiaHistory(client, garantiaId, ingreso.id, usuarioId, 'Reingreso registrado', fallaReportada, estadoAnterior, 'En revisión');
@@ -502,7 +503,7 @@ async function validarIngreso(ingresoId, data, usuarioId) {
            diagnostico_tecnico = COALESCE($4, diagnostico_tecnico),
            actualizado_por = $5,
            fecha_actualizacion = CURRENT_TIMESTAMP
-       WHERE id = $6`,
+       WHERE negocio_id = app_tenant_id() AND id = $6`,
       [
         estadoValidacion,
         estadoValidacion === 'Garantía rechazada' ? motivo : null,
@@ -515,7 +516,7 @@ async function validarIngreso(ingresoId, data, usuarioId) {
     await client.query(
       `UPDATE garantias
        SET estado = $1, actualizado_por = $2, fecha_actualizacion = CURRENT_TIMESTAMP
-       WHERE id = $3`,
+       WHERE negocio_id = app_tenant_id() AND id = $3`,
       [garantiaEstado, usuarioId, ingreso.garantia_id]
     );
     await addGarantiaHistory(
@@ -545,7 +546,7 @@ async function registrarFotos(garantiaId, data, usuarioId) {
   const fotos = Array.isArray(data.fotos) ? data.fotos.filter(Boolean) : [];
   if (fotos.length === 0) return getGarantiaById(garantiaId);
 
-  const garantia = await pool.query('SELECT id, orden_id FROM garantias WHERE id = $1', [garantiaId]);
+  const garantia = await pool.query('SELECT id, orden_id FROM garantias WHERE negocio_id = app_tenant_id() AND id = $1', [garantiaId]);
   if (garantia.rows.length === 0) return null;
   const ingresoId = parseId(data.ingreso_garantia_id || data.ingresoId);
   for (const foto of fotos) {
@@ -565,7 +566,7 @@ async function registrarCostos(garantiaId, data, usuarioId) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const garantiaRes = await client.query('SELECT * FROM garantias WHERE id = $1 FOR UPDATE', [garantiaId]);
+    const garantiaRes = await client.query('SELECT * FROM garantias WHERE negocio_id = app_tenant_id() AND id = $1 FOR UPDATE', [garantiaId]);
     if (garantiaRes.rows.length === 0) {
       const err = new Error('Garantía no encontrada.');
       err.statusCode = 404;
@@ -580,7 +581,7 @@ async function registrarCostos(garantiaId, data, usuarioId) {
       const productoId = parseId(item.producto_id || item.productoId);
       const cantidad = parseInt(item.cantidad, 10) || 0;
       if (!productoId || cantidad <= 0) continue;
-      const prodRes = await client.query('SELECT id, nombre, stock, costo, activo FROM inventario WHERE id = $1 FOR UPDATE', [productoId]);
+      const prodRes = await client.query('SELECT id, nombre, stock, costo, activo FROM inventario WHERE negocio_id = app_tenant_id() AND id = $1 FOR UPDATE', [productoId]);
       if (prodRes.rows.length === 0 || !prodRes.rows[0].activo) {
         const err = new Error('Una refacción seleccionada ya no existe o está inactiva.');
         err.statusCode = 400;
@@ -596,7 +597,7 @@ async function registrarCostos(garantiaId, data, usuarioId) {
       const costoUnitario = normalizeMoney(item.costo_unitario ?? item.costoUnitario ?? prod.costo);
       const subtotal = Number((cantidad * costoUnitario).toFixed(2));
       const stockNuevo = stockAnterior - cantidad;
-      await client.query('UPDATE inventario SET stock = $1 WHERE id = $2', [stockNuevo, productoId]);
+      await client.query('UPDATE inventario SET stock = $1 WHERE negocio_id = app_tenant_id() AND id = $2', [stockNuevo, productoId]);
       await client.query(
         `INSERT INTO movimientos_inventario
          (producto_id, orden_id, usuario_id, tipo, cantidad, stock_anterior, stock_nuevo, motivo)
@@ -642,7 +643,7 @@ async function registrarCostos(garantiaId, data, usuarioId) {
        SET estado = CASE WHEN estado <> 'Rechazada' THEN 'Garantía aplicada' ELSE estado END,
            actualizado_por = $1,
            fecha_actualizacion = CURRENT_TIMESTAMP
-       WHERE id = $2`,
+       WHERE negocio_id = app_tenant_id() AND id = $2`,
       [usuarioId, garantiaId]
     );
     if (ingresoId) {
@@ -651,7 +652,7 @@ async function registrarCostos(garantiaId, data, usuarioId) {
          SET estado_seguimiento = 'En reparación por garantía',
              actualizado_por = $1,
              fecha_actualizacion = CURRENT_TIMESTAMP
-         WHERE id = $2`,
+         WHERE negocio_id = app_tenant_id() AND id = $2`,
         [usuarioId, ingresoId]
       );
     }
@@ -671,7 +672,7 @@ async function cerrarIngreso(ingresoId, data, usuarioId) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const ingresoRes = await client.query('SELECT * FROM ingresos_garantia WHERE id = $1 FOR UPDATE', [ingresoId]);
+    const ingresoRes = await client.query('SELECT * FROM ingresos_garantia WHERE negocio_id = app_tenant_id() AND id = $1 FOR UPDATE', [ingresoId]);
     if (ingresoRes.rows.length === 0) {
       const err = new Error('Ingreso de garantía no encontrado.');
       err.statusCode = 404;
@@ -691,14 +692,14 @@ async function cerrarIngreso(ingresoId, data, usuarioId) {
            fecha_entrega_garantia = COALESCE($2, CURRENT_TIMESTAMP),
            actualizado_por = $3,
            fecha_actualizacion = CURRENT_TIMESTAMP
-       WHERE id = $4`,
+       WHERE negocio_id = app_tenant_id() AND id = $4`,
       [resolucion, data.fecha_entrega_garantia || null, usuarioId, ingresoId]
     );
     if (ingreso.estado_validacion !== 'Garantía rechazada') {
       await client.query(
         `UPDATE garantias
          SET estado = 'Garantía aplicada', actualizado_por = $1, fecha_actualizacion = CURRENT_TIMESTAMP
-         WHERE id = $2`,
+         WHERE negocio_id = app_tenant_id() AND id = $2`,
         [usuarioId, ingreso.garantia_id]
       );
     }
@@ -715,7 +716,7 @@ async function cerrarIngreso(ingresoId, data, usuarioId) {
 }
 
 async function registrarHistorial(garantiaId, data, usuarioId) {
-  const garantia = await pool.query('SELECT id, orden_id, estado FROM garantias WHERE id = $1', [garantiaId]);
+  const garantia = await pool.query('SELECT id, orden_id, estado FROM garantias WHERE negocio_id = app_tenant_id() AND id = $1', [garantiaId]);
   if (garantia.rows.length === 0) return null;
   await addGarantiaHistory(pool, garantiaId, parseId(data.ingreso_garantia_id), usuarioId, data.evento || 'Seguimiento', normalizeText(data.comentario), garantia.rows[0].estado, data.estado_nuevo || garantia.rows[0].estado);
   await addOrderHistory(pool, garantia.rows[0].orden_id, usuarioId, 'Entregado', `Seguimiento de garantía: ${normalizeText(data.comentario) || data.evento || 'Actualización'}`);

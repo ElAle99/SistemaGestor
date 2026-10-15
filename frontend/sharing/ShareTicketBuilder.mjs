@@ -1,4 +1,5 @@
 import { authorizeTicketData } from '../printing/authorizedData.mjs';
+import { businessContactLines } from '../printing/BusinessIdentity.mjs';
 
 const money = value => Number(value).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
 // Visual template only. Reuse the allowlist, never the printable DOM or thermal template.
@@ -9,9 +10,9 @@ export function buildShareTicket(type, raw, business = {}) {
   const field = (label, value) => { if (value != null && value !== '') text(`${label}: ${value}`); };
   const rule = () => blocks.push({ kind: 'rule' });
   const total = (label, value, strong = false) => blocks.push({ kind: 'amount', label, value: value == null ? 'Por definir' : money(value), strong });
-  text('ALLFIX BACALAR', 'brand');
-  text('Reparación de equipos móviles', 'center');
-  if (data.businessContact) text(`Contacto: ${data.businessContact}`, 'center');
+  text(data.business.name, 'brand');
+  text(data.business.address, 'center');
+  for (const contact of businessContactLines(data.business)) text(contact, 'center');
   rule();
   text(({ service: 'COMPROBANTE DE SERVICIO', sale: 'COMPROBANTE DE VENTA', cashClosing: 'CORTE DE CAJA' })[type], 'title');
   field('Folio', data.folio); field('Fecha', data.date); field('Estado', data.status);
@@ -37,8 +38,8 @@ export function buildShareTicket(type, raw, business = {}) {
     }
   }
   rule();
-  if (data.publicTrackingUrl) { blocks.push({ kind: 'qr', value: data.publicTrackingUrl }); text('Consulta el estado de tu equipo', 'center'); }
   text('Gracias por su preferencia', 'thanks');
   text('Conserve este comprobante', 'center');
+  if (type === 'service') text(data.business.terms);
   return { type, folio: data.folio || 'comprobante', blocks };
 }

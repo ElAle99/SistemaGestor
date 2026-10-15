@@ -272,11 +272,6 @@
                     <i class="fa-solid fa-shield-halved"></i>
                     <span>Garantías</span>
                 </a>
-                <a href="#cotizaciones" class="menu-item" data-view="cotizaciones">
-                    <i class="fa-solid fa-file-invoice"></i>
-                    <span>Cotizaciones</span>
-                    <span class="menu-badge hidden" id="quotes-menu-badge">0</span>
-                </a>
                 <div class="menu-group" id="inventory-menu-group">
                     <button type="button" class="menu-item menu-parent" id="inventory-menu-toggle" data-view="inventario" aria-expanded="false">
                         <i class="fa-solid fa-boxes-stacked"></i>
@@ -843,60 +838,8 @@
                 </section>
 
                 <!-- ========================================== -->
-                <!-- VIEW: COTIZACIONES                         -->
                 <!-- ========================================== -->
-                <section class="view-section hidden" id="view-cotizaciones">
-                    <div class="search-actions-bar quote-toolbar">
-                        <div class="search-input-wrapper quote-search-wrapper">
-                            <i class="fa-solid fa-magnifying-glass"></i>
-                            <input type="text" id="quote-search" placeholder="Buscar por cliente, teléfono, equipo o modelo">
-                        </div>
-                    </div>
-                    <div class="card quote-table-card">
-                        <div class="card-body table-responsive quote-table-body">
-                            <div class="quote-table-header">
-                                <div>
-                                    <h3>Listado de solicitudes</h3>
-                                    <p>Seguimiento de cotizaciones recibidas</p>
-                                </div>
-                                <span id="quote-results-count">0 solicitudes</span>
-                            </div>
-                            <div class="quote-controls-row">
-                                <select id="quote-status-filter" class="form-select quote-control-select">
-                                    <option value="">Todos los estados</option>
-                                    <option value="Pendiente">Pendiente</option>
-                                    <option value="Contactado">Contactado</option>
-                                    <option value="Cotizado">Cotizado</option>
-                                    <option value="Aceptado">Aceptado</option>
-                                    <option value="Rechazado">Rechazado</option>
-                                </select>
-                                <select id="quote-sort" class="form-select quote-control-select">
-                                    <option value="fecha_desc">Más recientes</option>
-                                    <option value="fecha_asc">Más antiguas</option>
-                                    <option value="cliente_asc">Cliente A-Z</option>
-                                    <option value="estado_asc">Estado</option>
-                                </select>
-                            </div>
-                            <table class="table quote-table" id="quotes-table">
-                                <thead>
-                                    <tr>
-                                        <th>Fecha</th>
-                                        <th>Cliente</th>
-                                        <th>Teléfono</th>
-                                        <th>Equipo</th>
-                                        <th>Marca / Modelo</th>
-                                        <th>Problema Reportado</th>
-                                        <th>Estado</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <!-- Dynamic rows -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
+
 
                 <!-- ========================================== -->
                 <!--  INVENTARIO                           -->
@@ -1591,7 +1534,7 @@
                                         </div>
                                         <div class="form-group">
                                             <label for="cfg-business-phone">Teléfono de Contacto</label>
-                                            <input type="text" id="cfg-business-phone" class="form-control" value="983 123 4567" required>
+                                            <input type="text" id="cfg-business-phone" class="form-control" value="">
                                         </div>
                                     </div>
                                     <div class="form-group">
@@ -1658,7 +1601,7 @@
         <div class="form-group"><label for="cfg-print-copies">Copias</label><input id="cfg-print-copies" class="form-control" type="number" min="1" max="5"></div>
         <div class="form-group"><label for="cfg-ticket-print-mode">Impresión automática</label><select id="cfg-ticket-print-mode" class="form-select"><option value="direct">Activada al cobrar</option><option value="ask">Desactivada</option></select></div>
     </div>
-    <div class="printer-options"><label><input type="checkbox" id="cfg-print-logo"> Mostrar logo</label><label><input type="checkbox" id="cfg-print-qr"> Mostrar QR</label></div>
+    <div class="printer-options"><label><input type="checkbox" id="cfg-print-logo"> Mostrar logo</label></div>
     <div class="printer-config-actions"><button type="button" class="btn btn-secondary" id="btn-connect-printer">Conectar impresora</button>
 <button type="button" class="btn btn-secondary" id="btn-select-other-printer">Cambiar impresora</button>
 <button type="button" class="btn btn-secondary" id="btn-disconnect-printer">Desconectar</button>
@@ -3512,12 +3455,12 @@
                 <div class="ticket-preview-box ticket-sale-receipt hidden" id="ticket-venta-container">
                     <div class="ticket-tear-edge"></div>
                     <div class="ticket-main-header">
-                        <h2 id="ticket-venta-business-name">ALLFIX BACALAR</h2>
+                        <h2 id="ticket-venta-business-name"></h2>
                         <p class="ticket-sale-phone">
                             <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>
-                            <span id="ticket-venta-business-phone">983 190 9656</span>
+                            <span id="ticket-venta-business-phone"></span>
                         </p>
-                        <p class="ticket-business-info" id="ticket-venta-business-info">Av. 19 Libramiento entre Calle 26<br>Bacalar, Q. Roo</p>
+                        <p class="ticket-business-info" id="ticket-venta-business-info"></p>
                         <p class="ticket-social-info" id="ticket-venta-social-info"></p>
                     </div>
 
@@ -3573,8 +3516,8 @@
                 <div class="ticket-preview-box ticket-sale-receipt hidden" id="ticket-corte-container">
                     <div class="ticket-tear-edge"></div>
                     <div class="ticket-main-header">
-                        <img src="img/logoallfix-ticket.png" alt="Logo para ticket" class="ticket-logo thermal-ticket-logo" onerror="this.style.display='none'">
-                        <h2 id="ticket-corte-business-name">ALLFIX BACALAR</h2>
+                        <img alt="Logo para ticket" class="ticket-logo thermal-ticket-logo" onerror="this.style.display='none'">
+                        <h2 id="ticket-corte-business-name"></h2>
                         <p class="ticket-social-info" id="ticket-corte-social-info"></p>
                     </div>
                     <div class="ticket-meta-block">
@@ -3616,18 +3559,18 @@
                 <div class="ticket-preview-box ticket-service-receipt" id="ticket-recepcion-container">
                     <div class="ticket-tear-edge"></div>
                     <div class="ticket-main-header">
-                        <h2 id="ticket-rec-business-name">ALLFIX BACALAR</h2>
+                        <h2 id="ticket-rec-business-name"></h2>
                         <p class="ticket-whatsapp">
                             <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>
-                            <span id="ticket-rec-whatsapp">983 190 9656</span>
+                            <span id="ticket-rec-whatsapp"></span>
                         </p>
-                        <p class="ticket-business-info" id="ticket-rec-business-info">Av. 19 Libramiento entre Calle 26<br>Bacalar, Q. Roo</p>
+                        <p class="ticket-business-info" id="ticket-rec-business-info"></p>
                         <div class="ticket-social-icons" aria-label="Redes sociales">
                             <i class="fa-brands fa-facebook" aria-hidden="true"></i>
                             <i class="fa-brands fa-instagram" aria-hidden="true"></i>
                             <i class="fa-brands fa-tiktok" aria-hidden="true"></i>
                         </div>
-                        <p class="ticket-social-handle" id="ticket-rec-social-handle">@allfixbacalar</p>
+                        <p class="ticket-social-handle" id="ticket-rec-social-handle"></p>
                     </div>
 
                     <div class="ticket-meta-block">
@@ -3687,9 +3630,7 @@
                         <p><span id="ticket-val-order-observations">Se notificará al cliente cualquier detalle adicional encontrado.</span></p>
                     </div>
 
-                    <div class="ticket-legal-text" id="ticket-rec-legal-text">
-                        <strong>IMPORTANTE:</strong> Una vez que su equipo esté listo y haya sido notificado, contará con un plazo máximo de 30 días para recogerlo. Después de ese plazo el establecimiento podrá disponer del equipo conforme a sus políticas internas.
-                    </div>
+                    <div class="ticket-legal-text" id="ticket-rec-legal-text"></div>
 
                     <div class="ticket-signature-section">
                         <img src="" id="ticket-val-signature-img" class="signature-render" alt="Firma del Cliente">
@@ -3697,7 +3638,7 @@
                     </div>
 
                     <div class="ticket-order-footer">
-                        <strong>Gracias por confiar en Allfix Bacalar</strong>
+                        <strong>Gracias por su confianza</strong>
                         <span>Conserve este comprobante para dar seguimiento a su orden</span>
                     </div>
                     <div class="ticket-tear-edge ticket-tear-edge-bottom"></div>
@@ -3705,7 +3646,7 @@
 
                 <!-- Etiqueta pequeña para el equipo -->
                 <div class="ticket-preview-box thermal-label-box hidden" id="etiqueta-pequena-container">
-                    <div class="thermal-header" id="thermal-business-name">ALLFIX BACALAR</div>
+                    <div class="thermal-header" id="thermal-business-name"></div>
                     <svg id="thermal-folio-barcode" class="thermal-folio-barcode"></svg>
                     <div class="thermal-folio" id="thermal-val-folio">AFB-2026-0001</div>
                     <div class="thermal-details">
@@ -3738,142 +3679,35 @@
 
     <!-- ========================================== -->
     <dialog id="order-print-selector" aria-labelledby="order-print-selector-title">
+        <div class="order-actions-handle" aria-hidden="true"></div>
         <div class="modal-header">
-            <h3 id="order-print-selector-title">¿Qué deseas imprimir?</h3>
-            <button type="button" class="btn-close-modal" id="order-print-selector-close" aria-label="Cerrar selector de impresión"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            <div class="order-actions-heading"><span class="order-actions-success" aria-hidden="true"><i class="fa-solid fa-check"></i></span><div><h3 id="order-print-selector-title">Acciones de la orden</h3><p id="order-actions-folio"></p></div></div>
+            <button type="button" class="btn-close-modal" id="order-print-selector-close" aria-label="Cerrar acciones de la orden"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
         </div>
-        <div class="order-print-options">
+        <div class="order-print-options"><p class="order-actions-prompt">¿Qué deseas hacer?</p>
             <button type="button" class="order-print-option" id="order-print-customer">
                 <i class="fa-solid fa-receipt" aria-hidden="true"></i>
-                <span><strong>Ticket para el cliente</strong><small>Comprobante que se entrega al cliente</small></span>
+                <span><strong>Ticket para el cliente</strong><small>Imprime el comprobante para entregar al cliente</small></span>
             </button>
             <button type="button" class="order-print-option" id="btn-print-equipment-label">
                 <i class="fa-solid fa-mobile-screen" aria-hidden="true"></i>
-                <span><strong>Etiqueta para el equipo</strong><small>Etiqueta interna para pegar al dispositivo</small></span>
+                <span><strong>Ticket para el equipo</strong><small>Imprime la etiqueta interna para pegar al dispositivo</small></span>
             </button>
+            <button type="button" class="order-print-option" id="order-actions-share"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i><span><strong>Compartir ticket</strong><small>Compártelo por WhatsApp u otras aplicaciones</small></span></button>
+            <button type="button" class="order-print-option" id="order-actions-download"><i class="fa-solid fa-download" aria-hidden="true"></i><span><strong>Descargar ticket</strong><small>Guarda el comprobante como imagen</small></span></button>
             <p id="order-print-selector-status" role="status" aria-live="polite"></p>
         </div>
-        <div class="modal-footer"><button type="button" class="btn btn-secondary" id="order-print-selector-cancel">Cancelar</button></div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" id="order-print-selector-cancel">Finalizar</button></div>
     </dialog>
 
     <!-- Independent digital preview: never used by physical printing. -->
     <dialog id="share-ticket-preview" aria-labelledby="share-ticket-preview-title">
         <header><div><h3 id="share-ticket-preview-title">Comprobante para compartir</h3><p id="share-ticket-image-info"></p></div><button type="button" class="btn btn-secondary" id="btn-close-share-preview" aria-label="Cerrar vista previa">Cerrar</button></header>
-        <div class="share-ticket-image-wrap"><img id="share-ticket-preview-image" alt="Comprobante visual Allfix Bacalar"></div>
+        <div class="share-ticket-image-wrap"><img id="share-ticket-preview-image" alt="Comprobante visual del establecimiento"></div>
         <footer><button type="button" class="btn btn-secondary" id="btn-download-share-preview">Descargar PNG</button><button type="button" class="btn btn-success" id="btn-share-preview">Compartir / WhatsApp</button><p id="share-preview-status" role="status" aria-live="polite"></p></footer>
     </dialog>
-    <!-- INTERACTIVE MODAL: QUOTE DETAIL           -->
     <!-- ========================================== -->
-    <div id="quote-modal" class="modal-overlay hidden">
-        <div class="modal-container modal-large quote-detail-modal">
-            <div class="modal-header quote-modal-header">
-                <div class="quote-modal-title">
-                    <span class="quote-modal-icon"><i class="fa-solid fa-clipboard-list"></i></span>
-                    <div>
-                        <h3>Detalle de cotización</h3>
-                        <p>Información y seguimiento de la solicitud.</p>
-                    </div>
-                </div>
-                <button class="btn-close-modal" id="btn-close-quote-modal"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="modal-body quote-modal-body">
-                <div class="quote-detail-layout">
-                    <section class="quote-info-card quote-summary-card">
-                        <div class="quote-card-head">
-                            <span><i class="fa-solid fa-user-check"></i></span>
-                            <div>
-                                <h4>Datos del cliente y equipo</h4>
-                                <p>Resumen recibido desde el formulario web.</p>
-                            </div>
-                        </div>
-                        <div class="quote-details-info">
-                            <div class="quote-detail-item">
-                                <small>Fecha</small>
-                                <strong id="quote-detail-date"></strong>
-                            </div>
-                            <div class="quote-detail-item">
-                                <small>Estado actual</small>
-                                <span id="quote-detail-status-badge"></span>
-                            </div>
-                            <div class="quote-detail-item">
-                                <small>Cliente</small>
-                                <strong id="quote-detail-client"></strong>
-                            </div>
-                            <div class="quote-detail-item">
-                                <small>Teléfono</small>
-                                <strong id="quote-detail-phone"></strong>
-                            </div>
-                            <div class="quote-detail-item">
-                                <small>Contacto preferido</small>
-                                <strong id="quote-detail-contact"></strong>
-                            </div>
-                            <div class="quote-detail-item">
-                                <small>Equipo</small>
-                                <strong id="quote-detail-device"></strong>
-                            </div>
-                            <div class="quote-detail-item quote-detail-wide">
-                                <small>Marca / Modelo</small>
-                                <strong id="quote-detail-brand-model"></strong>
-                            </div>
-                        </div>
-                    </section>
 
-                    <section class="quote-info-card quote-problem-card">
-                        <div class="quote-card-head compact">
-                            <span><i class="fa-solid fa-screwdriver-wrench"></i></span>
-                            <h4>Problema reportado</h4>
-                        </div>
-                        <p id="quote-detail-problem"></p>
-                    </section>
-
-                    <section class="quote-info-card quote-evidence-card" id="quote-detail-photos-container">
-                        <div class="quote-card-head compact">
-                            <span><i class="fa-solid fa-images"></i></span>
-                            <h4>Fotografías</h4>
-                        </div>
-                        <div id="quote-detail-photos" class="quote-detail-photos"></div>
-                    </section>
-
-                    <form id="quote-action-form" class="quote-action-card">
-                        <input type="hidden" id="quote-detail-id">
-                        <div class="quote-card-head">
-                            <span><i class="fa-solid fa-list-check"></i></span>
-                            <div>
-                                <h4>Seguimiento</h4>
-                                <p>Estado, notas y conversión a orden.</p>
-                            </div>
-                        </div>
-                        <div class="quote-action-row">
-                            <div class="form-group">
-                                <label for="quote-detail-status">Estado de la cotización</label>
-                                <select id="quote-detail-status" class="form-select">
-                                    <option value="Pendiente">Pendiente</option>
-                                    <option value="Contactado">Contactado</option>
-                                    <option value="Cotizado">Cotizado</option>
-                                    <option value="Aceptado">Aceptado</option>
-                                    <option value="Rechazado">Rechazado</option>
-                                </select>
-                            </div>
-                            <button type="button" class="btn btn-success quote-convert-btn" id="btn-convert-quote">
-                                <i class="fa-solid fa-file-signature"></i> Convertir en orden
-                            </button>
-                        </div>
-                        <div class="form-group">
-                            <label for="quote-detail-observations">Observaciones / Notas internas</label>
-                            <textarea id="quote-detail-observations" class="form-control" rows="4" placeholder="Ingresa notas internas sobre el contacto con el cliente..."></textarea>
-                        </div>
-                        <div class="modal-footer quote-modal-footer">
-                            <button type="button" class="btn btn-danger" id="btn-delete-quote"><i class="fa-solid fa-trash"></i> Eliminar</button>
-                            <div class="quote-footer-actions">
-                                <button type="button" class="btn btn-secondary" id="btn-cancel-quote">Cerrar</button>
-                                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Guardar Cambios</button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- ========================================== -->
     <!-- INTERACTIVE MODAL: ADD/EDIT EVENT          -->
@@ -3980,6 +3814,7 @@
     <script src="js/app.js?v=20261011-escpos"></script>
     <script src="dist/share-ticket.js?v=20261011-visual"></script>
     <script src="js/receiptShare.js?v=20261011-visual"></script>
+    <script src="js/orderActionsUI.js?v=20261013"></script>
     <script src="js/quickOrderExtras.js?v=20260926-access"></script>
     <script src="js/quickOrder.js?v=20260929-save"></script>
     <script defer src="dist/order-catalog.js?v=20260927-autocomplete"></script>

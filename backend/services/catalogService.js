@@ -59,9 +59,8 @@ async function addEntry(kind, data, scope, db = pool, verifiedParent = null) {
   if (!scope) throw error('Configura el negocio de esta instalación antes de guardar catálogos privados.', 409);
   const def = definition(kind);
   const name = cleanName(data.nombre, def.max);
-  if (def.parent && (!verifiedParent || Number(verifiedParent.id) !== Number(data.parent_id))) {
-    await visible(def.parent, data.parent_id, scope, db);
-  }
+  let parent = verifiedParent;
+  if (def.parent && (!parent || Number(parent.id) !== Number(data.parent_id))) parent = await visible(def.parent, data.parent_id, scope, db);
   const params = [key(name), scope];
   const parentWhere = def.column ? `AND ${def.column} = $3` : '';
   if (def.column) params.push(Number(data.parent_id));
@@ -69,8 +68,9 @@ async function addEntry(kind, data, scope, db = pool, verifiedParent = null) {
   if (existing.rows.some(row => row.activo === false)) throw error('Este elemento está desactivado. Utiliza otro nombre o consulta al administrador.', 409);
   if (existing.rows[0]) return existing.rows[0];
   const values = [scope, name, key(name)];
-  if (def.column) values.push(Number(data.parent_id));
-  const inserted = await db.query(`INSERT INTO ${def.table} (negocio_id, nombre, clave${def.column ? `, ${def.column}` : ''})
+  const parentScope = def.column?.replace(/_id$/, '_scope');
+  if (def.column) values.push(Number(data.parent_id),Number(parent.negocio_id || 0));
+  const inserted = await db.query(`INSERT INTO ${def.table} (negocio_id, nombre, clave${def.column ? `, ${def.column}, ${parentScope}` : ''})
     VALUES (${values.map((_, i) => `$${i + 1}`).join(',')}) ON CONFLICT DO NOTHING RETURNING *`, values);
   if (inserted.rows[0]) return inserted.rows[0];
   const concurrent = await db.query(`SELECT * FROM ${def.table} WHERE clave = $1 AND negocio_id = $2 ${parentWhere}`, params);
@@ -82,7 +82,7 @@ async function linkRepair(data, scope, db = pool) {
   const fault = await visible('fallas', data.falla_id, scope, db);
   const repair = await visible('reparaciones', data.reparacion_id, scope, db);
   if (fault.tipo_equipo_id !== repair.tipo_equipo_id) throw error('La falla y la reparación deben pertenecer al mismo equipo.');
-  await db.query('INSERT INTO falla_reparaciones (negocio_id, falla_id, reparacion_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING', [scope, fault.id, repair.id]);
+  await db.query('INSERT INTO falla_reparaciones (negocio_id, falla_id, reparacion_id,falla_scope,reparacion_scope) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING', [scope, fault.id, repair.id,Number(fault.negocio_id||0),Number(repair.negocio_id||0)]);
   return { success: true };
 }
 async function deactivate(kind, id, scope) {

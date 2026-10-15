@@ -24,15 +24,17 @@ test('general order list omits secrets while authenticated detail preserves them
   }
 });
 
-test('public folio endpoint never serializes access credentials', async () => {
+test('authenticated folio endpoint never serializes access credentials', async () => {
   const handlers = {};
   const router = Object.fromEntries(['get', 'post', 'put', 'delete', 'patch'].map(method => [method, (url, ...callbacks) => { handlers[`${method} ${url}`] = callbacks; }]));
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../routes/ordenes.js'), 'utf8'), {
     module: { exports: {} }, console,
     require(name) {
       if (name === 'express') return { Router: () => router };
+      if (name === '../config/tenantContext') return require('../config/tenantContext');
       if (name === '../middleware/auth') return { authMiddleware() {}, adminOnly() {} };
       if (name === '../middleware/rateLimit') return { rateLimit: () => () => {} };
+      if (name === '../config/db') return {pool:{query:async()=>({rows:[{data:{folio:'test',status:'Recibido'}}]})}};
       if (name === '../services/ordenService') return { getOrdenByFolio: async () => ({ folio: 'test', lock_pin: '0012', lock_pass: 'private', lock_pattern: '1-2-5-8' }) };
       return {};
     }

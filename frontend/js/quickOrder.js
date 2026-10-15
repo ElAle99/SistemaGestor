@@ -115,11 +115,12 @@ async function showQuickOrder(print = false, silent = false) {
     if (!quickCreatedOrder) return;
     const status = document.getElementById('quick-order-print-status');
     try {
-        const opened = await viewOrderDetails(quickCreatedOrder.id, { openPreview: !print || !globalThis.printerService?.isNative() });
-        if (opened === false) throw new Error('No se pudo abrir la orden.');
         if (print) {
-            globalThis.openOrderPrintSelector();
+            globalThis.openOrderActionsModal(quickCreatedOrder, { loadDetails: true });
+            return;
         }
+        const opened = await viewOrderDetails(quickCreatedOrder.id, { openPreview: !print });
+        if (opened === false) throw new Error('No se pudo abrir la orden.');
     } catch (error) {
         status.textContent = 'La orden está guardada. No se pudo abrir o imprimir el ticket; vuelve a intentarlo.';
     }
@@ -177,6 +178,13 @@ quickOrderForm.addEventListener('submit', async event => {
         submit.textContent = 'Crear orden';
     }
     if (quickCreatedOrder) {
+        quickOrderModal.classList.add('hidden');
+        try {
+            globalThis.openOrderActionsModal(quickCreatedOrder, { created: true, loadDetails: true });
+        } catch {
+            globalThis.AllfixUI?.notify('La orden está guardada. Abre sus acciones desde Órdenes.');
+            quickOrderModal.classList.remove('hidden');
+        }
         // Post-save failures must never invite submitting an already saved order again.
         const refresh = typeof refreshQuickOrderData === 'function' ? refreshQuickOrderData : loadAllData;
         Promise.resolve(refresh(Number(data.anticipo) > 0)).catch(() => {});

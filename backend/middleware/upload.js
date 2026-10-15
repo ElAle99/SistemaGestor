@@ -1,6 +1,7 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { pool } = require('../config/db');
 
 const uploadDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadDir)) {
@@ -35,4 +36,18 @@ const upload = multer({
   fileFilter: fileFilter
 });
 
-module.exports = upload;
+function registered(middleware) {
+  return (req,res,next)=>middleware(req,res,async error=>{
+    if(error)return next(error);
+    const files=req.file?[req.file]:(req.files||[]);
+    try {
+      if(!req.user?.negocio_id)throw new Error('Tenant requerido para subir archivos.');
+      for(const file of files)await pool.query('INSERT INTO archivos(negocio_id,url,filename,publico) VALUES($1,$2,$3,$4)',[req.user.negocio_id,'/uploads/'+file.filename,file.filename,req.baseUrl==='/api/configuracion'&&req.path==='/logo']);
+      next();
+    } catch(error) {
+      for(const file of files) { const target=path.resolve(uploadDir,file.filename); if(path.dirname(target)===path.resolve(uploadDir)) fs.unlink(target,()=>{}); }
+      next(error);
+    }
+  });
+}
+module.exports = {single:field=>registered(upload.single(field)),array:(field,max)=>registered(upload.array(field,max))};

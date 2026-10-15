@@ -18,7 +18,7 @@ async function setSystemSetting(key, value, updatedBy, client = pool) {
   const result = await client.query(
     `INSERT INTO configuracion_sistema (clave, valor, actualizado_por, fecha_actualizacion)
      VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-     ON CONFLICT (clave) DO UPDATE SET
+     ON CONFLICT (clave, negocio_id) DO UPDATE SET
        valor = EXCLUDED.valor,
        actualizado_por = EXCLUDED.actualizado_por,
        fecha_actualizacion = CURRENT_TIMESTAMP

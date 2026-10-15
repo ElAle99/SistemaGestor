@@ -7,6 +7,7 @@ const { authMiddleware, adminOnly } = require('../middleware/auth');
 const { printTicketText, printTicketImage } = require('../services/ticketPrinterService');
 const { createUser, updateUser, publicUser } = require('../services/userService');
 const upload = require('../middleware/upload');
+const { isLegacyBusiness } = require('../db/initTenancy');
 
 const router = express.Router();
 
@@ -125,30 +126,18 @@ $printers | ConvertTo-Json -Compress
 
 // Configuracion del negocio
 router.get('/negocio', authMiddleware, async (req, res) => {
+  if (!req.user.negocio_id) return res.status(403).json({ error: 'Negocio no asociado' });
   try {
-    const result = await pool.query('SELECT * FROM configuracion WHERE id = 1');
-    if (result.rows.length === 0) {
-      res.json({
-        nombre: '',
-        direccion: '',
-        telefono: '',
-        whatsapp: '',
-        redes_sociales: '',
-        terminos_legales: '',
-        logo_url: '',
-        logo_ticket_url: '',
-        impresora_ticket: '',
-        papel_ticket: '80mm',
-        auto_imprimir_ticket: true
-      });
-    }
-    else res.json(result.rows[0]);
+    const result = await pool.query('SELECT * FROM configuracion WHERE negocio_id = $1', [req.user.negocio_id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Configuracion del negocio no encontrada' });
+    res.json({ ...result.rows[0], legacy_business: await isLegacyBusiness(pool, req.user.negocio_id) });
   } catch (error) {
     res.status(500).json({ error: 'Error al obtener configuracion' });
   }
 });
 
 router.put('/negocio', authMiddleware, adminOnly, async (req, res) => {
+  if (!req.user.negocio_id) return res.status(403).json({ error: 'Negocio no asociado' });
   try {
     const {
       nombre,
@@ -164,9 +153,13 @@ router.put('/negocio', authMiddleware, adminOnly, async (req, res) => {
       auto_imprimir_ticket
     } = req.body;
     const currentResult = await pool.query(
-      'SELECT impresora_ticket, papel_ticket, auto_imprimir_ticket FROM configuracion WHERE id = 1'
+      'SELECT impresora_ticket, papel_ticket, auto_imprimir_ticket FROM configuracion WHERE negocio_id = $1', [req.user.negocio_id]
     );
     const currentPrintConfig = currentResult.rows[0] || {};
+    for (const url of new Set([logo_url, logo_ticket_url].filter(Boolean))) {
+      const owned = await pool.query('SELECT url FROM negocio_logos WHERE url = $1 AND negocio_id = $2', [url, req.user.negocio_id]);
+      if (!owned.rows.length) return res.status(403).json({ error: 'El logo no pertenece al negocio de la sesion.' });
+    }
     const preservedPrinter = impresora_ticket === undefined
       ? (currentPrintConfig.impresora_ticket || '')
       : (impresora_ticket || '');
@@ -178,11 +171,11 @@ router.put('/negocio', authMiddleware, adminOnly, async (req, res) => {
       : (auto_imprimir_ticket !== false);
     await pool.query(
       `INSERT INTO configuracion (
-         id, nombre, direccion, telefono, whatsapp, redes_sociales, terminos_legales,
+         negocio_id, nombre, direccion, telefono, whatsapp, redes_sociales, terminos_legales,
          logo_url, logo_ticket_url, impresora_ticket, papel_ticket, auto_imprimir_ticket
        )
-       VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-       ON CONFLICT (id) DO UPDATE SET
+       VALUES ($12, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       ON CONFLICT (negocio_id) DO UPDATE SET
          nombre = $1,
          direccion = $2,
          telefono = $3,
@@ -205,7 +198,8 @@ router.put('/negocio', authMiddleware, adminOnly, async (req, res) => {
         logo_ticket_url || '',
         preservedPrinter,
         preservedPaper,
-        preservedAutoPrint
+        preservedAutoPrint,
+        req.user.negocio_id
       ]
     );
     res.json({ message: 'Configuración actualizada' });
@@ -220,6 +214,7 @@ router.post('/logo', authMiddleware, adminOnly, upload.single('logo'), async (re
       return res.status(400).json({ error: 'No se recibió ningún logo.' });
     }
 
+    await pool.query('INSERT INTO negocio_logos (url, negocio_id) VALUES ($1, $2)', [`/uploads/${req.file.filename}`, req.user.negocio_id]);
     res.json({
       url: `/uploads/${req.file.filename}`,
       filename: req.file.filename
@@ -285,6 +280,7 @@ router.get('/usuarios', authMiddleware, adminOnly, async (req, res) => {
     const result = await pool.query(
       `SELECT id, username, rol, nombre, correo, telefono, activo, fecha_creacion
        FROM usuarios
+       WHERE negocio_id=app_tenant_id()
        ORDER BY fecha_creacion DESC, id DESC`
     );
     res.json(result.rows.map(publicUser));
@@ -318,7 +314,7 @@ router.delete('/usuarios/:id', authMiddleware, adminOnly, async (req, res) => {
     if (Number(req.params.id) === Number(req.user.id)) {
       return res.status(400).json({ error: 'No puedes desactivar tu propio usuario.' });
     }
-    await pool.query('UPDATE usuarios SET activo = false, session_version = session_version + 1 WHERE id = $1', [req.params.id]);
+    await pool.query('UPDATE usuarios SET activo = false, session_version = session_version + 1 WHERE negocio_id = app_tenant_id() AND id = $1', [req.params.id]);
     res.json({ message: 'Usuario desactivado' });
   } catch (error) {
     res.status(500).json({ error: 'Error al desactivar usuario' });

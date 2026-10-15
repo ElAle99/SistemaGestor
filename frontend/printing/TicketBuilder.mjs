@@ -1,3 +1,4 @@
+import { buildBusinessHeader, businessLegalLines } from './BusinessIdentity.mjs';
 export const safeText = value => String(value ?? '').normalize('NFC')
   .replace(/[\x00-\x1f\x7f-\x9f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 1200);
 const money = value => `$${(Number.isFinite(Number(value)) ? Number(value) : 0).toFixed(2)}`;
@@ -26,12 +27,14 @@ export function serviceTicket(data) {
   const url = publicTrackingUrl(data.publicTrackingUrl);
   if (url) lines.push({ kind: 'qr', value: url }, line('Consulta el estado de tu orden', { align: 'center' }));
   lines.push(...field('Folio', data.folio), line('Conserve este ticket.', { align: 'center' }));
+  const legal = businessLegalLines(data.business);
+  if (legal.length) lines.push(separator, ...legal);
   return lines;
 }
 
 export function equipmentLabelTicket(data) {
   if (!safeText(data.folio)) throw new Error('La etiqueta requiere el folio de la orden.');
-  return [line('ALLFIX BACALAR', { align: 'center' }),
+  return [...buildBusinessHeader(data.business, { compact: true }),
     line(`FOLIO: ${safeText(data.folio)}`, { bold: true }),
     ...field('Cliente', data.customerName), ...field('Celular', data.phone),
     ...field('Equipo', [data.deviceType, data.brand, data.model].filter(Boolean).join(' ')), separator,
@@ -75,9 +78,8 @@ export class TicketBuilder {
       test: () => [line('PRUEBA ESC/POS', { bold: true }), line('ñ Ñ á é í ó ú ¿Qué? ¡Sí! $123.45'), { kind: 'qr', value: 'https://example.com/' }] }[type];
     if (!template) throw new Error('Tipo de ticket no compatible.');
     // Templates select fields explicitly. Raw objects and internal identifiers never enter the queue.
-    return { type, lines: [line('Allfix Bacalar', { align: 'center', bold: true, large: true }),
-      line('REPARACIÓN DE EQUIPOS MÓVILES', { align: 'center' }),
-      ...field('WhatsApp', data.businessContact), separator, ...template(data)],
+    const header = buildBusinessHeader(data.business);
+    return { type, lines: [...header, ...(header.length ? [separator] : []), ...template(data)],
       logoUrl: typeof data.logoUrl === 'string' ? data.logoUrl : '' };
   }
 }

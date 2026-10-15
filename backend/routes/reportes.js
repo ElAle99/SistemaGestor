@@ -11,7 +11,7 @@ router.get('/ingresos', authMiddleware, async (req, res) => {
     if (periodo === 'mes') groupBy = "TO_CHAR(fecha, 'YYYY-MM')";
     if (periodo === 'ano') groupBy = "TO_CHAR(fecha, 'YYYY')";
 
-    let query = `SELECT ${groupBy} as periodo, SUM(total) as ingresos FROM ventas WHERE 1=1`;
+    let query = `SELECT ${groupBy} as periodo, SUM(total) as ingresos FROM ventas WHERE negocio_id=app_tenant_id()`;
     const params = [];
     let idx = 1;
     if (desde) {
@@ -36,7 +36,7 @@ router.get('/reparaciones', authMiddleware, async (req, res) => {
     let query = `
       SELECT estado, COUNT(*) as cantidad 
       FROM ordenes_servicio 
-      WHERE fecha_creacion BETWEEN $1 AND $2 
+      WHERE negocio_id=app_tenant_id() AND fecha_creacion BETWEEN $1 AND $2
       GROUP BY estado
     `;
     const result = await pool.query(query, [desde || '1900-01-01', hasta || '2100-01-01']);
@@ -54,7 +54,7 @@ router.get('/ventas', authMiddleware, async (req, res) => {
       FROM ventas_detalle vd
       JOIN ventas v ON vd.venta_id = v.id
       JOIN inventario i ON vd.producto_id = i.id
-      WHERE 1=1
+      WHERE vd.negocio_id=app_tenant_id() AND v.negocio_id=vd.negocio_id AND i.negocio_id=vd.negocio_id
     `;
     const params = [];
     let idx = 1;

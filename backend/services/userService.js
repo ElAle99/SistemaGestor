@@ -16,13 +16,7 @@ function normalizeUsername(username) {
 }
 
 async function ensureUserProfileColumns(client = pool) {
-  await client.query('ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS correo VARCHAR(120)');
-  await client.query('ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS telefono VARCHAR(30)');
-  await client.query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS usuarios_correo_unique_idx
-    ON usuarios (LOWER(correo))
-    WHERE correo IS NOT NULL AND TRIM(correo) <> ''
-  `);
+  // Schema is initialized/migrated at startup; tenant connections have no DDL privileges.
 }
 
 function normalizeUserPayload(data = {}) {
@@ -130,6 +124,7 @@ function publicUser(row) {
   if (!row) return null;
   return {
     id: row.id,
+    negocio_id: row.negocio_id,
     username: row.username,
     rol: row.rol,
     nombre: row.nombre,
@@ -208,7 +203,7 @@ async function updateUser(id, data, { client = pool } = {}) {
   }
 
   params.push(id);
-  query += ` WHERE id = $${params.length} RETURNING id, username, rol, nombre, correo, telefono, activo, fecha_creacion`;
+  query += ` WHERE negocio_id = app_tenant_id() AND id = $${params.length} RETURNING id, username, rol, nombre, correo, telefono, activo, fecha_creacion`;
 
   const result = await client.query(query, params);
   if (result.rows.length === 0) {

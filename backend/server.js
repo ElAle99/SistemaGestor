@@ -3,7 +3,6 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { initDB, pool } = require('./config/db');
-const garantiaService = require('./services/garantiaService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -98,7 +97,7 @@ app.use('/vendor/html2canvas', express.static(path.join(__dirname, 'node_modules
 app.use('/vendor/jspdf', express.static(path.join(__dirname, 'node_modules', 'jspdf', 'dist')));
 app.use('/vendor/jspdf-autotable', express.static(path.join(__dirname, 'node_modules', 'jspdf-autotable', 'dist')));
 app.use('/vendor/dayjs', express.static(path.join(__dirname, 'node_modules', 'dayjs')));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', require('./routes/privateFiles'));
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(frontendPath, 'index.html'));
@@ -113,7 +112,8 @@ app.use('/api/ordenes', require('./routes/ordenes'));
 app.use('/api/catalogos', require('./routes/catalogos'));
 app.use('/api/inventario', require('./routes/inventario'));
 app.use('/api/ventas', require('./routes/ventas'));
-app.use('/api/cotizaciones', require('./routes/cotizaciones'));
+app.use('/api/cotizaciones', (req,res)=>res.status(410).json({error:'Este modulo ya no esta disponible.'}));
+app.get(['/cotizaciones','/cotizaciones/*'],(req,res)=>res.status(410).send('Este modulo ya no esta disponible.'));
 app.use('/api/calendario', require('./routes/calendario'));
 app.use('/api/reportes', require('./routes/reportes'));
 app.use('/api/configuracion', require('./routes/config'));
@@ -122,6 +122,7 @@ app.use('/api/pos', require('./routes/pos'));
 app.use('/api/caja', require('./routes/caja'));
 app.use('/api/eventos', require('./routes/eventos'));
 app.use('/api/uploads', require('./routes/uploads'));
+app.use('/api/archivos', require('./routes/privateFiles'));
 app.use('/api/garantias', require('./routes/garantias'));
 
 app.get('*', (req, res, next) => {
@@ -130,11 +131,15 @@ app.get('*', (req, res, next) => {
 });
 
 // Iniciar servidor
+app.use((error,req,res,next)=>{
+  if(res.headersSent)return next(error);
+  console.error('Error de solicitud:',error.code||error.name);
+  res.status(error.status>=400&&error.status<500?error.status:500).json({error:'No se pudo completar la solicitud.'});
+});
 async function start() {
   try {
     if (!process.env.JWT_SECRET?.trim()) throw new Error('JWT_SECRET es obligatorio.');
     await initDB();
-    await garantiaService.initGarantiasDB();
     console.log('Base de datos inicializada correctamente');
     return app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
   } catch (error) {

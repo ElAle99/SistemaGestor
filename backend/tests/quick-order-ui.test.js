@@ -31,7 +31,9 @@ function ui({ failPrint = false, failSave = false, failPreview = false } = {}) {
       calls.push({ url, options });
       return { ok: !failSave, json: async () => failSave ? { error: 'Caja cerrada' } : { id: 17, folio: 'AFB-2026-10043' } };
     },
-    async viewOrderDetails(id) { calls.push({ preview: id }); return !failPreview; },
+    APP_STATE: { selectedOrderForReceipt: { id: 17, folio: 'AFB-2026-10043' } },
+    async viewOrderDetails(id, options) { calls.push({ preview: id, options }); return !failPreview; },
+    openOrderActionsModal(order, options) { calls.push({ actions: order.id, created: options.created }); if (failPrint) throw new Error('selector unavailable'); },
     async printReceipt() { calls.push({ print: true }); if (failPrint) throw new Error('printer unavailable'); return true; },
     openOrderPrintSelector() { calls.push({ selector: true }); if (failPrint) throw new Error('selector unavailable'); },
     async loadAllData() { calls.push({ refresh: true }); }
@@ -59,10 +61,12 @@ test('quick form sends only reception fields and blocks duplicate in-flight subm
   assert.equal(Object.keys(payload).length, 12); // eleven fields plus selected customer id
   assert.equal(h.element('quick-order-form').classList.contains('hidden'), true);
   assert.match(h.element('quick-order-success-message').textContent, /10043/);
-  assert.ok(!h.calls.some(c => c.preview || c.print));
+  assert.ok(!h.calls.some(c => c.print));
+  assert.ok(!h.calls.some(c => c.preview));
+  assert.ok(h.calls.some(c => c.actions === 17 && c.created));
   await h.element('quick-order-print').events.click();
-  assert.ok(h.calls.some(c => c.preview === 17));
-  assert.ok(h.calls.some(c => c.selector));
+  assert.ok(!h.calls.some(c => c.preview));
+  assert.equal(h.calls.filter(c => c.actions === 17).length, 2);
   assert.ok(!h.calls.some(c => c.print));
 });
 
@@ -80,6 +84,20 @@ test('failed save keeps captured fields and enables correction', async () => {
   assert.equal(h.element('quick-client-name').value, 'Juan Pérez');
   assert.match(h.element('quick-order-error').textContent, /Caja cerrada/);
   assert.equal(h.element('quick-order-submit').disabled, false);
+  assert.ok(!h.calls.some(c => c.print));
+  assert.ok(!h.calls.some(c => c.actions));
+});
+
+test('post-create actions wait for backend confirmation and never send a print job', async () => {
+  const h = ui();
+  let confirm;
+  h.context.fetch = () => new Promise(resolve => { confirm = resolve; });
+  const saving = h.submit();
+  assert.ok(!h.calls.some(c => c.actions || c.preview || c.print));
+  assert.equal(h.element('quick-order-submit').disabled, true);
+  confirm({ ok: true, json: async () => ({ id: 17, folio: 'AFB-2026-10043' }) });
+  await saving;
+  assert.ok(h.calls.some(c => c.actions === 17 && c.created));
   assert.ok(!h.calls.some(c => c.print));
 });
 

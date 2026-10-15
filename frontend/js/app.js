@@ -16,14 +16,14 @@ const APP_STATE = {
     selectedOrderForReceipt: null,
     selectedSaleForReceipt: null,
     selectedCajaForReceipt: null,
-    cotizaciones: [],
+
     eventos: [],
     garantias: [],
     garantiaStats: null,
     cajaActiva: null,
     cajaHistorial: [],
     notifications: [],
-    cotizacionesPollId: null,
+    inventoryPollId: null,
     currentOrderParts: [],
     selectedOrderPart: null,
     currentWarrantyCostParts: []
@@ -379,7 +379,7 @@ function clearSessionState() {
     sessionStorage.removeItem('allfix_user');
     APP_STATE.currentUser = null;
     APP_STATE.currentRole = 'Administrador';
-    stopCotizacionesPolling();
+    stopInventoryPolling();
 }
 
 function decodeJwtPayload(token) {
@@ -469,7 +469,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initEstablishmentConfigForm();
     initPrinterConfigForm();
     initConfigurationNavigation();
-    initCotizaciones();
+
     initCalendarioEvents();
     checkSession();
 });
@@ -557,7 +557,7 @@ function checkSession() {
         APP_STATE.currentRole = user.rol || 'Administrador';
         updateSidebarProfile(user);
         document.getElementById('sidebar-avatar').innerText = (user.nombre || user.username || 'U').charAt(0).toUpperCase();
-        
+
         showAppContainer();
     } else {
         showLoginContainer();
@@ -584,7 +584,7 @@ function showAppContainer() {
     loadEstablishmentConfig().then(syncConfigForms);
     applyRolePermissions();
     loadAllData();
-    startCotizacionesPolling();
+    startInventoryPolling();
 }
 
 function initLogin() {
@@ -626,7 +626,7 @@ function initLogin() {
     if (logoutButton) {
         logoutButton.addEventListener('click', () => {
             window.printerManager?.clear();
-            stopCotizacionesPolling();
+            stopInventoryPolling();
             sessionStorage.removeItem('allfix_user');
             showLoginContainer();
         });
@@ -1308,19 +1308,12 @@ function renderNotificationsDrawer() {
 }
 
 function getNotificationDisplayTitle(notification = {}) {
-    if (notification.action === 'openQuote') return 'Nueva cotización';
+
     return notification.title || 'Notificación';
 }
 
 function getNotificationDisplayDesc(notification = {}) {
-    if (notification.action === 'openQuote') {
-        const quote = APP_STATE.cotizaciones.find(q => q.id === notification.quoteId);
-        if (quote) {
-            const clientName = getQuoteValue(quote, ['cliente_nombre', 'nombre'], 'Cliente');
-            const device = `${getQuoteValue(quote, ['tipo_equipo', 'equipo'], 'Equipo')} ${getQuoteValue(quote, ['marca'])} ${getQuoteValue(quote, ['modelo'])}`.trim();
-            return `${clientName} solicitó cotización para ${device}.`;
-        }
-    }
+
     return notification.desc || '';
 }
 
@@ -1333,7 +1326,7 @@ function getNotificationPriorityLabel(type) {
 
 function getNotificationActionLabel(notification = {}) {
     if (!notification.action) return '';
-    if (notification.action === 'openQuote') return 'Ver cotización';
+
     if (notification.action === 'openInventory') return 'Ver producto';
     if (notification.action === 'openOrder') return 'Abrir orden';
     return 'Abrir';
@@ -1345,45 +1338,39 @@ function getNotificationSecondaryActionLabel(notification = {}) {
     return '';
 }
 
-function startCotizacionesPolling() {
-    if (APP_STATE.cotizacionesPollId) return;
+function startInventoryPolling() {
+    if (APP_STATE.inventoryPollId) return;
 
-    APP_STATE.cotizacionesPollId = setInterval(async () => {
+    APP_STATE.inventoryPollId = setInterval(async () => {
         if (!APP_STATE.currentUser) return;
 
-        const previousPendingIds = new Set(
-            APP_STATE.cotizaciones
-                .filter(q => q.estado === 'Pendiente')
-                .map(q => q.id)
-        );
+
         const previousLowStockIds = new Set(
             APP_STATE.inventario
                 .filter(p => p.stock <= p.stock_minimo)
                 .map(p => p.id)
         );
 
-        await Promise.all([loadCotizaciones(), loadInventario()]);
-        updateQuotesMenuBadge();
+        await Promise.all([ loadInventario()]);
+
         updateInventoryMenuBadge();
 
-        const hasNewPendingQuote = APP_STATE.cotizaciones.some(q => q.estado === 'Pendiente' && !previousPendingIds.has(q.id));
+
         const hasNewLowStock = APP_STATE.inventario.some(p => p.stock <= p.stock_minimo && !previousLowStockIds.has(p.id));
-        if (hasNewPendingQuote || hasNewLowStock || !document.getElementById('notifications-drawer')?.classList.contains('hidden')) {
+        if (hasNewLowStock || !document.getElementById('notifications-drawer')?.classList.contains('hidden')) {
             renderDashboard();
             renderNotificationsDrawer();
         }
 
-        const activeCotizacionesView = !document.getElementById('view-cotizaciones')?.classList.contains('hidden');
-        if (activeCotizacionesView) {
-            renderCotizaciones();
-        }
+
+
     }, 15000);
 }
 
-function stopCotizacionesPolling() {
-    if (!APP_STATE.cotizacionesPollId) return;
-    clearInterval(APP_STATE.cotizacionesPollId);
-    APP_STATE.cotizacionesPollId = null;
+function stopInventoryPolling() {
+    if (!APP_STATE.inventoryPollId) return;
+    clearInterval(APP_STATE.inventoryPollId);
+    APP_STATE.inventoryPollId = null;
 }
 
 function handleNotificationClick(notification, actionType = 'primary') {
@@ -1409,18 +1396,7 @@ function handleNotificationClick(notification, actionType = 'primary') {
         }
     }
 
-    if (notification.action === 'openQuote') {
-        const statusFilter = document.getElementById('quote-status-filter');
-        const searchInput = document.getElementById('quote-search');
-        if (statusFilter) statusFilter.value = 'Pendiente';
-        if (searchInput) searchInput.value = '';
 
-        switchView('cotizaciones');
-        renderCotizaciones();
-        setTimeout(() => {
-            window.openQuoteDetail(notification.quoteId);
-        }, 80);
-    }
 
     if (notification.action === 'openInventory') {
         const searchInput = document.getElementById('inventory-search');
@@ -1443,14 +1419,7 @@ function handleNotificationClick(notification, actionType = 'primary') {
     }
 }
 
-function updateQuotesMenuBadge() {
-    const badge = document.getElementById('quotes-menu-badge');
-    if (!badge) return;
 
-    const pendingCount = APP_STATE.cotizaciones.filter(q => q.estado === 'Pendiente').length;
-    badge.textContent = pendingCount;
-    badge.classList.toggle('hidden', pendingCount === 0);
-}
 
 function updateInventoryMenuBadge() {
     const badge = document.getElementById('inventory-menu-badge');
@@ -1474,6 +1443,7 @@ function toggleInventorySubmenu(forceOpen = null) {
 }
 
 function switchView(viewName) {
+    if (!document.getElementById(`view-${viewName}`)) viewName = 'dashboard';
     // Cambiar clases activas del menu
     document.querySelectorAll('.menu-item').forEach(item => {
         if (item.getAttribute('data-view') === viewName) {
@@ -1502,7 +1472,7 @@ function switchView(viewName) {
         dashboard: 'Dashboard General',
         clientes: 'Gestión de Clientes',
         ordenes: 'Órdenes de Servicio',
-        cotizaciones: 'Solicitudes de Cotización',
+
         garantias: 'Garantias',
         inventario: currentInventorySection === 'accesorios' ? 'Inventario de Accesorios' : 'Inventario de Refacciones',
         pos: 'Ventas',
@@ -1554,7 +1524,7 @@ function applyRolePermissions() {
 // CARGA DE DATOS DESDE LA API REAL (SQLITE)
 // ==========================================
 async function refreshQuickOrderData(hasAdvance = false) {
-    // A new reception does not change inventory, users, quotes or cash history.
+    // A new reception does not change inventory, users or cash history.
     await Promise.all([loadClientes(), loadOrdenes(), ...(hasAdvance ? [loadCaja()] : [])]);
     renderDashboard();
     renderClientes();
@@ -1570,7 +1540,7 @@ async function loadAllData() {
             loadInventario(),
             loadVentas(),
             loadCaja(),
-            loadCotizaciones(),
+
             loadEventos(),
             loadGarantias()
         ];
@@ -1583,7 +1553,7 @@ async function loadAllData() {
         renderOrdenes();
         renderGarantias();
         renderInventario();
-        renderCotizaciones();
+
         renderCalendario();
         renderReportes();
         renderPOSCatalog();
@@ -1650,12 +1620,7 @@ async function loadCaja() {
     }
 }
 
-async function loadCotizaciones() {
-    const response = await fetch(`${BASE_API_URL}/cotizaciones`);
-    if (response.ok) {
-        APP_STATE.cotizaciones = await response.json();
-    }
-}
+
 
 async function loadEventos() {
     const response = await fetch(`${BASE_API_URL}/calendario/orders`);
@@ -1694,7 +1659,7 @@ function renderDashboard() {
         terminado: 0,
         entregado: 0
     };
-    
+
     APP_STATE.ordenes.forEach(o => {
         const badgeClass = getStatusBadgeClass(o.status);
         if (badgeClass === 'status-recibido') counts.recibido++;
@@ -1719,7 +1684,7 @@ function renderDashboard() {
     // 2. Rellenar tabla de Últimas ordenes
     const tableBody = document.querySelector('#dashboard-orders-table tbody');
     tableBody.innerHTML = '';
-    
+
     const latest = APP_STATE.ordenes.slice(0, 5);
     if (latest.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="7" class="text-center">No hay Órdenes registradas.</td></tr>';
@@ -1746,21 +1711,11 @@ function renderDashboard() {
     const alertsList = document.getElementById('dashboard-alerts-list');
     alertsList.innerHTML = '';
     APP_STATE.notifications = [];
-    updateQuotesMenuBadge();
+
     updateInventoryMenuBadge();
 
-    const pendingQuotes = APP_STATE.cotizaciones.filter(q => q.estado === 'Pendiente');
-    pendingQuotes.forEach(q => {
-            const clientName = getQuoteValue(q, ['cliente_nombre', 'nombre'], 'Cliente');
-            const device = `${getQuoteValue(q, ['tipo_equipo', 'equipo'], 'Equipo')} ${getQuoteValue(q, ['marca'])} ${getQuoteValue(q, ['modelo'])}`.trim();
-            APP_STATE.notifications.push({
-                type: 'info',
-                title: 'Nueva cotización',
-                desc: `${clientName} solicit? cotización para ${device}.`,
-                action: 'openQuote',
-                quoteId: q.id
-            });
-    });
+
+
 
     const todayStr = new Date().toISOString().split('T')[0];
     const tomorrow = new Date();
@@ -1864,7 +1819,7 @@ function renderDashboard() {
     document.getElementById('dash-sales-month').innerText = `$${monthSales.toFixed(2)}`;
     document.getElementById('dash-profit-month').innerText = `$${monthProfit.toFixed(2)}`;
     document.getElementById('dash-repairs-month').innerText = monthRepairsCount;
-    
+
     const lowStockCount = APP_STATE.inventario.filter(p => p.stock <= p.stock_minimo).length;
     document.getElementById('dash-low-stock').innerText = `${lowStockCount} items`;
     updateDashboardChart();
@@ -1882,7 +1837,7 @@ function addAlertItem(type, title, desc, metadata = {}) {
         li.setAttribute('role', 'button');
         li.tabIndex = 0;
     }
-    
+
     let icon = 'fa-circle-info';
     if (type === 'danger') icon = 'fa-circle-exclamation';
     if (type === 'warning') icon = 'fa-triangle-exclamation';
@@ -1938,9 +1893,9 @@ function getClientOrders(client = {}) {
 function renderClientes() {
     const tableBody = document.querySelector('#clients-table tbody');
     tableBody.innerHTML = '';
-    
+
     const searchVal = normalizeText(document.getElementById('client-search').value);
-    
+
     const filtered = APP_STATE.clientes.filter(c => [
         c.nombre,
         c.apellido_paterno,
@@ -2234,7 +2189,7 @@ function getOrderClientFullName(order = {}) {
 function renderOrdenes() {
     const tableBody = document.querySelector('#orders-main-table tbody');
     tableBody.innerHTML = '';
-    
+
     const searchInput = document.getElementById('order-search');
     const searchVal = normalizeText(searchInput.value);
     const filterStatus = document.getElementById('filter-order-status').value;
@@ -2262,7 +2217,7 @@ function renderOrdenes() {
             o.servicio_solicitado
         ].filter(Boolean).join(' '));
         const matchSearch = !searchVal || haystack.includes(searchVal);
-        
+
         const matchStatus = filterStatus === 'ALL' || o.status === filterStatus;
         return matchSearch && matchStatus;
     });
@@ -2297,7 +2252,7 @@ function renderOrdenes() {
             tr.innerHTML = `
                 <td data-label="Orden">
                     <div class="order-folio-cell">
-                        <strong>${escapeHtml(o.folio || '-')}</strong>
+                        <button type="button" class="order-folio-copy" title="Copiar folio" aria-label="Copiar folio"><strong>${escapeHtml(o.folio || '-')}</strong></button>
                         <span>#${String(o.id).padStart(4, '0')}</span>
                     </div>
                 </td>
@@ -2358,6 +2313,10 @@ function renderOrdenes() {
                     </div>
                 </td>
             `;
+            tr.querySelector('.order-folio-copy')?.addEventListener('click', event => {
+                event.stopPropagation();
+                window.copyOrderFolio(o.folio);
+            });
             tableBody.appendChild(tr);
         });
     }
@@ -3929,11 +3888,11 @@ function openOrderModal(editing = false) {
     setInputValue('form-mano-obra', '0');
     setInputValue('form-costo-refaccion', '0');
     setInputValue('form-costo-real', '');
-    
+
     // Reiniciar Canvas
     clearSignature();
     clearPattern();
-    
+
     document.querySelectorAll('#order-modal .modal-tab-content').forEach(content => {
         content.classList.remove('hidden');
     });
@@ -4823,12 +4782,12 @@ function initSignaturePad() {
         if (!isDrawing) return;
         e.preventDefault();
         const pos = getMousePos(e);
-        
+
         ctx.beginPath();
         ctx.moveTo(lastX, lastY);
         ctx.lineTo(pos.x, pos.y);
         ctx.stroke();
-        
+
         lastX = pos.x;
         lastY = pos.y;
     }
@@ -4855,7 +4814,7 @@ function initSignaturePad() {
 // Lógica de envío del registro de Ordenes
 function initOrderRegistration() {
     const orderForm = document.getElementById('order-form');
-    
+
     // Manejo de condicionales de estados (Motivo obligatorio de Cancelado o Retrasado)
     const statusSelect = document.getElementById('form-order-status');
     const reasonGroup = document.getElementById('status-reason-group');
@@ -4933,7 +4892,7 @@ function initOrderRegistration() {
             clientAddress: getInputValue('form-client-address') || null,
             clientPreferredContact: getRadioValue('client_contact_method', 'WhatsApp'),
             clientRemarks: null,
-            
+
             // Equipo
             deviceType: document.getElementById('form-device-type').value,
             color: document.getElementById('form-device-color').value || null,
@@ -4943,7 +4902,7 @@ function initOrderRegistration() {
             imei: document.getElementById('form-device-imei1').value || null,
             imei2: document.getElementById('form-device-imei2').value || null,
             serial: document.getElementById('form-device-serial').value || null,
-            
+
             // Desbloqueos
             sec_android: document.getElementById('form-sec-android').value || null,
             sec_patch: document.getElementById('form-sec-patch').value || null,
@@ -4974,7 +4933,7 @@ function initOrderRegistration() {
             vis_marco: getCheckboxValue('chk-vis-marco'),
             vis_puerto: getCheckboxValue('chk-vis-puerto'),
             vis_otro: getCheckboxValue('chk-vis-otro'),
-            
+
             // Accesorios
             acc_funda: getCheckboxValue('chk-acc-funda'),
             acc_sim: getCheckboxValue('chk-acc-sim'),
@@ -5001,13 +4960,13 @@ function initOrderRegistration() {
             refacciones: orderParts,
             tipo_orden: document.querySelector('input[name="order_type"]:checked')?.value || 'Reparación directa',
             pendiente_presupuesto: isDiagnosisOrderSelected(),
-            
+
             // Estado
             status: selectedStatus,
             status_reason: reasonInput.value || null,
             publicRemarks: document.getElementById('form-order-comentario').value || 'Avance registrado en recepción.',
             estimatedDate: document.getElementById('form-fecha-entrega').value || null,
-            
+
             firma_imagen: signatureDataUrl,
             evidenciasNuevas: orderPhotos,
             evidenciaEstado: isEditing ? document.getElementById('form-order-status').value : 'Recibido',
@@ -5037,9 +4996,8 @@ function initOrderRegistration() {
                 loadAllData();
 
                 if (!isEditing) {
-                    // Previsualizar Ticket inmediatamente al crear una nueva orden
-                    await viewOrderDetails(finalOrder.id, { openPreview: !window.printerService?.isNative() });
-                    window.openOrderPrintSelector();
+                    // Backend creation is complete before presenting optional actions.
+                    window.openOrderActionsModal(finalOrder, { created: true });
                 }
             } else {
                 const err = await response.json();
@@ -5090,7 +5048,7 @@ async function editOrderDetails(id) {
     document.getElementById('form-client-phone').value = o.clientPhone || '';
     setRadioValue('client_contact_method', o.clientPreferredContact || 'WhatsApp');
     document.getElementById('order-form').dataset.selectedClientId = o.clientId || '';
-    
+
     // Cargar datos del cliente si existen en el estado
     const c = o.clientPhone ? APP_STATE.clientes.find(cli => cli.telefono === o.clientPhone || cli.telefono_principal === o.clientPhone) : null;
     if (c) {
@@ -5105,7 +5063,7 @@ async function editOrderDetails(id) {
     document.getElementById('form-device-imei1').value = o.imei || '';
     document.getElementById('form-device-imei2').value = o.imei2 || '';
     document.getElementById('form-device-serial').value = o.serial || '';
-    
+
     document.getElementById('form-sec-android').value = o.sec_android || '';
     document.getElementById('form-sec-patch').value = o.sec_patch || '';
     document.getElementById('form-sec-imei-orig').value = o.sec_imei_orig || '';
@@ -5123,7 +5081,7 @@ async function editOrderDetails(id) {
     updateLockVisibility();
     document.getElementById('form-lock-pin').value = o.lock_pin || '';
     document.getElementById('form-lock-pass').value = o.lock_pass || '';
-    
+
     if (o.lock_type === 'Patrón' && o.lock_pattern) {
         const isPatternSequence = /^\d(?:-\d)*$/.test(String(o.lock_pattern));
         document.getElementById('form-lock-pattern-sequence').value = o.lock_pattern;
@@ -5176,7 +5134,7 @@ async function editOrderDetails(id) {
     document.getElementById('form-costo-refaccion').value = o.costo_refaccion || 0;
     setInputValue('form-mano-obra', o.mano_obra ?? Math.max((o.costo_real || o.costo_estimado || 0) - (o.costo_refaccion || 0), 0));
     setOrderParts(o.refacciones || o.refacciones_utilizadas || []);
-    
+
     const profit = (o.costo_real || 0) - (o.costo_refaccion || 0);
     document.getElementById('form-ganancia-label').value = profit.toFixed(2);
     const orderTypeInput = document.querySelector(`input[name="order_type"][value="${o.tipo_orden || 'Reparación directa'}"]`);
@@ -5190,7 +5148,7 @@ async function editOrderDetails(id) {
     if (o.status === 'Retrasado' || o.status === 'Cancelado') {
         document.getElementById('form-status-reason').value = o.status_reason || '';
     }
-    
+
     document.getElementById('form-fecha-entrega').value = o.estimatedDate || '';
 
     const orderForm = document.getElementById('order-form');
@@ -5238,6 +5196,7 @@ document.getElementById('btn-close-receipt-modal').addEventListener('click', () 
 document.getElementById('btn-close-receipt').addEventListener('click', () => receiptModal.classList.add('hidden'));
 saleSuccessCloseButton?.addEventListener('click', () => saleSuccessModal?.classList.add('hidden'));
 saleSuccessPreviewButton?.addEventListener('click', () => {
+    window.viewVentaDetails(APP_STATE.selectedSaleForReceipt, { openPreview: false });
     saleSuccessModal?.classList.add('hidden');
     receiptModal.classList.add('sale-ticket-only');
     setReceiptPrintLabels('Ticket de Venta');
@@ -5245,6 +5204,7 @@ saleSuccessPreviewButton?.addEventListener('click', () => {
     receiptModal.classList.remove('hidden');
 });
 saleSuccessPrintButton?.addEventListener('click', async () => {
+    window.viewVentaDetails(APP_STATE.selectedSaleForReceipt, { openPreview: false });
     const printed = await printReceipt(null, { silent: false, type: 'sale' });
     if (printed && APP_STATE.selectedSaleForReceipt) {
         showSaleSuccessModal(APP_STATE.selectedSaleForReceipt, { printed: true });
@@ -5540,15 +5500,9 @@ function showSaleSuccessModal(sale, options = {}) {
     saleSuccessModal.classList.remove('hidden');
 }
 
-async function handleCompletedSale(completedVenta) {
-    saleSuccessModal?.classList.add('hidden');
-    window.viewVentaDetails(completedVenta, { openPreview: false });
-
-    let printed = false;
-    if (ESTABLISHMENT_CONFIG.autoPrintTicket !== false) {
-        printed = await printReceipt(null, { silent: true });
-    }
-    showSaleSuccessModal(completedVenta, { printed });
+function handleCompletedSale(completedVenta) {
+    APP_STATE.selectedSaleForReceipt = normalizeVenta(completedVenta);
+    showSaleSuccessModal(APP_STATE.selectedSaleForReceipt);
 }
 
 window.printEquipmentLabel = async () => {
@@ -5572,54 +5526,112 @@ window.printReceiptBrowser = printReceiptBrowser;
 // UI selection only: all jobs continue through the existing print functions and queue.
 const orderPrintSelector = document.getElementById('order-print-selector');
 let orderPrintBusy = false;
+const orderActionBusy = new Set();
 let orderPrintOptions = {};
-window.openOrderPrintSelector = (options = {}) => {
+let orderActionsDataPromise = null;
+const incompleteOrderActionsData = new WeakSet();
+async function ensureOrderActionsData() {
+    if (!orderPrintOptions.loadDetails) return;
+    if (!orderActionsDataPromise) {
+        const id = APP_STATE.selectedOrderForReceipt.id;
+        orderActionsDataPromise = fetch(`${BASE_API_URL}/ordenes/${id}`).then(async response => {
+            if (!response.ok) throw new Error('No se pudo cargar la orden. Intenta nuevamente.');
+            const order = await response.json();
+            if (!order || String(order.id) !== String(id)) throw new Error('No se pudo cargar la orden solicitada.');
+            APP_STATE.selectedOrderForReceipt = order;
+            orderPrintOptions.loadDetails = false;
+        }).catch(error => { orderActionsDataPromise = null; throw error; });
+    }
+    await orderActionsDataPromise;
+}
+window.openOrderActionsModal = (order, options = {}) => {
     if (orderPrintBusy || orderPrintSelector.open) return;
-    if (!APP_STATE.selectedOrderForReceipt) { AllfixUI.notify('Abre el detalle de la orden.'); return; }
-    orderPrintOptions = options;
+    if (!order) { AllfixUI.notify('Abre el detalle de la orden.'); return; }
+    APP_STATE.selectedOrderForReceipt = order;
+    if (options.loadDetails) incompleteOrderActionsData.add(order);
+    orderPrintOptions = { ...options, loadDetails: Boolean(options.loadDetails || incompleteOrderActionsData.has(order)) };
+    orderActionsDataPromise = null;
+    orderPrintSelector.classList.toggle('is-created', Boolean(options.created));
+    document.getElementById("order-print-selector-title").textContent = options.created ? "Orden creada correctamente" : "Acciones de la orden";
+    document.getElementById("order-actions-folio").textContent = order.folio ? "Folio: " + order.folio : "";
     document.getElementById('order-print-selector-status').textContent = '';
     orderPrintSelector.showModal();
 };
+window.openOrderPrintSelector = (options = {}) => window.openOrderActionsModal(APP_STATE.selectedOrderForReceipt, options);
 window.requestReceiptPrint = (options = {}) => {
     const element = getActiveReceiptElement();
     if (['ticket-venta-container', 'ticket-corte-container'].includes(element?.id)) return printReceipt(null, options);
     window.openOrderPrintSelector(options);
 };
 function closeOrderPrintSelector() {
-    if (!orderPrintBusy) orderPrintSelector.close();
+    if (!orderActionBusy.size) orderPrintSelector.close();
 }
 for (const id of ['order-print-selector-close', 'order-print-selector-cancel']) {
     document.getElementById(id).addEventListener('click', closeOrderPrintSelector);
 }
 orderPrintSelector.addEventListener('cancel', event => {
-    if (orderPrintBusy) event.preventDefault();
+    if (orderActionBusy.size) event.preventDefault();
 });
 async function chooseOrderPrint(type) {
     if (orderPrintBusy) return;
     orderPrintBusy = true;
+    orderActionBusy.add(type);
     const status = document.getElementById('order-print-selector-status');
-    const controls = [...orderPrintSelector.querySelectorAll('button')];
-    // Equipment printing has its own existing click guard; invoke it before disabling controls.
-    const work = type === 'equipmentLabel' ? window.printEquipmentLabel()
-        : printReceipt(null, { ...orderPrintOptions, type: 'service' });
+    const controls = [document.getElementById(type === 'equipmentLabel' ? 'btn-print-equipment-label' : 'order-print-customer')];
     controls.forEach(button => { button.disabled = true; });
+    const button = controls[0];
+    const icon = button.querySelector('i'), initialIcon = icon.className;
+    const description = button.querySelector('small'), initialDescription = description.textContent;
+    description.textContent = 'Preparando…';
+    icon.className = 'fa-solid fa-spinner fa-spin';
+    button.setAttribute('aria-busy', 'true');
     orderPrintSelector.setAttribute('aria-busy', 'true');
     status.textContent = 'Enviando a impresión…';
     try {
-        if (await work) orderPrintSelector.close();
+        await ensureOrderActionsData();
+        if (await printReceipt(null, { ...orderPrintOptions, type })) status.textContent = 'Ticket enviado correctamente. Puedes realizar otra acción.';
         else status.textContent = 'No se pudo imprimir. Selecciona la opción otra vez para reintentar el trabajo pendiente.';
     } catch (error) {
         status.textContent = error.message;
     } finally {
         orderPrintBusy = false;
+        orderActionBusy.delete(type);
         controls.forEach(button => { button.disabled = false; });
+        icon.className = initialIcon;
+        description.textContent = initialDescription;
+        button.removeAttribute('aria-busy');
         orderPrintSelector.removeAttribute('aria-busy');
     }
 }
 document.getElementById('order-print-customer').addEventListener('click', () => chooseOrderPrint('service'));
 document.getElementById('btn-print-equipment-label').addEventListener('click', () => chooseOrderPrint('equipmentLabel'));
 
-
+for (const type of ['share', 'download']) {
+    const button = document.getElementById('order-actions-' + type);
+    button.addEventListener('click', async () => {
+        if (orderActionBusy.has('share') || orderActionBusy.has('download')) return;
+        orderActionBusy.add(type);
+        button.disabled = true;
+        button.setAttribute('aria-busy', 'true');
+        const icon = button.querySelector('i'), initial = icon.className;
+        const description = button.querySelector('small'), initialDescription = description.textContent;
+        description.textContent = 'Preparando…';
+        icon.className = 'fa-solid fa-spinner fa-spin';
+        const status = document.getElementById('order-print-selector-status');
+        status.textContent = 'Preparando ticket…';
+        try {
+            await ensureOrderActionsData();
+            await window.orderReceiptActions[type]();
+            status.textContent = document.getElementById('receipt-share-status').textContent;
+        } catch (error) { status.textContent = error.message || 'No se pudo preparar el ticket. Intenta nuevamente.'; }
+        finally { orderActionBusy.delete(type); button.disabled = false; button.removeAttribute('aria-busy'); icon.className = initial; description.textContent = initialDescription; }
+    });
+}
+orderPrintSelector.addEventListener('click', event => {
+    if (event.target !== orderPrintSelector) return;
+    const r = orderPrintSelector.getBoundingClientRect();
+    if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) closeOrderPrintSelector();
+});
 
 function getConfiguredTicketPaper() {
     return detectConfiguredTicketPaper();
@@ -5642,7 +5654,8 @@ async function viewOrderDetails(id, options = {}) {
     document.getElementById('ticket-rec-business-name').innerText = ESTABLISHMENT_CONFIG.name.toUpperCase();
     document.getElementById('ticket-rec-business-info').innerText = ESTABLISHMENT_CONFIG.address;
     applyOrderTicketHeaderContactInfo();
-    document.getElementById('ticket-rec-legal-text').innerHTML = `<strong>IMPORTANTE:</strong> ${escapeHtml(ESTABLISHMENT_CONFIG.terms)}`;
+    document.getElementById('ticket-rec-legal-text').textContent = ESTABLISHMENT_CONFIG.terms;
+    document.getElementById('ticket-rec-legal-text').hidden = !ESTABLISHMENT_CONFIG.terms.trim();
     document.getElementById('thermal-business-name').innerText = ESTABLISHMENT_CONFIG.name.toUpperCase();
 
     // Rellenar previsualización de ticket
@@ -5652,7 +5665,7 @@ async function viewOrderDetails(id, options = {}) {
     setReceiptFieldText('ticket-val-client-name', o.clientName);
     setReceiptFieldText('ticket-val-client-phone', o.clientPhone);
     setReceiptFieldText('ticket-val-client-email', o.clientEmail);
-    
+
     const deviceLabel = o.deviceDescription || [o.deviceType, o.brand, o.model].filter(Boolean).join(' ');
     const deviceColor = hasReceiptValue(o.color) ? o.color : '';
     const deviceLabelWithColor = deviceColor ? `${deviceLabel} (${deviceColor})` : deviceLabel;
@@ -5661,7 +5674,7 @@ async function viewOrderDetails(id, options = {}) {
     setReceiptFieldText('ticket-val-device-model', o.model);
     setReceiptFieldText('ticket-val-device-serial', o.serial || o.imei || o.imei2);
     setReceiptFieldText('ticket-val-device', deviceLabelWithColor);
-    
+
     // Accesorios listados
     const accList = [];
     if (o.acc_funda) accList.push('Funda');
@@ -5809,7 +5822,7 @@ function renderInventario() {
     refaccionesBody.innerHTML = '';
     accesoriosBody.innerHTML = '';
     updateInventoryMenuBadge();
-    
+
     const searchVal = document.getElementById('inventory-search').value.toLowerCase().trim();
 
     const filtered = APP_STATE.inventario
@@ -5935,7 +5948,7 @@ document.getElementById('inventory-form').addEventListener('submit', withFormFee
 
     let uploadedFotoUrl = document.getElementById('inventory-form').dataset.currentFoto || '';
     const fileInput = document.getElementById('inv-foto-file');
-    
+
     if (fileInput.files.length > 0) {
         const formData = new FormData();
         formData.append('foto', fileInput.files[0]);
@@ -6010,7 +6023,7 @@ window.openEditInventoryModal = function(id) {
     document.getElementById('inv-stock').value = item.stock;
     document.getElementById('inv-stock-min').value = item.stock_minimo;
     document.getElementById('inv-descripcion').value = item.descripcion || '';
-    
+
     // Store current image URL
     const currentFoto = item.foto_url || item.fotografia || '';
     document.getElementById('inventory-form').dataset.currentFoto = currentFoto;
@@ -6708,6 +6721,7 @@ function initPOS() {
     });
 
     payButton.addEventListener('click', async () => {
+        if (payButton.dataset.processing === 'true') return;
         if (APP_STATE.cart.length === 0) {
             AllfixUI.notify('El carrito de compras está vacío.');
             return;
@@ -6724,7 +6738,7 @@ function initPOS() {
             switchView('caja');
             return;
         }
-        
+
         if (metodo === 'Efectivo' && payment.cashReceived < total) {
             AllfixUI.notify('El efectivo recibido es menor al total a cobrar.');
             return;
@@ -6762,6 +6776,11 @@ function initPOS() {
             usuario_id: APP_STATE.currentUser?.id || null
         };
 
+        const previousPayLabel = payButton.innerHTML;
+        payButton.dataset.processing = 'true';
+        payButton.disabled = true;
+        payButton.setAttribute('aria-busy', 'true');
+        payButton.textContent = 'Procesando...';
         try {
             const response = await fetch(`${BASE_API_URL}/pos/venta`, {
                 method: 'POST',
@@ -6771,9 +6790,9 @@ function initPOS() {
 
             if (response.ok) {
                 const completedVenta = await response.json();
-                
+                handleCompletedSale(completedVenta);
+
                 APP_STATE.cart = [];
-                updateCartUI();
                 if (discountInput) discountInput.value = '';
                 cashInput.value = '';
                 if (transferInput) transferInput.value = '';
@@ -6783,14 +6802,22 @@ function initPOS() {
                 observationsToggle?.classList.remove('active');
                 if (observationsToggle) observationsToggle.innerHTML = '<i class="fa-solid fa-note-sticky"></i> Agregar observaciones';
                 changeDisplay.innerText = '$0.00';
-                await loadAllData();
-                await handleCompletedSale(completedVenta);
+                // Let confirmation paint before refreshing the background views.
+                requestAnimationFrame(() => setTimeout(() => {
+                    updateCartUI();
+                    Promise.resolve(loadAllData()).catch(error => console.error('No se pudo actualizar la vista después del cobro:', error));
+                }, 0));
             } else {
                 const err = await response.json();
                 AllfixUI.notify('Error al procesar cobro: ' + err.error);
             }
         } catch (err) {
             console.error('Error de red:', err);
+        } finally {
+            payButton.dataset.processing = 'false';
+            payButton.disabled = false;
+            payButton.removeAttribute('aria-busy');
+            payButton.innerHTML = previousPayLabel;
         }
     });
 
@@ -7179,16 +7206,16 @@ let calendarInstance = null;
 function renderCalendario() {
     const calendarEl = document.getElementById('full-calendar-container');
     if (!calendarEl) return;
-    
+
     // Preparar eventos para el calendario
     const events = [];
-    
+
     // 1. Agregar Órdenes de Servicio como eventos
     APP_STATE.ordenes.forEach(o => {
         if (o.status === 'Cancelado') return; // Ignorar canceladas
-        
+
         const color = getCalendarStatusColor(o.status);
-        
+
         // Si tiene fecha de entrega
         if (o.estimatedDate) {
             events.push({
@@ -7204,7 +7231,7 @@ function renderCalendario() {
             });
         }
     });
-    
+
     // 2. Agregar Eventos Manuales
     APP_STATE.eventos.forEach(e => {
         const category = e.categoria || e.tipo_evento || 'otro';
@@ -7223,11 +7250,11 @@ function renderCalendario() {
             }
         });
     });
-    
+
     if (calendarInstance) {
         calendarInstance.destroy();
     }
-    
+
     calendarInstance = new FullCalendar.Calendar(calendarEl, {
         initialView: window.matchMedia('(max-width: 640px)').matches ? 'listWeek' : 'dayGridMonth',
         locale: 'es',
@@ -7265,7 +7292,7 @@ function renderCalendario() {
             eventModal.classList.remove('hidden');
         }
     });
-    
+
     calendarInstance.render();
 }
 
@@ -8893,13 +8920,13 @@ function renderUsuarios() {
     if (!tableBody) return;
     tableBody.innerHTML = '';
     renderUserCreationSetting();
-    
+
     APP_STATE.usuarios.forEach(u => {
         const tr = document.createElement('tr');
         const statusAction = u.activo
             ? `<button class="btn btn-xs btn-outline" onclick="toggleUsuarioStatus(${u.id}, false)"><i class="fa-solid fa-ban"></i> Desactivar</button>`
             : `<button class="btn btn-xs btn-secondary" onclick="toggleUsuarioStatus(${u.id}, true)"><i class="fa-solid fa-circle-check"></i> Activar</button>`;
-            
+
         tr.innerHTML = `
             <td><code>USR-${String(u.id).padStart(3, '0')}</code></td>
             <td><strong>${escapeHtml(u.nombre || '-')}</strong></td>
@@ -9006,7 +9033,7 @@ function initUsuarios() {
     const btnCancel = document.getElementById('btn-cancel-user');
     const userForm = document.getElementById('user-form');
     const allowSwitch = document.getElementById('allow-user-creation-switch');
-    
+
     if (btnAdd) {
         btnAdd.addEventListener('click', () => {
             openUserModal();
@@ -9018,7 +9045,7 @@ function initUsuarios() {
     if (btnCancel) {
         btnCancel.addEventListener('click', () => userModal.classList.add('hidden'));
     }
-    
+
     if (userForm) {
         userForm.addEventListener('submit', withFormFeedback(async (e) => {
             e.preventDefault();
@@ -9032,13 +9059,13 @@ function initUsuarios() {
                 rol: document.getElementById('user-rol').value,
                 activo: document.getElementById('user-activo').checked
             };
-            
+
             try {
                 const response = await fetch(`${BASE_API_URL}/users${userId ? `/${userId}` : ''}`, {
                     method: userId ? 'PUT' : 'POST',
                     body: JSON.stringify(data)
                 });
-                
+
                 if (response.ok) {
                     AllfixUI.notify(userId ? 'Usuario actualizado correctamente.' : 'Operador registrado con exito.');
                     userModal.classList.add('hidden');
@@ -9141,21 +9168,10 @@ function initProfileModal() {
 // AJUSTES DEL ESTABLECIMIENTO
 // ==========================================
 const ESTABLISHMENT_CONFIG = {
-    name: 'AllFix Bacalar',
-    phone: '983 123 4567',
-    whatsapp: '983 190 9656',
-    redes_sociales: JSON.stringify({
-        facebook: 'Allfix bacalar reparación de celulares',
-        tiktok: '@allfixbacalar',
-        instagram: '@allfixbacalar'
-    }),
-    address: 'Av. 19 Libramiento entre Calle 26\nBacalar, Q. Roo',
-    terms: 'IMPORTANTE: Una vez que su equipo esté listo y haya sido notificado, contará con un plazo máximo de 30 días para recogerlo. Después de ese plazo el establecimiento podrá disponer del equipo conforme a sus políticas internas.',
-    logoUrl: '',
-    ticketLogoUrl: '',
-    ticketPrinter: '',
-    ticketPaper: '58mm',
-    autoPrintTicket: true
+    name: '', phone: '', whatsapp: '', redes_sociales: '', address: '', terms: '',
+    negocio_id: null, logoUrl: '', ticketLogoUrl: '',
+    ticketPrinter: '', ticketPaper: '58mm', autoPrintTicket: true
+
 };
 
 const DEFAULT_BUSINESS_LOGO = 'img/logoallfixv2.png';
@@ -9166,7 +9182,7 @@ function getBusinessLogoUrl() {
 }
 
 function getTicketLogoUrl() {
-    return ESTABLISHMENT_CONFIG.ticketLogoUrl || DEFAULT_TICKET_LOGO;
+    return ESTABLISHMENT_CONFIG.ticketLogoUrl || ESTABLISHMENT_CONFIG.logoUrl || '';
 }
 
 function hasCustomBusinessLogo() {
@@ -9215,7 +9231,13 @@ function applyTicketLogoSource(logoUrl = getTicketLogoUrl()) {
             img.style.display = 'none';
             header?.classList.remove('has-ticket-logo');
         };
-        img.src = logoUrl || DEFAULT_TICKET_LOGO;
+        if (!logoUrl) {
+            img.removeAttribute('src');
+            img.style.display = 'none';
+            header?.classList.remove('has-ticket-logo');
+            return;
+        }
+        img.src = logoUrl;
         img.style.display = '';
         if (img.complete) {
             if (img.naturalWidth > 0) header?.classList.add('has-ticket-logo');
@@ -9303,7 +9325,11 @@ function applySaleTicketHeaderInfo() {
             ESTABLISHMENT_CONFIG.whatsapp || ESTABLISHMENT_CONFIG.phone || ''
         ).trim();
     }
-    if (businessAddress) businessAddress.textContent = ESTABLISHMENT_CONFIG.address;
+    if (businessAddress) {
+        businessAddress.textContent = ESTABLISHMENT_CONFIG.address;
+        businessAddress.hidden = !ESTABLISHMENT_CONFIG.address.trim();
+    }
+    if (businessPhone) businessPhone.closest('p').hidden = !businessPhone.textContent.trim();
 }
 
 function applyTicketContactInfo() {
@@ -9394,38 +9420,60 @@ async function uploadTicketLogoIfNeeded() {
     return data.url || '';
 }
 
-async function loadEstablishmentConfig() {
-    const saved = localStorage.getItem('allfix_establishment_config');
-    if (saved) {
-        Object.assign(ESTABLISHMENT_CONFIG, JSON.parse(saved));
+function establishmentCacheKey() {
+    return 'allfix_establishment_config:' + (ESTABLISHMENT_CONFIG.negocio_id ?? APP_STATE.currentUser?.negocio_id ?? 'unresolved') + ':' + (APP_STATE.currentUser?.id ?? 'session');
+}
+function applyBusinessPrinterScope() {
+    if (!ESTABLISHMENT_CONFIG.negocio_id) return;
+    const scope = [ESTABLISHMENT_CONFIG.negocio_id, APP_STATE.currentUser?.sucursal_id || 'default'].join('-');
+    const key = 'allfix_printing_v4:' + scope.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 100);
+    let previous = null;
+    const existing = localStorage.getItem(key);
+    if (!existing || existing === '{}') {
+        if (ESTABLISHMENT_CONFIG.legacy_business) {
+            try {
+                previous = JSON.parse(localStorage.getItem('allfix_printing_v4:default-default') || localStorage.getItem('allfix_printing_v4:default') || localStorage.getItem('allfix_printing_v3:default-default') || localStorage.getItem('allfix_printer_v2') || 'null');
+            } catch { /* Existing preference API will use its validated defaults. */ }
+        }
+        // New businesses must not consume the old installation-wide preferences fallback.
+        localStorage.setItem(key, '{}');
     }
+    window.printerManager?.setScope(scope);
+    if (previous) window.printerService.savePreferences(previous);
+}
+async function loadEstablishmentConfig() {
+    // Do not inherit the legacy global browser cache across sessions/businesses.
+    Object.assign(ESTABLISHMENT_CONFIG, { name: '', phone: '', address: '', terms: '', whatsapp: '', redes_sociales: '', logoUrl: '', ticketLogoUrl: '', negocio_id: null, identityUnavailable: true });
 
     try {
         const response = await fetch(`${BASE_API_URL}/configuracion/negocio`);
         if (response.ok) {
             const serverConfig = await response.json();
             const mappedConfig = {
-                name: serverConfig.nombre || serverConfig.name || ESTABLISHMENT_CONFIG.name,
-                phone: serverConfig.telefono || serverConfig.phone || ESTABLISHMENT_CONFIG.phone,
-                address: serverConfig.direccion || serverConfig.address || ESTABLISHMENT_CONFIG.address,
-                terms: serverConfig.terminos_legales || serverConfig.terms || ESTABLISHMENT_CONFIG.terms,
-                logoUrl: serverConfig.logo_url || serverConfig.logoUrl || ESTABLISHMENT_CONFIG.logoUrl || '',
-                ticketLogoUrl: serverConfig.logo_ticket_url || serverConfig.ticketLogoUrl || ESTABLISHMENT_CONFIG.ticketLogoUrl || '',
-                whatsapp: serverConfig.whatsapp || ESTABLISHMENT_CONFIG.whatsapp || '',
-                redes_sociales: serverConfig.redes_sociales || ESTABLISHMENT_CONFIG.redes_sociales || '',
+                name: serverConfig.nombre ?? serverConfig.name ?? '',
+                phone: serverConfig.telefono ?? serverConfig.phone ?? '',
+                address: serverConfig.direccion ?? serverConfig.address ?? '',
+                terms: serverConfig.terminos_legales ?? serverConfig.terms ?? '',
+                logoUrl: serverConfig.logo_url ?? serverConfig.logoUrl ?? '',
+                ticketLogoUrl: serverConfig.logo_ticket_url ?? serverConfig.ticketLogoUrl ?? '',
+                whatsapp: serverConfig.whatsapp ?? '',
+                redes_sociales: serverConfig.redes_sociales ?? '',
+                negocio_id: serverConfig.negocio_id ?? null,
+                legacy_business: serverConfig.legacy_business === true,
+                identityUnavailable: false,
                 ticketPrinter: ESTABLISHMENT_CONFIG.ticketPrinter || '',
                 ticketPaper: ESTABLISHMENT_CONFIG.ticketPaper || '58mm',
                 autoPrintTicket: ESTABLISHMENT_CONFIG.autoPrintTicket !== false
             };
             Object.assign(ESTABLISHMENT_CONFIG, mappedConfig);
-            localStorage.setItem('allfix_establishment_config', JSON.stringify(ESTABLISHMENT_CONFIG));
+            localStorage.setItem(establishmentCacheKey(), JSON.stringify(ESTABLISHMENT_CONFIG));
         }
     } catch (err) {
         console.warn('No se pudo cargar la configuración del establecimiento desde el backend:', err);
     }
 
     if (window.printerService) {
-        window.printerManager?.setScope([APP_STATE.currentUser?.negocio_id || 'default', APP_STATE.currentUser?.sucursal_id || 'default'].join('-'));
+        applyBusinessPrinterScope();
         const localPrintPreferences = window.printerService.readPreferences();
         ESTABLISHMENT_CONFIG.ticketPrinter = localPrintPreferences.printerName;
         ESTABLISHMENT_CONFIG.ticketPaper = localPrintPreferences.paperWidth;
@@ -9437,10 +9485,10 @@ async function loadEstablishmentConfig() {
 
 async function saveEstablishmentConfig(config) {
     const normalizedConfig = {
-        name: config.name || config.nombre || ESTABLISHMENT_CONFIG.name,
-        phone: config.phone || config.telefono || ESTABLISHMENT_CONFIG.phone,
-        address: config.address || config.direccion || ESTABLISHMENT_CONFIG.address,
-        terms: config.terms || config.terminos_legales || ESTABLISHMENT_CONFIG.terms,
+        name: config.name ?? config.nombre ?? ESTABLISHMENT_CONFIG.name,
+        phone: config.phone ?? config.telefono ?? ESTABLISHMENT_CONFIG.phone,
+        address: config.address ?? config.direccion ?? ESTABLISHMENT_CONFIG.address,
+        terms: config.terms ?? config.terminos_legales ?? ESTABLISHMENT_CONFIG.terms,
         logoUrl: config.logoUrl ?? config.logo_url ?? ESTABLISHMENT_CONFIG.logoUrl ?? '',
         ticketLogoUrl: config.ticketLogoUrl ?? config.logo_ticket_url ?? ESTABLISHMENT_CONFIG.ticketLogoUrl ?? '',
         whatsapp: config.whatsapp ?? ESTABLISHMENT_CONFIG.whatsapp ?? '',
@@ -9449,9 +9497,6 @@ async function saveEstablishmentConfig(config) {
         ticketPaper: (config.ticketPaper || config.papel_ticket || ESTABLISHMENT_CONFIG.ticketPaper) === '58mm' ? '58mm' : '80mm',
         autoPrintTicket: config.autoPrintTicket ?? config.auto_imprimir_ticket ?? ESTABLISHMENT_CONFIG.autoPrintTicket ?? true
     };
-
-    Object.assign(ESTABLISHMENT_CONFIG, normalizedConfig);
-    localStorage.setItem('allfix_establishment_config', JSON.stringify(ESTABLISHMENT_CONFIG));
 
     const response = await fetch(`${BASE_API_URL}/configuracion/negocio`, {
         method: 'PUT',
@@ -9477,6 +9522,8 @@ async function saveEstablishmentConfig(config) {
         throw new Error(err.error || 'No se pudo guardar la configuración del establecimiento.');
     }
 
+    Object.assign(ESTABLISHMENT_CONFIG, normalizedConfig, { identityUnavailable: false });
+    localStorage.setItem(establishmentCacheKey(), JSON.stringify(ESTABLISHMENT_CONFIG));
     applyBusinessBranding();
     return true;
 }
@@ -9493,7 +9540,7 @@ function syncConfigForms() {
     const printerInput = document.getElementById('cfg-ticket-printer');
     const paperDetected = document.getElementById('cfg-ticket-paper-detected');
     const printModeSelect = document.getElementById('cfg-ticket-print-mode');
-    
+
     if (nameInput) nameInput.value = ESTABLISHMENT_CONFIG.name;
     if (phoneInput) phoneInput.value = ESTABLISHMENT_CONFIG.phone;
     if (whatsappInput) whatsappInput.value = ESTABLISHMENT_CONFIG.whatsapp || '';
@@ -9549,7 +9596,7 @@ function initEstablishmentConfigForm() {
         setBusinessLogoPreview(DEFAULT_BUSINESS_LOGO, 'Se usará el logo base al guardar');
         applyBusinessBranding();
     });
-    
+
     form.addEventListener('submit', withFormFeedback(async (e) => {
         e.preventDefault();
         try {
@@ -9578,27 +9625,29 @@ function initEstablishmentConfigForm() {
 
 function applyOrderTicketHeaderContactInfo() {
     const socials = parseSocialProfiles();
-    const socialHandle = socials.instagram || socials.tiktok || socials.facebook || socials.raw || '@allfixbacalar';
+    const socialHandle = socials.instagram || socials.tiktok || socials.facebook || socials.raw || '';
     const handleElement = document.getElementById('ticket-rec-social-handle');
     const whatsappElement = document.getElementById('ticket-rec-whatsapp');
 
     if (handleElement) {
         handleElement.textContent = String(socialHandle).trim();
+        handleElement.hidden = !handleElement.textContent;
     }
     if (whatsappElement) {
         whatsappElement.textContent = String(
-            ESTABLISHMENT_CONFIG.whatsapp || ESTABLISHMENT_CONFIG.phone || '983 190 9656'
+            ESTABLISHMENT_CONFIG.whatsapp || ESTABLISHMENT_CONFIG.phone || ''
         ).trim();
+        whatsappElement.closest('p').hidden = !whatsappElement.textContent;
     }
 }
 
 function updateDashboardChart() {
     const chart = document.querySelector('.dashboard-chart');
     if (!chart) return;
-    
+
     const now = new Date();
     const monthsData = [];
-    
+
     for (let i = 5; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
         monthsData.push({
@@ -9608,21 +9657,21 @@ function updateDashboardChart() {
             revenue: 0
         });
     }
-    
+
     APP_STATE.ordenes.forEach(o => {
         if (!o.dateIn) return;
         const parts = o.dateIn.split('-');
         if (parts.length !== 3) return;
         const oYear = parseInt(parts[0], 10);
         const oMonth = parseInt(parts[1], 10) - 1;
-        
+
         const match = monthsData.find(m => m.year === oYear && m.month === oMonth);
         if (match) {
             const rev = o.costo_real !== null && o.costo_real !== undefined ? o.costo_real : o.costo_estimado;
             match.revenue += rev;
         }
     });
-    
+
     APP_STATE.ventas.forEach(v => {
         if (!v.fecha) return;
         const datePart = v.fecha.split(' ')[0];
@@ -9630,29 +9679,29 @@ function updateDashboardChart() {
         if (parts.length !== 3) return;
         const vYear = parseInt(parts[0], 10);
         const vMonth = parseInt(parts[1], 10) - 1;
-        
+
         const match = monthsData.find(m => m.year === vYear && m.month === vMonth);
         if (match) {
             match.revenue += v.total;
         }
     });
-    
+
     const maxRev = Math.max(...monthsData.map(m => m.revenue), 1000);
-    
+
     const rects = chart.querySelectorAll('rect');
     const texts = chart.querySelectorAll('text');
-    
+
     monthsData.forEach((mData, idx) => {
         const barHeight = Math.max(5, (mData.revenue / maxRev) * 140);
         const yPos = 170 - barHeight;
-        
+
         if (rects[idx]) {
             rects[idx].setAttribute('y', yPos);
             rects[idx].setAttribute('height', barHeight);
             rects[idx].setAttribute('title', `$${mData.revenue.toFixed(2)}`);
         }
     });
-    
+
     let monthTextIdx = 0;
     texts.forEach(txt => {
         const x = parseFloat(txt.getAttribute('x'));
@@ -9662,7 +9711,7 @@ function updateDashboardChart() {
             txt.textContent = lbl.charAt(0).toUpperCase() + lbl.slice(1);
             monthTextIdx++;
         }
-        
+
         if (x === 30) {
             if (y === 75) {
                 txt.textContent = `$${(maxRev * 0.5 / 1000).toFixed(1)}k`;
@@ -9676,256 +9725,16 @@ function updateDashboardChart() {
 }
 
 // ==========================================
-// MÓDULO COTIZACIONES (GESTIÓN Y DETALLES)
 // ==========================================
-function initCotizaciones() {
-    const quoteModal = document.getElementById('quote-modal');
-    
-    document.getElementById('btn-close-quote-modal').addEventListener('click', () => quoteModal.classList.add('hidden'));
-    document.getElementById('btn-cancel-quote').addEventListener('click', () => quoteModal.classList.add('hidden'));
-    
-    document.getElementById('quote-search').addEventListener('input', renderCotizaciones);
-    document.getElementById('quote-status-filter').addEventListener('change', renderCotizaciones);
-    document.getElementById('quote-sort').addEventListener('change', renderCotizaciones);
-    
-    document.getElementById('quote-action-form').addEventListener('submit', withFormFeedback(async (e) => {
-        e.preventDefault();
-        const id = document.getElementById('quote-detail-id').value;
-        const estado = document.getElementById('quote-detail-status').value;
-        const observaciones = document.getElementById('quote-detail-observations').value;
-        
-        try {
-            const response = await fetch(`${BASE_API_URL}/cotizaciones/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ estado, observaciones_internas: observaciones })
-            });
-            if (response.ok) {
-                AllfixUI.notify('Cotización actualizada.');
-                quoteModal.classList.add('hidden');
-                loadAllData();
-            } else {
-                const err = await response.json();
-                AllfixUI.notify('Error al actualizar: ' + err.error);
-            }
-        } catch (err) {
-            console.error(err);
-        }
-    }));
 
-    document.getElementById('btn-delete-quote').addEventListener('click', async () => {
-        const id = document.getElementById('quote-detail-id').value;
-        if (await AllfixUI.confirm('¿Está seguro de eliminar esta cotización?')) {
-            try {
-                const response = await fetch(`${BASE_API_URL}/cotizaciones/${id}`, {
-                    method: 'DELETE'
-                });
-                if (response.ok) {
-                    AllfixUI.notify('Cotización eliminada.');
-                    quoteModal.classList.add('hidden');
-                    loadAllData();
-                } else {
-                    const err = await response.json();
-                    AllfixUI.notify('Error al eliminar: ' + err.error);
-                }
-            } catch (err) {
-                console.error(err);
-            }
-        }
-    });
 
-    document.getElementById('btn-convert-quote').addEventListener('click', async () => {
-        const id = document.getElementById('quote-detail-id').value;
-        if (await AllfixUI.confirm('¿Desea convertir esta cotización en una Orden de Servicio activa? Se creará el cliente y la orden automáticamente.')) {
-            try {
-                const response = await fetch(`${BASE_API_URL}/cotizaciones/${id}/convertir`, {
-                    method: 'POST'
-                });
-                if (response.ok) {
-                    const result = await response.json();
-                    AllfixUI.notify(`Orden de Servicio creada con éxito. Folio generado: ${result.folio}`);
-                    quoteModal.classList.add('hidden');
-                    loadAllData();
-                    editOrderDetails(result.ordenId);
-                } else {
-                    const err = await response.json();
-                    AllfixUI.notify('Error al convertir cotización: ' + err.error);
-                }
-            } catch (err) {
-                console.error(err);
-            }
-        }
-    });
-}
 
-function getQuoteValue(quote, keys, fallback = '') {
-    for (const key of keys) {
-        const value = quote?.[key];
-        if (value !== undefined && value !== null && value !== '') return value;
-    }
-    return fallback;
-}
 
-function getQuotePhotos(quote) {
-    if (Array.isArray(quote?.photos)) return quote.photos;
-    if (Array.isArray(quote?.fotografias)) return quote.fotografias;
 
-    const raw = quote?.photos || quote?.fotografias || '[]';
-    try {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-        console.error("Error al parsear fotos de cotización:", e);
-        return [];
-    }
-}
 
-function renderCotizaciones() {
-    const tableBody = document.querySelector('#quotes-table tbody');
-    if (!tableBody) return;
-    tableBody.innerHTML = '';
-    updateQuotesMenuBadge();
-    const resultsCount = document.getElementById('quote-results-count');
-    
-    const searchVal = document.getElementById('quote-search').value.toLowerCase().trim();
-    const statusFilter = document.getElementById('quote-status-filter').value;
-    const sortValue = document.getElementById('quote-sort').value;
-    
-    const filtered = APP_STATE.cotizaciones
-        .filter(q => !statusFilter || q.estado === statusFilter)
-        .filter(q => {
-            if (!searchVal) return true;
-            const searchable = [
-                getQuoteValue(q, ['cliente_nombre', 'nombre']),
-                getQuoteValue(q, ['cliente_telefono', 'telefono']),
-                getQuoteValue(q, ['correo', 'email']),
-                getQuoteValue(q, ['tipo_equipo', 'equipo']),
-                getQuoteValue(q, ['marca']),
-                getQuoteValue(q, ['modelo']),
-                getQuoteValue(q, ['problema_reportado', 'problema'])
-            ].join(' ').toLowerCase();
 
-            return searchable.includes(searchVal);
-        })
-        .sort((a, b) => {
-            if (sortValue === 'fecha_asc') return new Date(getQuoteValue(a, ['fecha', 'fecha_creacion'], 0)) - new Date(getQuoteValue(b, ['fecha', 'fecha_creacion'], 0));
-            if (sortValue === 'cliente_asc') return getQuoteValue(a, ['cliente_nombre', 'nombre']).localeCompare(getQuoteValue(b, ['cliente_nombre', 'nombre']));
-            if (sortValue === 'estado_asc') return getQuoteValue(a, ['estado']).localeCompare(getQuoteValue(b, ['estado']));
-            return new Date(getQuoteValue(b, ['fecha', 'fecha_creacion'], 0)) - new Date(getQuoteValue(a, ['fecha', 'fecha_creacion'], 0));
-        });
 
-    if (resultsCount) {
-        resultsCount.textContent = `${filtered.length} ${filtered.length === 1 ? 'solicitud' : 'solicitudes'}`;
-    }
 
-    if (filtered.length === 0) {
-        tableBody.innerHTML = '<tr class="quote-empty-state"><td colspan="8" class="text-center">No hay cotizaciones con esos criterios.</td></tr>';
-        return;
-    }
-    
-    filtered.forEach(q => {
-        const tr = document.createElement('tr');
-        tr.className = 'quote-row';
-        const fecha = getQuoteValue(q, ['fecha', 'fecha_creacion']);
-        const cliente = getQuoteValue(q, ['cliente_nombre', 'nombre']);
-        const telefono = getQuoteValue(q, ['cliente_telefono', 'telefono']);
-        const equipo = getQuoteValue(q, ['tipo_equipo', 'equipo']);
-        const marca = getQuoteValue(q, ['marca']);
-        const modelo = getQuoteValue(q, ['modelo']);
-        const problema = getQuoteValue(q, ['problema_reportado', 'problema']);
-        
-        let badgeClass = 'bg-primary';
-        if (q.estado === 'Pendiente') badgeClass = 'bg-secondary';
-        else if (q.estado === 'Contactado') badgeClass = 'bg-info';
-        else if (q.estado === 'Cotizado') badgeClass = 'bg-warning';
-        else if (q.estado === 'Aceptado') badgeClass = 'bg-success';
-        else if (q.estado === 'Rechazado') badgeClass = 'bg-danger';
-        
-        const dateStr = fecha ? String(fecha).split('T')[0].split(' ')[0] : '';
-        
-        tr.innerHTML = `
-            <td>${dateStr}</td>
-            <td><strong>${cliente}</strong></td>
-            <td>${telefono}</td>
-            <td>${equipo}</td>
-            <td>${marca} ${modelo}</td>
-            <td>${problema}</td>
-            <td><span class="badge ${badgeClass}">${q.estado}</span></td>
-            <td>
-                <button class="btn btn-xs btn-secondary quote-view-button" onclick="openQuoteDetail(${q.id})"><i class="fa-solid fa-eye"></i> Ver</button>
-            </td>
-        `;
-        tableBody.appendChild(tr);
-    });
-}
-
-window.openQuoteDetail = function(id) {
-    const quote = APP_STATE.cotizaciones.find(q => q.id === id);
-    if (!quote) return;
-    const quoteDate = getQuoteValue(quote, ['fecha', 'fecha_creacion']);
-    const contactValue = String(getQuoteValue(quote, ['medio_contacto', 'preferred_contact'], 'whatsapp')).toLowerCase();
-    const contactLabel = contactValue.includes('call') || contactValue.includes('llamada')
-        ? 'Llamada'
-        : contactValue.includes('whatsapp')
-            ? 'WhatsApp'
-            : contactValue || 'No especificado';
-    
-    document.getElementById('quote-detail-id').value = quote.id;
-    document.getElementById('quote-detail-date').textContent = formatOperationDateTime(quoteDate);
-    document.getElementById('quote-detail-client').textContent = getQuoteValue(quote, ['cliente_nombre', 'nombre']);
-    document.getElementById('quote-detail-phone').textContent = getQuoteValue(quote, ['cliente_telefono', 'telefono']);
-    document.getElementById('quote-detail-contact').textContent = contactLabel;
-    document.getElementById('quote-detail-device').textContent = getQuoteValue(quote, ['tipo_equipo', 'equipo']);
-    document.getElementById('quote-detail-brand-model').textContent = `${getQuoteValue(quote, ['marca'])} ${getQuoteValue(quote, ['modelo'])}`;
-    document.getElementById('quote-detail-problem').textContent = getQuoteValue(quote, ['problema_reportado', 'problema']);
-    
-    const badgeEl = document.getElementById('quote-detail-status-badge');
-    badgeEl.textContent = quote.estado;
-    let badgeClass = 'badge quote-status-badge bg-primary';
-    if (quote.estado === 'Pendiente') badgeClass = 'badge quote-status-badge bg-secondary';
-    else if (quote.estado === 'Contactado') badgeClass = 'badge quote-status-badge bg-info';
-    else if (quote.estado === 'Cotizado') badgeClass = 'badge quote-status-badge bg-warning';
-    else if (quote.estado === 'Aceptado') badgeClass = 'badge quote-status-badge bg-success';
-    else if (quote.estado === 'Rechazado') badgeClass = 'badge quote-status-badge bg-danger';
-    badgeEl.className = badgeClass;
-    
-    document.getElementById('quote-detail-status').value = quote.estado;
-    document.getElementById('quote-detail-observations').value = quote.observaciones_internas || '';
-    
-    const convertBtn = document.getElementById('btn-convert-quote');
-    if (quote.estado === 'Aceptado' || quote.orden_id) {
-        convertBtn.disabled = true;
-        convertBtn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Convertido en Orden`;
-    } else {
-        convertBtn.disabled = false;
-        convertBtn.innerHTML = `<i class="fa-solid fa-file-signature"></i> Convertir en Orden`;
-    }
-    
-    const photosDiv = document.getElementById('quote-detail-photos');
-    photosDiv.innerHTML = '';
-    
-    const photosList = getQuotePhotos(quote);
-    
-    if (photosList.length === 0) {
-        document.getElementById('quote-detail-photos-container').style.display = 'none';
-    } else {
-        document.getElementById('quote-detail-photos-container').style.display = 'block';
-        photosList.forEach(photoBase64 => {
-            const img = document.createElement('img');
-            img.src = photoBase64;
-            img.className = 'quote-photo-thumbnail';
-            
-            img.addEventListener('click', () => {
-                const w = window.open();
-                w.document.write(`<img src="${photoBase64}" style="max-width:100%; max-height:100vh; display:block; margin:auto;">`);
-            });
-            
-            photosDiv.appendChild(img);
-        });
-    }
-    
-    document.getElementById('quote-modal').classList.remove('hidden');
-};
 
 // ==========================================
 // MÓDULO CALENDARIO (EVENTOS MANUALES)
@@ -9976,10 +9785,10 @@ function syncAllDayEventFields() {
 function initCalendarioEvents() {
     const eventModal = document.getElementById('event-modal');
     const eventForm = document.getElementById('event-form');
-    
+
     document.getElementById('btn-close-event-modal').addEventListener('click', () => eventModal.classList.add('hidden'));
     document.getElementById('btn-cancel-event').addEventListener('click', () => eventModal.classList.add('hidden'));
-    
+
     document.getElementById('btn-add-event-modal').addEventListener('click', () => {
         const now = new Date();
         now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
@@ -10002,7 +9811,7 @@ function initCalendarioEvents() {
         const id = document.getElementById('event-id').value;
         const isEditing = id !== '';
         syncAllDayEventFields();
-        
+
         const data = {
             titulo: document.getElementById('event-title').value.trim(),
             descripcion: document.getElementById('event-desc').value.trim(),
@@ -10011,7 +9820,7 @@ function initCalendarioEvents() {
             categoria: document.getElementById('event-category').value,
             color: document.getElementById('event-color').value
         };
-        
+
         try {
             let url = `${BASE_API_URL}/eventos`;
             let method = 'POST';
@@ -10019,13 +9828,13 @@ function initCalendarioEvents() {
                 url = `${BASE_API_URL}/eventos/${id}`;
                 method = 'PUT';
             }
-            
+
             const response = await fetch(url, {
                 method: method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
-            
+
             if (response.ok) {
                 AllfixUI.notify(isEditing ? 'Evento actualizado.' : 'Evento guardado.');
                 eventModal.classList.add('hidden');
@@ -10179,9 +9988,6 @@ function renderCalendario() {
                 editOrderDetails(props.orderId);
             } else if (props.type === 'manual') {
                 openEditEventModal(props.eventId);
-            } else if (props.type === 'quote' && typeof window.openQuoteDetail === 'function') {
-                switchView('cotizaciones');
-                window.openQuoteDetail(props.quoteId);
             }
         },
         dateClick: function(info) {
@@ -10213,7 +10019,10 @@ function openEditEventModal(eventId) {
     document.getElementById('event-modal').classList.remove('hidden');
 }
 
-async function printOrderTicket(id) {
-    const opened = await viewOrderDetails(id, { openPreview: false });
-    if (opened !== false) window.openOrderPrintSelector();
+function printOrderTicket(id) {
+    const selected = APP_STATE.selectedOrderForReceipt;
+    const order = APP_STATE.ordenes.find(item => String(item.id) === String(id));
+    if (order) window.openOrderActionsModal(order, { loadDetails: true });
+    else if (selected && String(selected.id) === String(id)) window.openOrderActionsModal(selected);
+    else window.openOrderActionsModal({ id }, { loadDetails: true });
 }

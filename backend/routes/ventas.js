@@ -17,7 +17,7 @@ router.get('/', authMiddleware, async (req, res) => {
       FROM ventas v
       JOIN ventas_detalle vd ON v.id = vd.venta_id
       JOIN inventario i ON vd.producto_id = i.id
-      WHERE 1=1
+      WHERE v.negocio_id=app_tenant_id()
     `;
     const params = [];
     let idx = 1;

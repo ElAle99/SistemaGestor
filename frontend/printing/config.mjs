@@ -23,7 +23,7 @@ export function normalizeConfig(input = {}) {
     codepage: ['cp850', 'cp858', 'windows1252', 'ascii'].includes(input.codepage) ? input.codepage : 'cp850',
     compatibilityProfile,
     codepageMapping: compatibilityMapping(compatibilityProfile, input.printerName),
-    autoPrint: input.autoPrint !== false, showQr: input.showQr !== false,
+    autoPrint: input.autoPrint !== false, showQr: false,
     showLogo: input.showLogo === true, cut: input.cut === true
   };
 }

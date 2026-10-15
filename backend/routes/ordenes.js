@@ -4,6 +4,7 @@ const ordenService = require('../services/ordenService');
 const { rateLimit } = require('../middleware/rateLimit');
 const { createQuickOrder } = require('../services/quickOrderService');
 const { scopeForUser } = require('../services/catalogService');
+const { withSystemContext } = require('../config/tenantContext');
 
 const router = express.Router();
 
@@ -27,8 +28,9 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
-router.get('/folio/:folio', rateLimit({ windowMs: 60 * 1000, max: 30, keyPrefix: 'folio-publico' }), async (req, res) => {
+router.get('/folio/:folio', authMiddleware, rateLimit({ windowMs: 60 * 1000, max: 30, keyPrefix: 'folio-publico' }), async (req, res) => {
   try {
+    // Globally unique public folio; only the existing public allowlist below is returned.
     const orden = await ordenService.getOrdenByFolio(req.params.folio);
     if (!orden) return res.status(404).json({ error: 'Folio no encontrado' });
 

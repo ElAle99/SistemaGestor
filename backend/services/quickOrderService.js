@@ -124,9 +124,8 @@ async function createQuickOrder(data, usuarioId, negocioId = null) {
     }
 
     const year = new Date().getFullYear();
-    const last = await db.query('SELECT folio FROM ordenes_servicio WHERE folio LIKE $1 ORDER BY id DESC LIMIT 1', [`AFB-${year}-%`]);
-    const lastNumber = Number(last.rows[0]?.folio?.split('-')[2]);
-    const folio = `AFB-${year}-${Number.isSafeInteger(lastNumber) ? lastNumber + 1 : 10000}`;
+    const allocated = await db.query('SELECT allocate_order_folio($1) AS folio', [year]);
+    const folio = allocated.rows[0].folio;
     const result = await db.query(`INSERT INTO ordenes_servicio
       (folio, cliente_id, usuario_creador_id, tipo_equipo, marca, modelo, color, falla_reportada,
        servicio_solicitado, costo_estimado, costo_real, mano_obra, anticipo, estado, pendiente_presupuesto, status_reason,
@@ -156,7 +155,7 @@ async function createQuickOrder(data, usuarioId, negocioId = null) {
     await db.query(`INSERT INTO auditoria_ordenes (orden_id, usuario_id, accion, detalle)
       VALUES ($1, $2, 'crear', $3::jsonb)`, [created.id, usuarioId, JSON.stringify({ folio, origen: 'recepcion_rapida', anticipo: order.anticipo, costo: order.costo_estimado })]);
     await db.query('COMMIT');
-    return { id: created.id, folio, status: 'Recibido' };
+    return { id: created.id, negocio_id: created.negocio_id, folio, status: 'Recibido' };
   } catch (error) {
     await db.query('ROLLBACK');
     throw error;

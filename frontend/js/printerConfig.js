@@ -15,7 +15,7 @@ function initPrinterConfigForm() {
     const prefs = service.readPreferences();
     paper.value = prefs.paperWidth; mode.value = prefs.autoPrint ? 'direct' : 'ask'; cut.checked = prefs.cut;
     for (const [key, id] of Object.entries(fields)) el(id).value = prefs[key];
-    el('cfg-print-qr').checked = prefs.showQr; el('cfg-print-logo').checked = prefs.showLogo;
+    el('cfg-print-logo').checked = prefs.showLogo;
     for (const option of el(fields.connection).options) option.disabled = option.value !== 'auto' && !capabilities[option.value];
     el('printer-capabilities').textContent = 'Disponibles: ' + Object.keys(capabilities).filter(key => capabilities[key]).join(', ');
     function diagnose(error, live = false) {
@@ -28,7 +28,7 @@ function initPrinterConfigForm() {
     function storeOptions() {
         const values = Object.fromEntries(Object.entries(fields).map(([key,id]) => [key,el(id).value]));
         const p = service.savePreferences({ ...values, paperWidth: paper.value, autoPrint: mode.value === 'direct',
-            cut: cut.checked, showQr: el('cfg-print-qr').checked, showLogo: el('cfg-print-logo').checked });
+            cut: cut.checked, showLogo: el('cfg-print-logo').checked });
         Object.assign(ESTABLISHMENT_CONFIG, { ticketPaper: p.paperWidth, autoPrintTicket: p.autoPrint, ticketPrinter: p.printerName });
     }
     const refresh = async () => {
@@ -102,7 +102,7 @@ function initPrinterConfigForm() {
         for (const [key,value] of Object.entries(profile)) if (fields[key]) el(fields[key]).value = value;
         storeOptions();
     });
-    for (const input of [mode, cut, ...Object.values(fields).map(el), el('cfg-print-qr'), el('cfg-print-logo')]) input.addEventListener('change', () => { storeOptions(); refresh(); });
+    for (const input of [mode, cut, ...Object.values(fields).map(el), el('cfg-print-logo')]) input.addEventListener('change', () => { storeOptions(); refresh(); });
     refreshChoices().catch(error => { status.textContent = error.message; });
     const logo = el('cfg-ticket-logo');
     setTicketLogoPreview();

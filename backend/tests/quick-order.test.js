@@ -37,7 +37,7 @@ function harness({ failAt, existing, duplicate = false, closedCash = false } = {
       if (sql.includes('SELECT * FROM clientes WHERE id')) return { rows: existing ? [existing] : [] };
       if (sql.includes('regexp_replace')) return { rows: duplicate ? [customer] : [] };
       if (sql.includes('INSERT INTO clientes')) return { rows: [customer] };
-      if (sql.includes('SELECT folio')) return { rows: [{ folio: `AFB-${new Date().getFullYear()}-10042` }] };
+      if (sql.includes('allocate_order_folio')) return { rows: [{ folio: `AFB-${new Date().getFullYear()}-10043` }] };
       if (sql.includes('INSERT INTO ordenes_servicio')) return { rows: [{ id: 17 }] };
       if (sql.includes('INSERT INTO historial_estados')) return { rows: [{ id: 18 }] };
       return { rows: [] };

@@ -25,6 +25,7 @@ test('catalog migration and tenant isolation on embedded PostgreSQL', async t =>
   const service = module.exports;
   try {
     await initCatalog(pool);
+    await pg.exec('ALTER TABLE marcas ADD COLUMN tipo_equipo_scope BIGINT DEFAULT 0; ALTER TABLE modelos_equipo ADD COLUMN marca_scope BIGINT DEFAULT 0; ALTER TABLE fallas_catalogo ADD COLUMN tipo_equipo_scope BIGINT DEFAULT 0; ALTER TABLE reparaciones_catalogo ADD COLUMN tipo_equipo_scope BIGINT DEFAULT 0; ALTER TABLE falla_reparaciones ADD COLUMN falla_scope BIGINT DEFAULT 0, ADD COLUMN reparacion_scope BIGINT DEFAULT 0');
     const initial = await service.getCatalog(1);
     const phone = initial.tipos.find(row => row.nombre === 'Celular');
     const samsung = initial.marcas.find(row => row.nombre === 'Samsung' && row.tipo_equipo_id === phone.id);

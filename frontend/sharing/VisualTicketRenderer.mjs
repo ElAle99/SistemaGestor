@@ -1,4 +1,3 @@
-import QRCode from 'qrcode';
 
 // Draw directly at sharing resolution; no printer settings, HTML capture or ESC/POS bytes.
 export async function renderShareTicket(ticket) {
@@ -45,10 +44,6 @@ export async function renderShareTicket(ticket) {
         ctx.font = face; ctx.textAlign = 'left'; lines.forEach((line,i) => ctx.fillText(line, margin, top + i * 36));
         ctx.textAlign = 'right'; ctx.fillText(block.value, width - margin, top);
       }); y += Math.max(1,lines.length) * 36 + 8;
-    } else if (block.kind === 'qr') {
-      const qr = document.createElement('canvas');
-      await QRCode.toCanvas(qr, block.value, { width: 200, margin: 2, errorCorrectionLevel: 'M' });
-      const top = y; commands.push(() => ctx.drawImage(qr, (width - 200) / 2, top)); y += 216;
     }
   }
   if (y > 30000) throw new Error('El comprobante es demasiado largo para una sola imagen.');

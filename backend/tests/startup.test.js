@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-function harness({ secret = 'test-only-secret', failDB = false, failWarranty = false } = {}) {
+function harness({ secret = 'test-only-secret', failDB = false, failWarranty = false, failTenant = false } = {}) {
   const events = [];
   const app = { use() {}, options() {}, get() {}, listen() { events.push('listen'); return {}; } };
   const express = () => app;
@@ -17,6 +17,8 @@ function harness({ secret = 'test-only-secret', failDB = false, failWarranty = f
       if (name === 'express') return express;
       if (name === 'cors') return () => () => {};
       if (name === 'path') return path;
+      if (name === './config/tenantContext') return { withSystemContext: callback => callback() };
+      if (name === './db/initTenancy') return { initTenancy: async () => { events.push('tenancy'); if(failTenant) throw new Error('tenant migration failed'); } };
       if (name === './config/env' || name.startsWith('./routes/')) return {};
       if (name === './config/db') return {
         initDB: async () => { events.push('database'); if (failDB) throw new Error('database unavailable'); },
@@ -30,12 +32,12 @@ function harness({ secret = 'test-only-secret', failDB = false, failWarranty = f
   });
   return { start: module.exports.start, events };
 }
-test('startup listens only after both initializers succeed', async () => {
+test('startup validates runtime without running privileged migrations', async () => {
   const { start, events } = harness();
   await start();
-  assert.deepEqual(events, ['database', 'warranty', 'listen']);
+  assert.deepEqual(events, ['database', 'listen']);
 });
-for (const options of [{ secret: '' }, { failDB: true }, { failWarranty: true }]) {
+for (const options of [{ secret: '' }, { failDB: true }]) {
   test(`startup closes pool without accepting traffic on ${JSON.stringify(options)}`, async () => {
     const { start, events } = harness(options);
     await assert.rejects(start());

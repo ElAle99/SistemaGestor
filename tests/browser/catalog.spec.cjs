@@ -80,6 +80,8 @@ test('cascading searchable selectors, multiple tags and exact order payload', as
   await select(page, 'deviceType', 'Celular');
   await select(page, 'brand', 'Samsung');
   await page.locator('#smart-model').fill('A55');
+  // Parent selection can restore brand focus while the async model options arrive.
+  await page.locator('#smart-model').click();
   await page.getByText('Samsung Galaxy A55 5G', { exact: true }).last().click();
   await select(page, 'fallas', 'Pantalla rota');
   await select(page, 'fallas', 'No carga');

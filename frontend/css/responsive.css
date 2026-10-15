@@ -91,8 +91,7 @@
         grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;
     }
     .dashboard-cols-2, .clients-layout, .pos-layout, .caja-layout,
-    .config-workspace, .financial-report-layout, .financial-breakdown-grid,
-    .quote-detail-layout { grid-template-columns: minmax(0, 1fr); }
+    .config-workspace, .financial-report-layout, .financial-breakdown-grid { grid-template-columns: minmax(0, 1fr); }
     .client-detail-panel { position: static; max-height: none; }
     .client-history-dialog { max-height: calc(var(--mobile-viewport-height, 100dvh) - 40px); }
     .client-history-body { overscroll-behavior: contain; }
@@ -194,7 +193,7 @@
     .form-row-2, .form-row-3, .client-form-grid, .client-detail-grid,
     .inventory-product-grid, .calendar-event-grid, .financial-summary-grid,
     .financial-breakdown-grid, .caja-active-meta-grid, .caja-summary-grid,
-    .caja-cortes-summary-grid, .quote-detail-layout { grid-template-columns: minmax(0, 1fr) !important; }
+    .caja-cortes-summary-grid { grid-template-columns: minmax(0, 1fr) !important; }
     .form-row-2 > *, .form-row-3 > *, .client-form-grid > * { grid-column: auto !important; }
     .business-brand-settings, .config-form-section-title, .business-logo-actions { flex-wrap: wrap; gap: 12px; }
     .config-section-link { flex-basis: 100px; font-size: 12px; justify-content: center; }

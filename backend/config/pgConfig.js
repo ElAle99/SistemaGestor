@@ -22,7 +22,9 @@ function shouldUseSsl(connectionString = '') {
 }
 
 function getPgPoolConfig() {
-  const connectionString = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
+  const connectionString = process.env.DATABASE_URL;
+  const username = connectionString ? decodeURIComponent(new URL(connectionString).username) : process.env.DB_USER;
+  if (!username || /^(postgres|supabase_admin)(\.|$)/i.test(username)) throw new Error('Configura una credencial de runtime no administrativa en DATABASE_URL o DB_USER.');
   const rejectUnauthorized = readBoolean(process.env.DB_SSL_REJECT_UNAUTHORIZED, false);
 
   if (connectionString) {
@@ -59,5 +61,11 @@ function getPgPoolConfig() {
 }
 
 module.exports = {
-  getPgPoolConfig
+  getPgPoolConfig,
+  getMigrationPoolConfig() {
+    if (!process.env.MIGRATION_DATABASE_URL) throw new Error('MIGRATION_DATABASE_URL es obligatorio para migraciones.');
+    const config = { connectionString: process.env.MIGRATION_DATABASE_URL, max: 1 };
+    if (shouldUseSsl(config.connectionString)) config.ssl = { rejectUnauthorized: readBoolean(process.env.DB_SSL_REJECT_UNAUTHORIZED, false) };
+    return config;
+  }
 };

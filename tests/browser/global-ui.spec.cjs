@@ -11,7 +11,7 @@ test.beforeAll(async () => {
       let html = fs.readFileSync(path.join(root, 'index.html'), 'utf8')
         .replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '')
         .replace(/<link[^>]*href="https:[^>]*>/g, '');
-      html = html.replace('</body>', `<script src="/js/formFeedback.js"></script><script src="/test-app.js"></script><script src="/js/quickOrderExtras.js"></script><script src="/js/quickOrder.js"></script><script src="/dist/order-catalog.js"></script><script src="/js/responsive.js"></script><script src="/js/ui.js"></script></body>`);
+      html = html.replace('</body>', `<script src="/js/formFeedback.js"></script><script src="/test-app.js"></script><script src="/js/orderActionsUI.js"></script><script src="/js/quickOrderExtras.js"></script><script src="/js/quickOrder.js"></script><script src="/dist/order-catalog.js"></script><script src="/js/responsive.js"></script><script src="/js/ui.js"></script></body>`);
       res.setHeader('Content-Type', 'text/html; charset=utf-8'); return res.end(html);
     }
     if (url === '/test-app.js') {
@@ -26,6 +26,13 @@ test.beforeAll(async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); origin = `http://127.0.0.1:${server.address().port}`;
 });
 test.afterAll(async () => { await new Promise(resolve => server.close(resolve)); });
+
+test('retired quotes and QR settings cannot be reopened', async ({page})=>{
+  await expect(page.locator('[data-view="cotizaciones"],#view-cotizaciones,#quote-modal,#cfg-print-qr')).toHaveCount(0);
+  await page.evaluate(()=>switchView('cotizaciones'));
+  await expect(page.locator('#view-dashboard')).toBeVisible();
+  expect(await page.evaluate(()=>typeof window.openQuoteDetail)).toBe('undefined');
+});
 
 test('printer configuration uses local preferences and browser fallback without QZ', async ({ page }) => {
   await page.evaluate(() => {
@@ -211,6 +218,7 @@ test('QZ reconnect retries a failed sale job without creating another sale or ti
     qz.print = async (...args) => { if (fail) { fail = false; window.__qzActive = false; throw new Error('Connection closed'); } return original(...args); };
     await handleCompletedSale({fecha:'2026-10-11',total:50,metodo_pago:'Efectivo',items:[{nombre:'Cable',cantidad:1,precio_unitario:50}]});
   });
+  await page.locator('#btn-sale-success-print').click();
   await expect(page.locator('#sale-success-message')).toHaveText('Venta completada, ticket pendiente de impresión');
   await page.locator('#btn-sale-retry-print').click();
   await expect.poll(() => page.evaluate(() => [...printerManager.jobs.values()][0].state)).toBe('printed');
@@ -229,6 +237,8 @@ test('service, sale, cash closing and reprint use native bytes without capturing
     const serviceJobs = window.printerManager.jobs.size;
     await window.printerManager.reprintLast('service');
     await handleCompletedSale({ fecha: '2026-10-11', total: 50, metodo_pago: 'Efectivo', items: [{ nombre: 'Cable', cantidad: 1, precio_unitario: 50 }] });
+    viewVentaDetails(APP_STATE.selectedSaleForReceipt, { openPreview: false });
+    await printReceipt(null, { type: 'sale' });
     APP_STATE.selectedCajaForReceipt = { fecha_cierre: '2026-10-11', resumen: { fondo_inicial: 100 }, monto_contado: 150, observaciones: 'PRIVATE_CASH_NOTE' };
     document.getElementById('btn-show-ticket-corte').click();
     await printReceipt();
@@ -246,6 +256,7 @@ test('confirmed sale survives printer disconnection and reconnect button retries
     window.__failWrite = true;
     await handleCompletedSale({ fecha: '2026-10-11', total: 50, metodo_pago: 'Efectivo', items: [{ nombre: 'Cable', cantidad: 1, precio_unitario: 50 }] });
   });
+  await page.locator('#btn-sale-success-print').click();
   await expect(page.locator('#sale-success-message')).toHaveText('Venta completada, ticket pendiente de impresión');
   await expect(page.locator('#btn-sale-retry-print')).toBeVisible();
   await page.evaluate(() => { window.__failWrite = false; });
@@ -270,6 +281,7 @@ test('POS sends the sale once before printing, failure never repeats the charge'
     window.__failWrite = true;
   });
   await page.locator('#btn-pos-pay').click();
+  await page.locator('#btn-sale-success-print').click();
   await expect(page.locator('#sale-success-message')).toHaveText('Venta completada, ticket pendiente de impresión');
   expect(charges).toBe(1);
   expect(await page.evaluate(() => APP_STATE.cart.length)).toBe(0);
@@ -277,6 +289,81 @@ test('POS sends the sale once before printing, failure never repeats the charge'
   await page.locator('#btn-sale-retry-print').click();
   await expect.poll(() => page.evaluate(() => [...window.printerManager.jobs.values()][0].state)).toBe('printed');
   expect(charges).toBe(1);
+});
+
+test('payment confirmation opens immediately after success without refresh, preview or printing', async ({ page }) => {
+  let charges = 0, confirm;
+  const confirmation = new Promise(resolve => { confirm = resolve; });
+  await page.route('**/api/pos/venta', async route => {
+    charges++;
+    await confirmation;
+    await route.fulfill({ json: { id: 987, total: 50, metodo_pago: 'Efectivo', items: [{ nombre: 'Servicio', tipo_item: 'reparacion', cantidad: 1, precio_unitario: 50 }] } });
+  });
+  await page.evaluate(() => {
+    initPOS(); switchView('pos');
+    APP_STATE.cart = [{ id: 1, nombre: 'Cable', precio: 50, qty: 1, type: 'product' }];
+    APP_STATE.cajaActiva = { id: 1 }; updateCartUI();
+    document.getElementById('pos-monto-recibido').value = '50';
+    ESTABLISHMENT_CONFIG.autoPrintTicket = true;
+    window.__previews = 0; window.__refreshes = 0;
+    const preview = viewVentaDetails;
+    viewVentaDetails = (...args) => { window.__previews++; return preview(...args); };
+    loadAllData = () => { window.__refreshes++; return new Promise(() => {}); };
+    const originalFetch = fetch;
+    window.fetch = async (...args) => {
+      const response = await originalFetch(...args);
+      if (String(args[0]).endsWith('/pos/venta') && response.ok) {
+        const json = response.json.bind(response);
+        response.json = async () => {
+          const result = await json();
+          window.__paymentConfirmedAt = performance.now();
+          return result;
+        };
+      }
+      return response;
+    };
+    const modal = document.getElementById('sale-success-modal');
+    new MutationObserver(() => {
+      if (!modal.classList.contains('hidden') && !window.__paymentModalMs) {
+        window.__paymentModalMs = performance.now() - window.__paymentConfirmedAt;
+        requestAnimationFrame(() => { window.__paymentFrameMs = performance.now() - window.__paymentConfirmedAt; });
+      }
+    }).observe(modal, { attributes: true, attributeFilter: ['class'] });
+  });
+  await page.locator('#btn-pos-pay').click();
+  await expect.poll(() => charges).toBe(1);
+  await expect(page.locator('#btn-pos-pay')).toHaveText('Procesando...');
+  await expect(page.locator('#btn-pos-pay')).toBeDisabled();
+  await page.locator('#btn-pos-pay').evaluate(button => button.dispatchEvent(new MouseEvent('click')));
+  expect(charges).toBe(1);
+  await expect(page.locator('#sale-success-modal')).toBeHidden();
+  confirm();
+  await expect(page.locator('#sale-success-modal')).toBeVisible();
+  await expect(page.locator('#sale-success-total')).toHaveText('$50.00');
+  await expect(page.locator('#sale-success-method')).toHaveText('Efectivo');
+  await expect.poll(() => page.evaluate(() => window.__paymentFrameMs)).toBeGreaterThan(0);
+  const result = await page.evaluate(() => ({ ms: window.__paymentModalMs, frameMs: window.__paymentFrameMs, previews: window.__previews, busy: document.getElementById('btn-pos-pay').getAttribute('aria-busy') }));
+  console.log('Backend confirmed payment to visible modal:', result.ms.toFixed(1), 'ms; next render frame:', result.frameMs.toFixed(1), 'ms');
+  expect(result.previews).toBe(0);
+  expect(result.busy).toBe(null);
+  expect(charges).toBe(1);
+  await page.locator('#btn-sale-success-preview').click();
+  await expect(page.locator('#receipt-modal')).toBeVisible();
+  expect(await page.evaluate(() => window.__previews)).toBe(1);
+});
+
+test('failed charge never displays confirmation and restores the pay button', async ({ page }) => {
+  await page.route('**/api/pos/venta', route => route.fulfill({ status: 400, json: { error: 'No se pudo registrar' } }));
+  await page.evaluate(() => {
+    initPOS(); switchView('pos');
+    APP_STATE.cart = [{ id: 1, nombre: 'Cable', precio: 50, qty: 1, type: 'product' }];
+    APP_STATE.cajaActiva = { id: 1 }; updateCartUI();
+    document.getElementById('pos-monto-recibido').value = '50';
+  });
+  await page.locator('#btn-pos-pay').click();
+  await expect(page.locator('#btn-pos-pay')).toBeEnabled();
+  await expect(page.locator('#sale-success-modal')).toBeHidden();
+  expect(await page.evaluate(() => APP_STATE.cart.length)).toBe(1);
 });
 
 test('logo is resized to printer width and contains only opaque black and white pixels', async ({ page }) => {
@@ -492,17 +579,16 @@ test('autocomplete requests stay quiet while normal requests retain loading feed
   await page.evaluate(() => fetch('/api/clientes'));
   expect(await page.evaluate(() => window.loadingCalls)).toBe(1);
 });
-test('full application creates without phone or price and never opens a ticket automatically', async ({ page }) => {
+test('full application creates without phone or price and opens optional actions after saving', async ({ page }) => {
   let posted;
   await page.route('**/api/catalogos', route => route.fulfill({ json: { tipos: [], marcas: [], fallas: [], reparaciones: [], relaciones: [], puede_guardar: true } }));
   await page.route('**/api/ordenes/rapida', async route => {
     posted = route.request().postDataJSON();
     await route.fulfill({ json: { id: 100, folio: 'TEST-100' } });
   });
+  await page.route('**/api/ordenes/100', route => route.fulfill({ json: { id: 100, folio: 'TEST-100', clientName: 'Prueba', deviceType: 'Celular' } }));
   await page.evaluate(() => {
     ESTABLISHMENT_CONFIG.autoPrintTicket = true;
-    window.previewCalls = 0;
-    window.viewOrderDetails = async () => { window.previewCalls++; };
     openQuickOrder();
   });
   await page.locator('#quick-client-name').fill('Prueba de recepción');
@@ -514,14 +600,17 @@ test('full application creates without phone or price and never opens a ticket a
   }
   expect(await page.locator('#quick-order-submit').evaluate(el => el.form?.id)).toBe('quick-order-form');
   await page.locator('#quick-order-submit').click();
-  await expect(page.getByText('Orden TEST-100 creada correctamente.')).toBeVisible();
+  await expect(page.locator('#order-print-selector-title')).toHaveText('Orden creada correctamente');
+  await expect(page.locator('#order-actions-folio')).toHaveText('Folio: TEST-100');
+  await expect(page.locator('#order-print-selector')).toBeVisible();
   expect(posted.costo_estimado).toBe(null);
   expect(posted.clientPhone).toBe('');
-  expect(await page.evaluate(() => window.previewCalls)).toBe(0);
   await expect(page.locator('#receipt-modal')).toBeHidden();
   expect(posted.model).toBe('A55');
   expect(posted.fallas).toEqual(['No carga']);
   expect(posted.reparaciones).toEqual(['Diagnóstico']);
+  await page.locator('#order-print-selector-cancel').click();
+  expect(await page.evaluate(() => APP_STATE.selectedOrderForReceipt.id)).toBe(100);
 });
 test('submit from the footer reveals the first missing required field', async ({ page }) => {
   await page.route('**/api/catalogos', route => route.fulfill({ json: { tipos: [], marcas: [], fallas: [], reparaciones: [], relaciones: [], puede_guardar: false } }));
@@ -569,7 +658,7 @@ test('equipment label and customer ticket use separate queued jobs with read-onl
   expect(result[1].text).toContain('LABEL_SECRET');
 });
 
-test('order selector waits for a choice, closes with cancel and Escape, and keeps POS direct', async ({ page }) => {
+test('order selector waits for a choice, closes with Finalizar and Escape, and keeps POS direct', async ({ page }) => {
   await serialFixture(page);
   await page.evaluate(() => {
     APP_STATE.selectedOrderForReceipt = { id: 42, folio: 'AFB-CHOICE', clientName: 'Ana', costo_estimado: 100 };
@@ -577,14 +666,16 @@ test('order selector waits for a choice, closes with cancel and Escape, and keep
   await page.locator('#btn-print-action').evaluate(button => button.click());
   await expect(page.locator('#order-print-selector')).toBeVisible();
   expect(await page.evaluate(() => printerManager.jobs.size)).toBe(0);
-  await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await page.getByRole('button', { name: 'Finalizar', exact: true }).click();
   await expect(page.locator('#order-print-selector')).not.toBeVisible();
   await page.evaluate(() => requestReceiptPrint());
   await page.keyboard.press('Escape');
   await expect(page.locator('#order-print-selector')).not.toBeVisible();
   await page.evaluate(() => requestReceiptPrint());
   await page.locator('#order-print-customer').click();
-  await expect(page.locator('#order-print-selector')).not.toBeVisible();
+  await expect(page.locator('#order-print-selector-status')).toContainText('Ticket enviado');
+  await expect(page.locator('#order-print-selector')).toBeVisible();
+  await page.locator('#order-print-selector-cancel').click();
   expect(await page.evaluate(() => [...printerManager.jobs.values()].map(job => job.ticket.type))).toEqual(['service']);
   await page.evaluate(async () => {
     ESTABLISHMENT_CONFIG.autoPrintTicket = false;
@@ -594,6 +685,110 @@ test('order selector waits for a choice, closes with cancel and Escape, and keep
   await expect(page.locator('#order-print-selector')).not.toBeVisible();
   expect(await page.evaluate(() => [...printerManager.jobs.values()].map(job => job.ticket.type))).toEqual(['service', 'sale']);
 });
+
+test('created order offers consecutive customer and equipment prints without fetching again', async ({ page }) => {
+  await serialFixture(page);
+  await page.evaluate(() => openOrderActionsModal({ id: 52, folio: 'AFB-CREATED', clientName: 'Ana', lock_type: 'PIN', lock_pin: 'INTERNAL', costo_estimado: 100 }, { created: true }));
+  await expect(page.locator('#order-print-selector-title')).toHaveText('Orden creada correctamente');
+  await expect(page.locator('#order-actions-folio')).toHaveText('Folio: AFB-CREATED');
+  await page.locator('#order-print-selector-cancel').click();
+  expect(await page.evaluate(() => printerManager.jobs.size)).toBe(0);
+  expect(await page.evaluate(() => APP_STATE.selectedOrderForReceipt.id)).toBe(52);
+  await page.evaluate(() => openOrderPrintSelector());
+  await page.locator('#order-print-customer').click();
+  await expect(page.locator('#order-print-selector-status')).toContainText('Ticket enviado');
+  await page.locator('#btn-print-equipment-label').click();
+  await expect(page.locator('#order-print-selector-status')).toContainText('Ticket enviado');
+  await expect(page.locator('#order-print-selector')).toBeVisible();
+  const jobs = await page.evaluate(() => [...printerManager.jobs.values()].map(job => ({ type: job.ticket.type, text: JSON.stringify(job.ticket) })));
+  expect(jobs.map(job => job.type)).toEqual(['service', 'equipmentLabel']);
+  expect(jobs[0].text).not.toContain('INTERNAL');
+  expect(jobs[1].text).toContain('INTERNAL');
+  await page.locator('#order-print-selector-cancel').click();
+});
+
+for (const [width, height] of [[1920, 1080], [1366, 768], [768, 1024], [390, 844], [360, 640]]) {
+  test(`order dialog centers or docks without moving background at ${width}x${height}`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await page.evaluate(() => {
+      document.body.style.minHeight = '2000px';
+      document.body.style.overflow = 'auto';
+      document.body.style.paddingRight = '3px';
+      const opener = document.createElement('button');
+      opener.id = 'test-order-opener';
+      opener.textContent = 'Abrir acciones';
+      document.body.appendChild(opener);
+      opener.focus({ preventScroll: true });
+      window.scrollTo(0, 120);
+      window.__beforeOrderUI = { scroll: window.scrollY, width: document.body.getBoundingClientRect().width };
+      openOrderActionsModal({ id: 52, folio: 'AFB-UI' }, { created: true });
+    });
+    const dialog = page.locator('#order-print-selector');
+    await expect(page.locator('#order-print-customer')).toBeFocused();
+    await expect.poll(async () => {
+      const r = await dialog.boundingBox();
+      return Math.abs(r.x + r.width / 2 - width / 2);
+    }).toBeLessThan(1);
+    await expect.poll(async () => {
+      const r = await dialog.boundingBox();
+      return width < 640 ? Math.abs(r.y + r.height - height) : Math.abs(r.y + r.height / 2 - height / 2);
+    }).toBeLessThan(1);
+    for (const id of ['order-print-customer', 'btn-print-equipment-label', 'order-actions-share', 'order-actions-download', 'order-print-selector-cancel']) {
+      await expect(page.locator('#' + id)).toBeInViewport();
+    }
+    await expect(page.locator('.order-actions-success')).toBeVisible();
+    expect(await page.evaluate(() => window.scrollY)).toBe(await page.evaluate(() => window.__beforeOrderUI.scroll));
+    expect(await page.evaluate(() => document.body.getBoundingClientRect().width)).toBe(await page.evaluate(() => window.__beforeOrderUI.width));
+    await page.locator('#order-print-selector-cancel').click();
+    await expect(page.locator('#test-order-opener')).toBeFocused();
+    await expect.poll(() => page.evaluate(() => ({ overflow: document.body.style.overflow, padding: document.body.style.paddingRight, scroll: window.scrollY }))).toEqual({ overflow: 'auto', padding: '3px', scroll: 120 });
+    // A short landscape viewport keeps the header/footer visible and scrolls the cards internally.
+    await page.setViewportSize({ width, height: 340 });
+    await page.evaluate(() => openOrderActionsModal({ id: 52, folio: 'AFB-UI' }));
+    expect(await page.locator('.order-print-options').evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
+    await page.locator('#order-actions-download').scrollIntoViewIfNeeded();
+    await expect(page.locator('#order-actions-download')).toBeInViewport();
+    await expect(page.locator('#order-print-selector-cancel')).toBeInViewport();
+    await page.keyboard.press('Escape');
+  });
+}
+
+for (const width of [1366, 390]) {
+  test(`order actions share then download the same private-safe PNG at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.addScriptTag({ url: origin + '/dist/share-ticket.js' });
+    await page.addScriptTag({ url: origin + '/js/receiptShare.js' });
+    await page.evaluate(() => {
+      window.__captures = 0;
+      const generate = visualTickets.generateShareTicketImage.bind(visualTickets);
+      visualTickets.generateShareTicketImage = async ticket => {
+        window.__captures++;
+        window.__sharedModel = JSON.stringify(ticket);
+        return generate(ticket);
+      };
+      Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true });
+      Object.defineProperty(navigator, 'share', { configurable: true, value: async ({ files }) => { window.__sharedName = files[0].name; } });
+      openOrderActionsModal({ id: 53, folio: 'AFB-SHARE', clientName: 'Ana', lock_pin: 'PRIVATE', lock_pass: 'PRIVATE', costo_estimado: 100 });
+    });
+    expect(await page.evaluate(() => window.__captures)).toBe(0);
+    await page.locator('#order-actions-share').click();
+    // The existing share flow can request another click to preserve user activation.
+    await expect(page.locator('#order-actions-share')).toBeEnabled();
+    if (!(await page.evaluate(() => window.__sharedName))) await page.locator('#order-actions-share').click();
+    await expect.poll(() => page.evaluate(() => window.__sharedName)).toBe('AFB-SHARE.png');
+    const downloaded = page.waitForEvent('download');
+    await page.locator('#order-actions-download').click();
+    expect((await downloaded).suggestedFilename()).toBe('AFB-SHARE.png');
+    expect(await page.evaluate(() => window.__captures)).toBe(1);
+    expect(await page.evaluate(() => window.__sharedModel)).not.toContain('PRIVATE');
+    await expect(page.locator('#order-print-selector')).toBeVisible();
+    const box = await page.locator('#order-print-selector').boundingBox();
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(width);
+    if (width === 390) expect(box.y + box.height).toBeCloseTo(844, 0);
+    await page.locator('#order-print-selector-cancel').click();
+  });
+}
 
 test('order selector retries the same failed label job and fits mobile', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -613,7 +808,8 @@ test('order selector retries the same failed label job and fits mobile', async (
   expect(box.x + box.width).toBeLessThanOrEqual(390);
   await page.evaluate(() => { printerManager.transports.serial.send = window.__originalSend; });
   await page.locator('#btn-print-equipment-label').click();
-  await expect(page.locator('#order-print-selector')).not.toBeVisible();
+  await expect(page.locator('#order-print-selector-status')).toContainText('Ticket enviado');
+  await expect(page.locator('#order-print-selector')).toBeVisible();
   expect(await page.evaluate(() => [...printerManager.jobs.values()].map(job => ({ type: job.ticket.type, state: job.state })))).toEqual([{ type: 'equipmentLabel', state: 'printed' }]);
 });
 
@@ -633,14 +829,150 @@ test('list and reprint open the same selector and block clicks while sending', a
   expect(await page.evaluate(() => printerManager.jobs.size)).toBe(0);
   await page.locator('#order-print-customer').click();
   await expect(page.locator('#order-print-customer')).toBeDisabled();
-  await expect(page.locator('#btn-print-equipment-label')).toBeDisabled();
+  await expect(page.locator('#btn-print-equipment-label')).toBeEnabled();
+  await page.locator('#order-print-customer').evaluate(button => button.click());
+  expect(await page.evaluate(() => printerManager.jobs.size)).toBe(1);
   await page.keyboard.press('Escape');
   await expect(page.locator('#order-print-selector')).toBeVisible();
   await page.evaluate(() => window.__releasePrint());
-  await expect(page.locator('#order-print-selector')).not.toBeVisible();
+  await expect(page.locator('#order-print-selector-status')).toContainText('Ticket enviado');
+  await page.locator('#order-print-selector-cancel').click();
   await page.locator('#btn-reprint-service').evaluate(button => button.click());
   await expect(page.locator('#order-print-selector')).toBeVisible();
   expect(await page.evaluate(() => printerManager.jobs.size)).toBe(1);
   await page.locator('#order-print-selector-close').click();
   await expect(page.locator('#order-print-selector')).not.toBeVisible();
+});
+
+test('list opens on the click frame without detail requests or PNG preparation', async ({ page }) => {
+  await serialFixture(page);
+  let requests = 0, release;
+  const gate = new Promise(resolve => { release = resolve; });
+  await page.route('**/api/ordenes/81', async route => {
+    requests++;
+    await gate;
+    await route.fulfill({ json: { id: 81, folio: 'AFB-INSTANT', clientName: 'Ana', lock_type: 'PIN', lock_pin: 'SECRET' } });
+  });
+  await page.evaluate(() => {
+    APP_STATE.ordenes = [{ id: 81, folio: 'AFB-INSTANT', clientName: 'Ana', status: 'Recibido' }];
+    renderOrdenes();
+    window.__pngWarmups = 0;
+    window.orderReceiptActions = { prepare: () => window.__pngWarmups++ };
+  });
+  const timing = await page.evaluate(async () => {
+    const button = document.querySelector('[onclick="printOrderTicket(81)"]');
+    const start = performance.now();
+    button.click();
+    const openMs = performance.now() - start;
+    const synchronous = document.getElementById('order-print-selector').open;
+    await new Promise(requestAnimationFrame);
+    return { synchronous, openMs, firstFrameMs: performance.now() - start, warmups: window.__pngWarmups };
+  });
+  console.log('Order modal synchronous open:', timing.openMs.toFixed(1), 'ms; first frame:', timing.firstFrameMs.toFixed(1), 'ms');
+  expect(timing.synchronous).toBe(true);
+  expect(timing.warmups).toBe(0);
+  expect(requests).toBe(0);
+  await expect(page.locator('#order-actions-folio')).toHaveText('Folio: AFB-INSTANT');
+  await page.locator('#btn-print-equipment-label').click();
+  await expect.poll(() => requests).toBe(1);
+  await expect(page.locator('#btn-print-equipment-label small')).toHaveText('Preparando…');
+  await page.locator('#btn-print-equipment-label').evaluate(button => button.click());
+  expect(requests).toBe(1);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#order-print-selector')).toBeVisible();
+  release();
+  await expect(page.locator('#order-print-selector-status')).toContainText('Ticket enviado');
+  await page.locator('#order-print-customer').click();
+  await expect(page.locator('#order-print-selector-status')).toContainText('Ticket enviado');
+  expect(requests).toBe(1);
+  expect(await page.evaluate(() => [...printerManager.jobs.values()].map(job => job.ticket.type))).toEqual(['equipmentLabel', 'service']);
+});
+
+test('folio copies by pointer and keyboard without invoking the row, with fallback and failure feedback', async ({ page }) => {
+  await page.evaluate(() => {
+    APP_STATE.ordenes = [{ id: 82, folio: 'AFB-2026-10046', clientName: 'Ana', status: 'Recibido' }];
+    renderOrdenes();
+    switchView('ordenes');
+    window.__rowClicks = 0;
+    document.querySelector('.order-folio-copy').closest('tr').addEventListener('click', () => window.__rowClicks++);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => { window.__copied = text; } } });
+  });
+  const folio = page.locator('.order-folio-copy');
+  await folio.click();
+  await expect(page.locator('.order-folio-toast')).toHaveText('Folio AFB-2026-10046 copiado');
+  expect(await page.evaluate(() => window.__copied)).toBe('AFB-2026-10046');
+  await folio.press('Enter');
+  await folio.press('Space');
+  expect(await page.evaluate(() => window.__rowClicks)).toBe(0);
+  await expect(page.locator('#order-print-selector')).not.toBeVisible();
+  await expect(page.locator('.order-folio-toast')).not.toBeVisible({ timeout: 3000 });
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+    document.execCommand = command => { window.__fallbackCopy = command; return true; };
+  });
+  await folio.click();
+  expect(await page.evaluate(() => window.__fallbackCopy)).toBe('copy');
+  await expect(folio).toBeFocused();
+  await page.evaluate(() => { document.execCommand = () => false; });
+  await folio.click();
+  await expect(page.locator('.order-folio-toast')).toHaveText('No se pudo copiar el folio');
+  await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('Denied'); } } }));
+  await folio.click();
+  await expect(page.locator('.order-folio-toast')).toHaveText('No se pudo copiar el folio');
+  expect(await page.evaluate(() => window.__rowClicks)).toBe(0);
+});
+
+test('establishment configuration drives new thermal and PNG headers without per-ticket fetches', async ({ page }) => {
+  await serialFixture(page);
+  await page.addScriptTag({ url: origin + '/dist/share-ticket.js' });
+  let reads = 0, writes = 0;
+  await page.route('**/api/configuracion/negocio', async route => {
+    if (route.request().method() === 'PUT') {
+      writes++;
+      await route.fulfill({ json: { message: 'Configuracion actualizada' } });
+    } else {
+      reads++;
+      await route.fulfill({ json: { nombre: 'Taller Uno', telefono: '555123', whatsapp: '555123', direccion: 'Calle Uno', terminos_legales: 'Recoger el equipo', logo_ticket_url: '' } });
+    }
+  });
+  const result = await page.evaluate(async () => {
+    localStorage.setItem('allfix_establishment_config', JSON.stringify({ name: 'OTRO NEGOCIO', terms: 'CLAUSULA AJENA' }));
+    await loadEstablishmentConfig();
+    const raw = { id: 1, folio: 'F-1', costo_estimado: 100 };
+    const before = authorizeTicketData('service', raw, ESTABLISHMENT_CONFIG);
+    await saveEstablishmentConfig({ name: 'Taller Dos', phone: '', whatsapp: '', address: '', terms: '' });
+    const after = authorizeTicketData('service', raw, ESTABLISHMENT_CONFIG);
+    const visual = visualTickets.build('service', raw, ESTABLISHMENT_CONFIG);
+    return { before, after, visual };
+  });
+  expect(result.before.business.name).toBe('Taller Uno');
+  expect(result.before.business.terms).toBe('Recoger el equipo');
+  expect(result.after.business.name).toBe('Taller Dos');
+  expect(result.after.business.terms).toBe('');
+  expect(result.after.business.phone).toBe('');
+  expect(result.after.business.address).toBe('');
+  expect(result.visual.blocks[0].text).toBe('Taller Dos');
+  expect(JSON.stringify(result)).not.toContain('OTRO NEGOCIO');
+  expect(reads).toBe(1);
+  expect(writes).toBe(1);
+});
+
+test('migrated business retains its existing QZ 58 mm preferences; another business never inherits them', async ({ page }) => {
+  await serialFixture(page);
+  let scope=1;
+  await page.route('**/api/configuracion/negocio',route=>route.fulfill({json:{negocio_id:scope,nombre:'Negocio '+scope,legacy_business:scope===1}}));
+  const legacy=await page.evaluate(async()=>{
+    const previous=printerService.savePreferences({connection:'qz',qzPrinterName:'POS-58-VALIDADA',paperWidth:'58mm',columns:32,copies:1});
+    localStorage.setItem('allfix_printing_v4:default-default',JSON.stringify(previous));
+    await loadEstablishmentConfig();
+    return {previous,current:printerService.readPreferences()};
+  });
+  expect(legacy.current).toEqual(legacy.previous);
+  scope=2;
+  const other=await page.evaluate(async()=>{await loadEstablishmentConfig();return printerService.readPreferences();});
+  expect(other.qzPrinterName).toBe('');
+  expect(other.paperWidth).toBe('58mm');
+  scope=1;
+  const restored=await page.evaluate(async()=>{await loadEstablishmentConfig();return printerService.readPreferences();});
+  expect(restored).toEqual(legacy.previous);
 });

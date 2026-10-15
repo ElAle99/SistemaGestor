@@ -51,6 +51,7 @@ router.get('/', authMiddleware, adminOnly, async (req, res) => {
     const result = await pool.query(
       `SELECT id, username, rol, nombre, correo, telefono, activo, fecha_creacion
        FROM usuarios
+       WHERE negocio_id=app_tenant_id()
        ORDER BY fecha_creacion DESC, id DESC`
     );
     res.json(result.rows.map(publicUser));
@@ -96,7 +97,7 @@ router.put('/me/profile', authMiddleware, async (req, res) => {
     const result = await pool.query(
       `UPDATE usuarios
        SET nombre = $1, correo = $2, telefono = $3
-       WHERE id = $4
+       WHERE negocio_id = app_tenant_id() AND id = $4
        RETURNING id, username, rol, nombre, correo, telefono, activo, fecha_creacion`,
       [data.nombre, data.correo || null, normalizePhone(data.telefono) || null, req.user.id]
     );
@@ -126,7 +127,7 @@ router.put('/me/password', authMiddleware, async (req, res) => {
     }
 
     const result = await pool.query(
-      'SELECT id, password FROM usuarios WHERE id = $1 AND activo = true',
+      'SELECT id, password FROM usuarios WHERE negocio_id = app_tenant_id() AND id = $1 AND activo = true',
       [req.user.id]
     );
 
@@ -140,7 +141,7 @@ router.put('/me/password', authMiddleware, async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await pool.query('UPDATE usuarios SET password = $1, session_version = session_version + 1 WHERE id = $2', [hashedPassword, req.user.id]);
+    await pool.query('UPDATE usuarios SET password = $1, session_version = session_version + 1 WHERE negocio_id = app_tenant_id() AND id = $2', [hashedPassword, req.user.id]);
 
     return res.json({ message: 'Contrasena actualizada correctamente.' });
   } catch (error) {
@@ -174,7 +175,7 @@ router.patch('/:id/status', authMiddleware, adminOnly, async (req, res) => {
     const result = await pool.query(
       `UPDATE usuarios
        SET activo = $1, session_version = session_version + 1
-       WHERE id = $2
+       WHERE negocio_id = app_tenant_id() AND id = $2
        RETURNING id, username, rol, nombre, correo, telefono, activo, fecha_creacion`,
       [activo, id]
     );

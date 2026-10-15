@@ -22,6 +22,7 @@ router.get('/', authMiddleware, async (req, res) => {
       SELECT c.*, o.folio, o.estado as orden_estado 
       FROM eventos_calendario c 
       LEFT JOIN ordenes_servicio o ON c.orden_id = o.id 
+      WHERE c.negocio_id=app_tenant_id()
       ORDER BY c.fecha_inicio ASC
     `);
     res.json(result.rows);
@@ -48,7 +49,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
   try {
     const { titulo, descripcion, fecha_inicio, fecha_fin, tipo_evento, categoria, color, orden_id } = req.body;
     const result = await pool.query(
-      'UPDATE eventos_calendario SET titulo = $1, descripcion = $2, fecha_inicio = $3, fecha_fin = $4, tipo_evento = $5, color = $6, orden_id = $7 WHERE id = $8 RETURNING *',
+      'UPDATE eventos_calendario SET titulo = $1, descripcion = $2, fecha_inicio = $3, fecha_fin = $4, tipo_evento = $5, color = $6, orden_id = $7 WHERE negocio_id = app_tenant_id() AND id = $8 RETURNING *',
       [titulo, descripcion, fecha_inicio, fecha_fin, tipo_evento || categoria, color || '#3b82f6', orden_id, req.params.id]
     );
     res.json(result.rows[0]);
@@ -59,7 +60,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
-    await pool.query('DELETE FROM eventos_calendario WHERE id = $1', [req.params.id]);
+    await pool.query('DELETE FROM eventos_calendario WHERE negocio_id = app_tenant_id() AND id = $1', [req.params.id]);
     res.json({ message: 'Evento eliminado' });
   } catch (error) {
     res.status(500).json({ error: 'Error al eliminar evento' });

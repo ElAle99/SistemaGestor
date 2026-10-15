@@ -7,6 +7,9 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "build": "node scripts/check-syntax.js",
+    "migrate:tenancy": "node scripts/migrate-tenancy.js",
+    "migrate:security": "node scripts/harden-tenancy.js",
+    "backup": "node scripts/backup-db.js",
     "test": "node --test tests/*.test.js"
   },
   "dependencies": {

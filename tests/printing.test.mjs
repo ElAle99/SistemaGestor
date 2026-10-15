@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { TicketBuilder } from '../frontend/printing/TicketBuilder.mjs';
+import { buildBusinessHeader, businessIdentity, businessLegalLines } from '../frontend/printing/BusinessIdentity.mjs';
+import { buildShareTicket } from '../frontend/sharing/ShareTicketBuilder.mjs';
 import { authorizeTicketData } from '../frontend/printing/authorizedData.mjs';
 import { EscPosEncoder } from '../frontend/printing/EscPosEncoder.mjs';
 import { normalizeConfig, createPreferences } from '../frontend/printing/config.mjs';
@@ -9,6 +11,75 @@ import { WebSerialPrinter, WebUsbPrinter, NativePrinter } from '../frontend/prin
 import { connectionDiagnostics, printerError } from '../frontend/printing/diagnostics.mjs';
 import { paperProfile } from '../frontend/printing/profiles.mjs';
 import { QzTrayPrinter } from '../frontend/printing/QzTrayPrinter.mjs';
+
+test('configured business header is compact and shared by service, sale and visual identity', () => {
+  const config = { name: 'Taller Norte', address: 'Calle Uno 25', phone: '555 123', whatsapp: '555 456', ticketLogoUrl: '/uploads/norte.png', redes_sociales: '{"facebook":"Norte"}', terms: 'Terminos de reparacion' };
+  const identity = businessIdentity(config);
+  assert.deepEqual(buildBusinessHeader(identity).map(line => line.text), ['Taller Norte', 'Calle Uno 25', 'Tel: 555 123', 'WhatsApp: 555 456']);
+  for (const type of ['service', 'sale']) {
+    const ticket = new TicketBuilder().build({ type, data: authorizeTicketData(type, { folio: 'F-1' }, config) });
+    assert.equal(ticket.lines[0].text, 'Taller Norte');
+    assert.equal(ticket.logoUrl, '/uploads/norte.png');
+    assert.doesNotMatch(JSON.stringify(ticket), /Facebook|Norte\"\}/);
+    assert.equal(JSON.stringify(ticket).includes('Terminos de reparacion'), type === 'service');
+    const visual = buildShareTicket(type, { folio: 'F-1' }, config);
+    assert.equal(visual.blocks[0].text, 'Taller Norte');
+    assert.ok(visual.blocks.some(block => block.text === 'Calle Uno 25'));
+  }
+  const label = new TicketBuilder().build({ type: 'equipmentLabel', data: authorizeTicketData('equipmentLabel', { folio: 'F-1' }, config) });
+  assert.equal(label.lines[0].text, 'Taller Norte');
+  assert.doesNotMatch(JSON.stringify(label), /Calle Uno|555|Terminos|facebook/);
+});
+
+test('business name alone and empty optional fields never fabricate identity or blank lines', () => {
+  const config = { name: 'Taller Centro', phone: '   ', whatsapp: null, address: '', terms: null };
+  assert.deepEqual(buildBusinessHeader(businessIdentity(config)).map(line => line.text), ['Taller Centro']);
+  assert.deepEqual(buildBusinessHeader(businessIdentity({})), []);
+  const ticket = new TicketBuilder().build({ type: 'service', data: authorizeTicketData('service', { folio: 'F-1' }, config) });
+  assert.doesNotMatch(JSON.stringify(ticket), /Allfix|ALLFIX|No disponible|Sin informacion|REPARACI/);
+  assert.equal(ticket.logoUrl, '');
+  assert.ok(ticket.lines.every(line => line.kind !== 'text' || line.text.trim()));
+});
+
+test('phone and WhatsApp referring to the same number appear once', () => {
+  const identity = businessIdentity({ name: 'Taller', phone: '555 123', whatsapp: '555123' });
+  assert.deepEqual(buildBusinessHeader(identity).map(line => line.text), ['Taller', 'Tel / WhatsApp: 555123']);
+  const png = buildShareTicket('service', { folio: 'F-1' }, { name: 'Taller', phone: '555123', whatsapp: '555123' });
+  assert.equal(png.blocks.filter(block => block.text?.includes('555123')).length, 1);
+});
+
+test('long configured service terms survive the existing 58 mm encoder without truncation', async () => {
+  const terms = ('Condiciones del servicio y entrega. ').repeat(90) + 'FIN DEL CONTRATO';
+  const config = { name: 'Taller', terms };
+  assert.equal(businessLegalLines(businessIdentity(config)).map(line => line.text).join(' '), terms);
+  const data = authorizeTicketData('service', { folio: 'F-1' }, config);
+  const ticket = new TicketBuilder().build({ type: 'service', data });
+  const bytes = await new EscPosEncoder().encode(ticket, normalizeConfig({ paperWidth: '58mm', showLogo: false }));
+  const output = Buffer.from(bytes).toString('latin1');
+  assert.match(output.replace(/[\r\n]/g, ' '), /FIN DEL CONTRATO/);
+  assert.equal((output.match(/Condiciones/g) || []).length, 90);
+});
+
+test('explicit tenant identities never cross between thermal or visual tickets', () => {
+  const businesses = [{ negocio_id: 1, name: 'Negocio Uno' }, { negocio_id: 2, name: 'Negocio Dos' }];
+  for (const type of ['service', 'sale', 'equipmentLabel']) {
+    for (const business of businesses) {
+      const raw = { negocio_id: business.negocio_id, folio: 'F-1' };
+      const data = authorizeTicketData(type, raw, business);
+      const ticket = new TicketBuilder().build({ type, data });
+      assert.equal(ticket.lines[0].text, business.name);
+      assert.doesNotMatch(JSON.stringify(data), /negocio_id/);
+      assert.throws(() => authorizeTicketData(type, raw, businesses.find(item => item.negocio_id !== raw.negocio_id)), /mismo negocio/);
+      assert.throws(() => authorizeTicketData(type, raw, { name: 'Global' }), /mismo negocio/);
+      if (type !== 'equipmentLabel') {
+        assert.equal(buildShareTicket(type, raw, business).blocks[0].text, business.name);
+        assert.throws(() => buildShareTicket(type, raw, businesses.find(item => item.negocio_id !== raw.negocio_id)), /mismo negocio/);
+      }
+    }
+  }
+  assert.throws(() => authorizeTicketData('service', {}, businesses[0]), /mismo negocio/);
+  assert.throws(() => authorizeTicketData('service', {}, { identityUnavailable: true }), /mismo negocio/);
+});
 
 function qzFixture() {
   let active = false; const calls = []; let connectCalls = 0; let fail = false; let closed;
@@ -168,15 +239,17 @@ const service = { folio: 'AFB-42', clientName: 'José Muñoz', deviceType: 'Celu
   serial: 'PRIVATE_SERIAL', clientPhone: 'PRIVATE_PHONE', clientEmail: 'PRIVATE_EMAIL', inspeccion_obs: 'PRIVATE_NOTES',
   tracking_token: 'PRIVATE_TOKEN_TEXT', jwt: 'PRIVATE_JWT', negocio_id: 'PRIVATE_TENANT', id: 'PRIVATE_ID' };
 
-test('service allowlist omits private fields from model and bytes, only QR contains public URL', async () => {
-  const ticket = builder.build({ type: 'service', data: authorizeTicketData('service', service) });
+test('service allowlist omits private fields from model and bytes, tracking URLs never enter the ticket', async () => {
+  const ticket = builder.build({ type: 'service', data: authorizeTicketData('service', service, { negocio_id: service.negocio_id }) });
   assert.doesNotMatch(JSON.stringify(ticket), /PRIVATE_/);
   assert.match(JSON.stringify(ticket), /750.00/);
   const text = ticket.lines.filter(line => line.kind === 'text').map(line => line.text).join('\n');
   assert.doesNotMatch(text, /token-publico|https:|09:00/);
   const bytes = await new EscPosEncoder().encode(ticket, normalizeConfig());
   assert.doesNotMatch(Buffer.from(bytes).toString('latin1'), /PRIVATE_/);
-  assert.ok(Buffer.from(bytes).includes(Buffer.from('token-publico')));
+  assert.equal(ticket.lines.some(line=>line.kind==='qr'),false);
+  assert.equal(Buffer.from(bytes).includes(Buffer.from('token-publico')),false);
+  assert.equal(normalizeConfig({showQr:true}).showQr,false);
   assert.ok(bytes.includes(0xa4)); // ñ in CP850
 });
 
@@ -204,11 +277,11 @@ test('ESC/POS command injection is stripped, unsupported Unicode falls back safe
 });
 
 test('QR can be disabled and invalid public URLs are never rendered', async () => {
-  const ticket = builder.build({ type: 'service', data: authorizeTicketData('service', service) });
+  const ticket = builder.build({ type: 'service', data: authorizeTicketData('service', service, { negocio_id: service.negocio_id }) });
   const bytes = await new EscPosEncoder().encode(ticket, normalizeConfig({ showQr: false }));
   assert.equal(Buffer.from(bytes).includes(Buffer.from('token-publico')), false);
-  const invalid = authorizeTicketData('service', { ...service, publicTrackingUrl: 'https://example.com/?jwt=SECRET' });
-  assert.equal(invalid.publicTrackingUrl, '');
+  const invalid = authorizeTicketData('service', { ...service, publicTrackingUrl: 'https://example.com/?jwt=SECRET' }, { negocio_id: service.negocio_id });
+  assert.equal(Object.hasOwn(invalid,'publicTrackingUrl'), false);
 });
 
 function harness(overrides = {}) {
@@ -218,7 +291,7 @@ function harness(overrides = {}) {
   const manager = new PrinterManager({ preferences, transports: { serial: transport }, fallback: { print: async () => ({ browser: true }) }, now: () => time });
   return { manager, storage, transport, get sends() { return sends; }, advance() { time += 1000000; } };
 }
-const request = () => ({ type: 'service', data: authorizeTicketData('service', service) });
+const request = () => ({ type: 'service', data: authorizeTicketData('service', service, { negocio_id: service.negocio_id }) });
 
 test('queue serializes and deduplicates double clicks and records states', async () => {
   const h = harness(); const states = []; h.manager.onChange(job => states.push(job.state));
@@ -307,15 +380,15 @@ test('native Android sends encoded bytes through raw item, never image capture',
 
 test('equipment label uses actual cost, payment status and only the selected secret', async () => {
   const raw = { ...service, costo_real: 1200, lock_type: 'PIN', clientPhone: '9831234567' };
-  const data = authorizeTicketData('equipmentLabel', raw);
+  const data = authorizeTicketData('equipmentLabel', raw, { name: 'Taller de prueba', negocio_id: service.negocio_id });
   assert.equal(data.pending, 950);
   const ticket = builder.build({ type: 'equipmentLabel', data });
-  assert.equal(ticket.lines[0].text, 'ALLFIX BACALAR');
+  assert.equal(ticket.lines[0].text, 'Taller de prueba');
   assert.equal(ticket.logoUrl, '');
   assert.match(JSON.stringify(ticket), /PRIVATE_PIN/);
   assert.doesNotMatch(JSON.stringify(ticket), /PRIVATE_PASS|PRIVATE_PATTERN|PRIVATE_ID/);
   assert.ok((await new EscPosEncoder().encode(ticket, normalizeConfig({ paperWidth: '58mm' }))).length);
-  assert.equal(authorizeTicketData('equipmentLabel', { ...raw, estado_pago: 'Pagado' }).pending, 0);
+  assert.equal(authorizeTicketData('equipmentLabel', { ...raw, estado_pago: 'Pagado' }, { negocio_id: service.negocio_id }).pending, 0);
 });
 
 test('equipment label omits absent optional data and patterns and requires folio', () => {

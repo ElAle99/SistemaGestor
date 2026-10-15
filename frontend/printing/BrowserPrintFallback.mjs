@@ -1,4 +1,3 @@
-import QRCode from 'qrcode';
 import { loadMonochromeLogo } from './EscPosEncoder.mjs';
 
 export class BrowserPrintFallback {
@@ -29,11 +28,6 @@ export class BrowserPrintFallback {
       }
       for (const item of ticket.lines) {
         if (item.kind === 'qr') {
-          if (config.showQr) {
-            const canvas = doc.createElement('canvas');
-            await QRCode.toCanvas(canvas, item.value, { errorCorrectionLevel: 'M', margin: 4, scale: 4 });
-            canvas.style.cssText = 'display:block;width:32mm;height:32mm;margin:auto'; section.append(canvas);
-          }
           continue;
         }
         const p = doc.createElement('p');

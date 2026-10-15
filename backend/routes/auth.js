@@ -6,9 +6,13 @@ const { pool } = require('../config/db');
 const { rateLimit } = require('../middleware/rateLimit');
 const { normalizeEmail, validatePassword } = require('../services/userService');
 const { sendPasswordResetEmail } = require('../services/emailService');
+const { withSystemContext } = require('../config/tenantContext');
+const { withTenant } = require('../config/tenantContext');
+const { setFileSession } = require('../middleware/fileSession');
 require('../config/env');
 
 const router = express.Router();
+// Credentials/reset tokens are verified globally; authenticated app routes run in their DB-owned tenant.
 const loginRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, keyPrefix: 'login' });
 const forgotPasswordRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 5, keyPrefix: 'forgot-password' });
 const resetPasswordRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, keyPrefix: 'reset-password' });
@@ -30,31 +34,27 @@ router.post('/login', loginRateLimit, async (req, res) => {
     const normalizedPassword = String(password || '');
 
     const result = await pool.query(
-      'SELECT * FROM usuarios WHERE LOWER(username) = LOWER($1) AND activo = true',
-      [normalizedUsername]
+      'SELECT auth_login($1,$2) AS identity',
+      [normalizedUsername,normalizedPassword]
     );
 
-    if (result.rows.length === 0) {
+    if (!result.rows[0]?.identity) {
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
-    const usuario = result.rows[0];
-    const validPassword = await bcrypt.compare(normalizedPassword, usuario.password);
-
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Credenciales inválidas' });
-    }
-
+    const usuario = result.rows[0].identity;
     const token = jwt.sign(
       { id: usuario.id, username: usuario.username, rol: usuario.rol, sessionVersion: usuario.session_version },
       process.env.JWT_SECRET,
       { expiresIn: '8h' }
     );
 
+    setFileSession(req,res,token,jwt.decode(token).exp);
     res.json({
       token,
       user: {
         id: usuario.id,
+        negocio_id: usuario.negocio_id,
         username: usuario.username,
         rol: usuario.rol,
         nombre: usuario.nombre,
@@ -78,22 +78,20 @@ router.post('/forgot-password', forgotPasswordRateLimit, async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT id, nombre, correo
-       FROM usuarios
-       WHERE LOWER(correo) = LOWER($1) AND activo = true
-       LIMIT 1`,
+      'SELECT auth_user_by_email($1) AS identity',
       [correo]
     );
 
-    if (result.rows.length === 0) {
+    if (!result.rows[0]?.identity) {
       return res.json({ message: genericMessage });
     }
 
-    const usuario = result.rows[0];
+    const usuario = result.rows[0].identity;
     const token = crypto.randomBytes(32).toString('hex');
     const tokenHash = hashResetToken(token);
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
+    await withTenant(usuario.negocio_id, async () => {
     await pool.query(
       `UPDATE password_reset_tokens
        SET used_at = CURRENT_TIMESTAMP
@@ -102,10 +100,11 @@ router.post('/forgot-password', forgotPasswordRateLimit, async (req, res) => {
     );
 
     await pool.query(
-      `INSERT INTO password_reset_tokens (usuario_id, token_hash, expires_at)
-       VALUES ($1, $2, $3)`,
-      [usuario.id, tokenHash, expiresAt]
+      `INSERT INTO password_reset_tokens (usuario_id, token_hash, expires_at, negocio_id)
+       VALUES ($1, $2, $3, $4)`,
+      [usuario.id, tokenHash, expiresAt, usuario.negocio_id]
     );
+    });
 
     const resetUrl = `${getPublicAppUrl(req)}/?reset_token=${token}`;
     await sendPasswordResetEmail({
@@ -130,7 +129,6 @@ router.post('/reset-password', resetPasswordRateLimit, async (req, res) => {
   let transactionOpen = false;
 
   try {
-    client = await pool.connect();
     const token = String(req.body?.token || '').trim();
     const password = String(req.body?.password || req.body?.newPassword || '');
     const errors = validatePassword(password);
@@ -143,6 +141,9 @@ router.post('/reset-password', resetPasswordRateLimit, async (req, res) => {
     }
 
     const tokenHash = hashResetToken(token);
+    const identity=(await pool.query('SELECT auth_reset_identity($1) AS identity',[tokenHash])).rows[0]?.identity;
+    if (!identity) return res.status(400).json({ error:'Token invalido o expirado.' });
+    client = await withTenant(identity.negocio_id,()=>pool.connect());
     await client.query('BEGIN');
     transactionOpen = true;
 
@@ -153,7 +154,7 @@ router.post('/reset-password', resetPasswordRateLimit, async (req, res) => {
        WHERE prt.token_hash = $1
          AND prt.used_at IS NULL
          AND prt.expires_at > CURRENT_TIMESTAMP
-         AND u.activo = true
+         AND u.activo = true AND prt.negocio_id=app_tenant_id() AND u.negocio_id=prt.negocio_id
        FOR UPDATE`,
       [tokenHash]
     );

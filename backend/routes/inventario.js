@@ -41,7 +41,7 @@ router.post('/upload', authMiddleware, upload.single('foto'), async (req, res) =
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const { search, categoria } = req.query;
-    let query = 'SELECT * FROM inventario WHERE activo = true';
+    let query = 'SELECT * FROM inventario WHERE negocio_id=app_tenant_id() AND activo = true';
     const params = [];
     let idx = 1;
     if (search) {
@@ -62,7 +62,7 @@ router.get('/', authMiddleware, async (req, res) => {
 
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM inventario WHERE id = $1 AND activo = true', [req.params.id]);
+    const result = await pool.query('SELECT * FROM inventario WHERE negocio_id = app_tenant_id() AND id = $1 AND activo = true', [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Producto no encontrado' });
     res.json(result.rows[0]);
   } catch (error) {
@@ -96,7 +96,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
     const codigoNormalizado = normalizeOptionalText(codigo);
     const codigoBarrasNormalizado = normalizeOptionalText(codigo_barras);
     const result = await pool.query(
-      'UPDATE inventario SET codigo = $1, codigo_barras = $2, nombre = $3, descripcion = $4, categoria = $5, costo = $6, precio = $7, stock = $8, stock_minimo = $9, fotografia = $10, foto_url = $11 WHERE id = $12 RETURNING *',
+      'UPDATE inventario SET codigo = $1, codigo_barras = $2, nombre = $3, descripcion = $4, categoria = $5, costo = $6, precio = $7, stock = $8, stock_minimo = $9, fotografia = $10, foto_url = $11 WHERE negocio_id = app_tenant_id() AND id = $12 RETURNING *',
       [codigoNormalizado, codigoBarrasNormalizado, nombre, descripcion, categoriaNormalizada, costo, precio, stock, stock_minimo, foto, foto, req.params.id]
     );
     res.json(result.rows[0]);
@@ -107,7 +107,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
-    await pool.query('UPDATE inventario SET activo = false WHERE id = $1', [req.params.id]);
+    await pool.query('UPDATE inventario SET activo = false WHERE negocio_id = app_tenant_id() AND id = $1', [req.params.id]);
     res.json({ message: 'Producto eliminado' });
   } catch (error) {
     res.status(500).json({ error: 'Error al eliminar producto' });

@@ -15,11 +15,13 @@
     let pending = null;
     const modal = document.getElementById('receipt-modal');
 
+    function receiptIsOpen() { return !modal.classList.contains('hidden') || document.getElementById('order-print-selector').open; }
     function currentReceipt() {
+        const orderActionsOpen = document.getElementById('order-print-selector').open;
         const element = getActiveReceiptElement();
-        if (!element) throw new Error('No hay un ticket listo para compartir.');
+        if (!element && !orderActionsOpen) throw new Error('No hay un ticket listo para compartir.');
         if (!window.visualTickets) throw new Error('No se pudo cargar el generador visual. Recarga el sistema.');
-        const type = element.id === 'ticket-venta-container' ? 'sale' : element.id === 'ticket-corte-container' ? 'cashClosing' : 'service';
+        const type = orderActionsOpen ? 'service' : element.id === 'ticket-venta-container' ? 'sale' : element.id === 'ticket-corte-container' ? 'cashClosing' : 'service';
         const raw = type === 'sale' ? APP_STATE.selectedSaleForReceipt : type === 'cashClosing' ? APP_STATE.selectedCajaForReceipt : APP_STATE.selectedOrderForReceipt;
         if (!raw) throw new Error('Abre una orden o venta para compartir su comprobante.');
         const ticket = window.visualTickets.build(type, raw, ESTABLISHMENT_CONFIG);
@@ -39,7 +41,7 @@
         if (pending?.key === receipt.key) return pending.promise;
         const job = { key: receipt.key };
         job.promise = prepare(receipt).then(result => {
-            if (!modal.classList.contains('hidden') && currentReceipt().key === result.key) prepared = result;
+            if (receiptIsOpen() && currentReceipt().key === result.key) prepared = result;
             return result;
         }).finally(() => { if (pending === job) pending = null; });
         pending = job;
@@ -58,7 +60,7 @@
         if (records.every(record => record.target.closest?.('.modal-footer'))) return;
         clearTimeout(warmupTimer);
         let receipt;
-        if (!modal.classList.contains('hidden')) {
+        if (receiptIsOpen()) {
             try { receipt = currentReceipt(); } catch { /* No authorized receipt selected yet. */ }
             // Layout changes (including mobile resize) must not close a valid preview.
             if (receipt && (prepared?.key === receipt.key || pending?.key === receipt.key)) return;
@@ -93,7 +95,7 @@
             if (!prepared || prepared.key !== receipt.key) {
                 status.textContent = 'Preparando imagen del ticket…';
                 const result = await ensurePrepared(receipt);
-                if (modal.classList.contains('hidden') || currentReceipt().key !== result.key) {
+                if (!receiptIsOpen() || currentReceipt().key !== result.key) {
                     status.textContent = 'El ticket cambió. Vuelve a pulsar para compartir el actual.';
                     return;
                 }
@@ -144,6 +146,11 @@
     document.getElementById('btn-share-preview')?.addEventListener('click', () => handleAction(true));
     preview?.addEventListener('cancel', () => clearPreview());
     window.addEventListener?.('pagehide', () => { prepared = null; clearPreview(); clearTimeout(warmupTimer); });
+    window.orderReceiptActions = {
+        share: () => handleAction(true), download: () => handleAction(false),
+        prepare: () => { try { ensurePrepared(currentReceipt()).catch(() => {}); } catch {} }
+    };
+    document.getElementById('order-print-selector').addEventListener('close', () => { prepared = null; clearPreview(); });
     function shareServiceTicket() { return handleAction(true); }
     shareButton.addEventListener('click', shareServiceTicket);
     // Discard customer data and reset the prompt on close or ticket changes.

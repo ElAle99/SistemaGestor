@@ -13,6 +13,8 @@ function load(file, dependencies = {}) {
     setInterval, clearInterval, URL, __dirname: path.dirname(filename),
     require(name) {
       if (Object.hasOwn(dependencies, name)) return dependencies[name];
+      if (name === '../config/tenantContext') return require('../config/tenantContext');
+      if (name === './fileSession') return require('../middleware/fileSession');
       throw new Error(`Unexpected dependency: ${name}`);
     }
   }, { filename });
@@ -88,12 +90,12 @@ for (const [name, user, version, expected] of [
   ['deleted account', undefined, 0, 401],
   ['revoked token', { activo: true, session_version: 1 }, 0, 401],
   ['legacy token', { activo: true, session_version: 0 }, undefined, 401],
-  ['current role from database', { id: 1, activo: true, rol: 'Recepcionista', session_version: 1 }, 1, 200]
+  ['current role from database', { id: 1, negocio_id: 1, activo: true, rol: 'Recepcionista', session_version: 1 }, 1, 200]
 ]) {
   test(`authentication: ${name}`, async () => {
     const { authMiddleware } = load('middleware/auth.js', {
       jsonwebtoken: { verify: () => ({ id: 1, rol: 'Administrador', sessionVersion: version }) },
-      '../config/db': { pool: { query: async () => ({ rows: user ? [user] : [] }) } }, '../config/env': {}
+      '../config/db': { pool: { query: async () => ({ rows: user ? [{identity:user}] : [] }) } }, '../config/env': {}
     });
     const req = { header: () => 'Bearer test' };
     const res = response();
