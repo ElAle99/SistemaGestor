@@ -1,4 +1,12 @@
 ﻿require('./config/env');
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.DATABASE_URL?.trim()) throw new Error('DATABASE_URL de runtime es obligatorio en producción.');
+  if (!process.env.JWT_SECRET?.trim()) throw new Error('JWT_SECRET es obligatorio en producción.');
+  try {
+    const url = new URL(process.env.DATABASE_URL);
+    if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname || !url.username || !url.password) throw new Error();
+  } catch { throw new Error('DATABASE_URL de runtime no es una URL PostgreSQL válida. Revisa el secreto sin publicarlo.'); }
+}
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -7,6 +15,7 @@ const { initDB, pool } = require('./config/db');
 const app = express();
 const PORT = process.env.PORT || 5000;
 const frontendPath = path.join(__dirname, '..', 'frontend');
+app.get('/healthz', (req, res) => res.json({ status: 'ok' }));
 
 const localOrigins = [
   'http://localhost:3000',
@@ -141,9 +150,9 @@ async function start() {
     if (!process.env.JWT_SECRET?.trim()) throw new Error('JWT_SECRET es obligatorio.');
     await initDB();
     console.log('Base de datos inicializada correctamente');
-    return app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+    return app.listen(PORT, '0.0.0.0', () => console.log(`Servidor corriendo en puerto ${PORT}`));
   } catch (error) {
-    console.error('Error al inicializar la base de datos:', error);
+    console.error('No se pudo iniciar el servidor. Verifica JWT_SECRET, DATABASE_URL de runtime y las migraciones administrativas.', error.code || error.name);
     await pool.end();
     throw error;
   }

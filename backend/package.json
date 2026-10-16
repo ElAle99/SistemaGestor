@@ -10,7 +10,9 @@
     "migrate:tenancy": "node scripts/migrate-tenancy.js",
     "migrate:security": "node scripts/harden-tenancy.js",
     "backup": "node scripts/backup-db.js",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "db:preflight": "node scripts/check-migration-capabilities.js",
+    "db:bootstrap": "node scripts/bootstrap-empty.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
@@ -30,5 +32,8 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=22.12.0 <23"
   }
 }

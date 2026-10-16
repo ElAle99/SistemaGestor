@@ -7,7 +7,10 @@
     "test": "node --test tests/printing.test.mjs tests/receipt-share.test.cjs && npm --prefix backend test",
     "test:browser": "playwright test",
     "android:sync": "npm run build:catalog && node scripts/prepare-android.mjs && cap sync android",
-    "android:open": "cap open android"
+    "android:open": "cap open android",
+    "render:build": "npm ci --include=dev && npm --prefix backend ci --include=dev && npm run build",
+    "db:preflight": "npm --prefix backend run db:preflight",
+    "db:bootstrap": "npm --prefix backend run db:bootstrap && npm --prefix backend run migrate:security"
   },
   "dependencies": {
     "@capacitor/android": "8.5.2",
@@ -29,5 +32,8 @@
     "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "^1.63.0",
     "vite": "^7.3.6"
+  },
+  "engines": {
+    "node": ">=22.12.0 <23"
   }
 }

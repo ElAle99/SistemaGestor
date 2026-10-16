@@ -7,6 +7,7 @@ const { pool } = require('../config/migrationDb');
 const { initTenancy } = require('../db/initTenancy');
 const { backupDatabase } = require('./backup-db');
 async function run() {
+  await require('./check-migration-capabilities').checkMigrationCapabilities(pool);
   const filename = path.join(__dirname,'../.env');
   const local = process.env.NODE_ENV!=='production' && fs.existsSync(filename);
   const configured=process.env.DATABASE_URL?new URL(process.env.DATABASE_URL):null;
@@ -26,7 +27,7 @@ async function run() {
     if (!(await db.query("SELECT 1 FROM tenant_migraciones WHERE version='20261014-v7'")).rowCount) await db.query(fs.readFileSync(path.join(__dirname,'../db/migrations/20261014_bootstrap_guard.sql'),'utf8'));
     if (!(await db.query("SELECT 1 FROM tenant_migraciones WHERE version='20261014-v8'")).rowCount) await db.query(fs.readFileSync(path.join(__dirname,'../db/migrations/20261014_financial_references.sql'),'utf8'));
     // Random server-generated value, never from an HTTP parameter and never logged.
-    await db.query("ALTER ROLE sistema_gestor_app PASSWORD '" + password + "'");
+    await db.query('ALTER ROLE sistema_gestor_app PASSWORD ' + require('pg').escapeLiteral(password));
     const after = (await db.query("SELECT (SELECT count(*) FROM ordenes_servicio) orders,(SELECT count(*) FROM ventas) sales,(SELECT md5(string_agg((to_jsonb(c)-'archivo_logo'-'archivo_logo_ticket')::text,'|' ORDER BY id)) FROM configuracion c) config")).rows[0];
     assert.deepEqual(after, before);
     await db.query('COMMIT');
