@@ -1,5 +1,6 @@
 {
   "scripts": {
+    "predev": "node scripts/local-postgres.cjs start-if-configured",
     "dev": "npm run build:catalog && npm --prefix backend run dev",
     "build:catalog": "vite build && vite build --config vite.printer.config.mjs && vite build --config vite.share.config.mjs",
     "build": "npm run build:catalog && npm --prefix backend run build",
@@ -8,7 +9,11 @@
     "test:browser": "playwright test",
     "android:sync": "npm run build:catalog && node scripts/prepare-android.mjs && cap sync android",
     "android:open": "cap open android",
-    "render:build": "npm ci --include=dev && npm --prefix backend ci --include=dev && npm run build",
+    "railway:build": "npm ci --include=dev && npm --prefix backend ci --include=dev && npm run build",
+    "db:check": "node backend/scripts/check-db.js",
+    "db:local:restore": "node scripts/restore-local-db.cjs",
+    "db:local:start": "node scripts/local-postgres.cjs start",
+    "db:local:stop": "node scripts/local-postgres.cjs stop",
     "db:preflight": "npm --prefix backend run db:preflight",
     "db:bootstrap": "npm --prefix backend run db:bootstrap && npm --prefix backend run migrate:security"
   },

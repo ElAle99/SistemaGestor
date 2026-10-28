@@ -49,3 +49,6 @@ Thumbs.db
 .idea/
 # Local database migration backups may contain establishment contact details.
 backend/db/backups/
+
+# Local PostgreSQL binaries, data and private connection settings.
+.local/

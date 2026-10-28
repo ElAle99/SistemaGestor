@@ -51,7 +51,11 @@ function createTenantPool(nativePool) {
     async query(...args) {
       const client = await api.connect();
       try { const result = await client.query(...args); await client.query('COMMIT'); return result; }
-      catch (error) { await client.query('ROLLBACK'); throw error; }
+      catch (error) {
+        // A broken socket may also reject ROLLBACK; preserve the original cause.
+        try { await client.query('ROLLBACK'); } catch { /* release discards failed sockets */ }
+        throw error;
+      }
       finally { client.release(); }
     },
     end: () => nativePool.end(),

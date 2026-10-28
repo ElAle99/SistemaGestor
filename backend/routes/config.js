@@ -18,7 +18,7 @@ function resolvePrintableLogoPath(logoUrl = '') {
   const candidates = [];
 
   if (cleanUrl.startsWith('uploads/')) {
-    candidates.push(path.resolve(__dirname, '..', cleanUrl));
+    candidates.push(path.resolve(require('../config/storage').uploadDir, cleanUrl.slice('uploads/'.length)));
   }
 
   if (cleanUrl.startsWith('img/')) {

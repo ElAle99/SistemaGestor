@@ -3,7 +3,7 @@ const path=require('node:path');
 const {pool}=require('../config/db');
 const {authMiddleware}=require('../middleware/auth');
 const {fileSessionToken}=require('../middleware/fileSession');
-const root=path.resolve(__dirname,'../uploads');
+const {uploadDir:root}=require('../config/storage');
 const router=express.Router();
 async function send(req,res,next,byId=false) {
   try {

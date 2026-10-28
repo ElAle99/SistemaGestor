@@ -1,167 +1,202 @@
-# Railway: provisionar el login de runtime sin relajar seguridad
+# Producción principal: Railway
 
-Revisión: 2026-10-15. Este procedimiento reutiliza scripts/harden-tenancy.js y las
-migraciones existentes v1–v8. No ejecutar CREATE ROLE/GRANT alternativos ni copiar
-las credenciales locales a producción. No se ha conectado ni migrado Railway desde
-esta sesión.
+## Arquitectura y alcance
 
-El error de pgConfig.js es correcto: el backend no puede usar el DATABASE_URL
-administrativo que Railway publica para su servicio PostgreSQL. Esa URL se conserva
-para el job de migraciones, no para server.js.
+Un servicio web desde la raíz del repositorio, con Node 22 y Railpack. Express
+sirve frontend y API. La base PostgreSQL existente permanece en su servicio actual,
+en el mismo proyecto y entorno. No crear otra base ni importar encima de la actual.
+`railway.json` es la única configuración de despliegue activa. No hay Dockerfile,
+vercel.json, render.yaml ni nixpacks.toml en este repositorio. El documento de Render
+se conserva exclusivamente como referencia histórica; no guía el despliegue actual.
 
-## 1. Respaldo y destino
+Build: `npm run railway:build` (instala ambos lockfiles y ejecuta `npm run build`).
+Start: `npm start`. Root Directory: `/` (raíz del repositorio, no `backend`).
+No configurar pre-deploy, bootstrap, seeds o migraciones en Build/Start.
+Node está limitado por engines y `.node-version`; usar `RAILPACK_NODE_VERSION=22`
+en Railway si hay una selección de versión previa en el panel.
 
-Detener los escritores de producción y obtener un respaldo recuperable del volumen
-PostgreSQL desde Railway antes de migrar. Usar el mismo entorno y base existentes;
-no crear otra base ni importar el respaldo local de Allfix.
+El build crea `frontend/dist/order-catalog.{js,css}`, `printer-service.js` y
+`share-ticket.js`; después valida sintaxis del backend y scripts del frontend.
+El build no necesita ni debe conectarse a PostgreSQL.
 
-Crear un job/servicio temporal de migraciones con el mismo código de
-SistemaGestor/ImpresionFinal2.0, raíz del repositorio y acceso a la red privada del
-mismo proyecto/entorno. Instalar las dependencias del backend. No configurar un
-servidor HTTP ni healthcheck HTTP en ese job, ni ejecutar la migración como build
-command del backend. Evitar reinicios/repeticiones automáticas del job.
+## Variables del servicio web
 
-## 2. Contraseña y variables
-
-Generar una contraseña en una terminal local privada, no en logs de Railway:
-
-```
-node -e "console.log(require('node:crypto').randomBytes(36).toString('base64url'))"
-```
-
-Guardar el resultado en un gestor de contraseñas y como APP_DB_PASSWORD en Railway.
-No escribir el valor en archivos del repositorio, comandos con contraseñas literales
-o capturas. Base64url evita caracteres que necesiten escape en URL o literales SQL
-del script existente. Para una cuenta ya existente, reutilizar la contraseña actual;
-cambiarla también cambia la credencial del rol y requiere coordinar otros procesos.
-
-Las expresiones siguientes suponen que el servicio PostgreSQL se llama **Postgres**
-y usa su puerto interno habitual 5432. Sustituir el nombre por el real usando el
-selector de referencias de Railway. Si el puerto interno difiere, conservar el de
-su URL privada. PGDATABASE debe ser la base de producción existente.
-
-En el job administrativo:
-
-| Variable | Valor |
+| Variable | Configuración |
 | --- | --- |
-| NODE_ENV | production |
-| MIGRATION_DATABASE_URL | `${{Postgres.DATABASE_URL}}` |
-| APP_DB_PASSWORD | contraseña nueva almacenada como secreto |
-| DATABASE_URL | `postgresql://sistema_gestor_app:${{APP_DB_PASSWORD}}@${{Postgres.RAILWAY_PRIVATE_DOMAIN}}:5432/${{Postgres.PGDATABASE}}` |
+| NODE_ENV | `production` |
+| RAILPACK_NODE_VERSION | `22` |
+| PGHOST | `${{Postgres.RAILWAY_PRIVATE_DOMAIN}}` |
+| PGPORT | `5432`, confirmar el puerto interno del servicio existente |
+| PGDATABASE | `${{Postgres.PGDATABASE}}` |
+| PGUSER | `sistema_gestor_app` |
+| PGPASSWORD | contraseña **existente** de sistema_gestor_app, como secreto |
+| JWT_SECRET | conservar el secreto actual, sin publicarlo |
+| DB_SSL | `false` para el contenedor estándar sin TLS nativo en la red privada |
+| DB_SSL_REJECT_UNAUTHORIZED | `true` o ausente; nunca false |
+| PUBLIC_APP_URL | URL HTTPS definitiva del servicio web |
+| FRONTEND_URL | misma URL HTTPS sin slash final |
+| UPLOAD_DIR | `/data/uploads`, con volumen adjunto en esa ruta |
+| SEED_DEFAULT_ADMIN | `false` |
+| ALLOW_USER_CREATION | `false` salvo decisión explícita de permitir registro |
 
-**DATABASE_URL se configura antes de crear el rol.** El script necesita leer la
-contraseña deseada, pero no se conecta con esta URL durante el aprovisionamiento.
-Solo conecta mediante config/migrationDb.js y MIGRATION_DATABASE_URL.
+Sustituir **Postgres** por el nombre real del servicio PostgreSQL mediante el
+selector de referencias del panel. En servicio web → Variables → New Variable,
+crear cada PG* anterior. Para PGPASSWORD introducir el secreto del usuario app,
+**no** una referencia a Postgres.PGPASSWORD, que suele ser administrativa.
+No modificar PGUSER/PGPASSWORD/DATABASE_URL del servicio PostgreSQL.
 
-No cambiar PGUSER, PGPASSWORD ni DATABASE_URL dentro del propio servicio PostgreSQL:
-son las credenciales administrativas del contenedor y del panel de Railway.
+Eliminar `DATABASE_URL` del servicio web si se elige la configuración PG*: una URL
+existente prevalece sobre todos los PG* y DB_*. Revisar también variables compartidas.
+Retirar DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME antiguos y cualquier PG* duplicada.
+No inyectar `MIGRATION_DATABASE_URL` al web; queda solo en herramientas administrativas.
+El archivo local backend/.env no se sube a GitHub ni a Railway.
 
-## 3. Comando exacto dentro de Railway
+Alternativa equivalente usando una única URL, conservando el rol app:
 
-Desde la raíz del repositorio, con esas variables y dependencias instaladas:
-
-```
-npm --prefix backend run migrate:security
-```
-
-Equivalente: `node backend/scripts/harden-tenancy.js`. Si el directorio de trabajo
-ya es backend: `npm run migrate:security`.
-
-Este comando crea primero el respaldo lógico en backend/db/backups, aplica v1/v2
-si faltan y después las migraciones de endurecimiento v3–v8. initTenancy confirma
-v1/v2 en su propia transacción; v3–v8 se aplican en otra con advisory lock. Si una
-fase falla, no iniciar el backend ni borrar versiones: revisar el error y retomar
-con el mismo comando. No se promete atomicidad de las dos fases juntas.
-
-Se crea sistema_gestor_tenant NOLOGIN/NOSUPERUSER/NOBYPASSRLS y
-sistema_gestor_app LOGIN/NOSUPERUSER/NOBYPASSRLS/NOCREATEDB/NOCREATEROLE,
-sin membresías administrativas, con los mismos permisos y FK validados localmente.
-No se modifican los SQL de políticas para adaptarlos a Railway. La versión final
-tiene **36 tablas protegidas**, incluidas las 32 originales, todas con ENABLE/FORCE.
-
-El script no arranca Node HTTP, no escribe .env en production ni imprime contraseñas.
-Comprueba la configuración y los conteos de órdenes/ventas antes y después. No usar
-47/17 como conteos esperados de Railway: los de producción pueden ser distintos.
-El respaldo lógico generado contiene datos privados: conservarlo fuera del contenedor
-efímero, junto al respaldo externo de Railway, sin publicarlo ni adjuntarlo al repo.
-
-Este script requiere el esquema base existente (configuracion, usuarios, órdenes,
-ventas, garantías y catálogos). No inicializa una base vacía. Una incompatibilidad de
-esquema, scopes ambiguos, referencias inválidas o pgcrypto no disponible debe detener
-el proceso; no se soluciona desactivando RLS ni eliminando registros.
-
-## 4. Backend: sustituir la referencia administrativa
-
-En Variables del servicio **backend**, reemplazar:
-
-```
-DATABASE_URL=${{Postgres.DATABASE_URL}}
+```text
+DATABASE_URL=postgresql://sistema_gestor_app:${{APP_DB_PASSWORD}}@${{Postgres.RAILWAY_PRIVATE_DOMAIN}}:5432/${{Postgres.PGDATABASE}}
 ```
 
-por la URL de sistema_gestor_app definida arriba, con el mismo APP_DB_PASSWORD.
-Conservar NODE_ENV=production y el JWT_SECRET existente; no rotar JWT_SECRET como
-parte de esta migración. El backend normal no necesita MIGRATION_DATABASE_URL:
-mantenerla solo en el job administrativo. Si ya está definida en backend, retirarla
-después de separar el job. El servidor tampoco la utiliza si permanece configurada.
+`APP_DB_PASSWORD` debe contener la contraseña existente codificada para URL si
+tiene caracteres reservados. Preferir PG* para no necesitar codificación.
+No usar `${{Postgres.DATABASE_URL}}` directamente para el runtime.
 
-Eliminar del backend los antiguos DB_USER/DB_PASSWORD con postgres y referencias
-administrativas de fallback que ya no sean necesarias. No confiar en
-SUPABASE_DATABASE_URL: el runtime actual usa DATABASE_URL o DB_*.
+Precedencia exacta: `DATABASE_URL` no vacía > `PG*` > `DB_*` heredadas.
+backend/config/env.js carga backend/.env sin reemplazar variables inyectadas.
+pgConfig ya no carga otro .env dependiente del directorio de trabajo.
+Producción exige DATABASE_URL o un conjunto PG* completo, y JWT_SECRET.
 
-Start command desde raíz: `npm start`. Desde backend: `npm start`.
-No concatenar migraciones al start command. No configurar migrate:security en el
-pre-deploy permanente del backend; ejecutar el job administrativo separado.
-Mantener las opciones TLS existentes acordes al endpoint utilizado; no resolver
-errores de certificado desactivando validación indiscriminadamente.
+## Red, TLS y diagnóstico del reset
 
-## 5. Verificación con la credencial de aplicación
+La URL local inspeccionada usa el proxy público `tokaido.proxy.rlwy.net:42462`,
+base railway y login sistema_gestor_app; no había PG* de conexión heredadas en el
+proceso de diagnóstico. Los DB_* locales estaban vacíos. La URL administrativa
+separada no se utiliza para el runtime.
 
-En un contenedor con el entorno final del backend, desde raíz:
+Comprobado desde este entorno: TCP conecta al proxy, pero una petición PostgreSQL
+SSLRequest recibe ECONNRESET antes de recibir S/N. SELECT 1 también falla con
+ECONNRESET. El protocolo no llegó a autenticar ni consultar RLS. Eso no demuestra
+contraseña equivocada, permisos insuficientes o que sea necesario activar TLS.
 
+Hipótesis pendientes: destino/puerto del TCP proxy desactualizado, PostgreSQL
+detenido o no escuchando, cierre en el proxy/red intermedia. Para distinguirlas:
+
+1. Abrir el servicio PostgreSQL existente en Railway y comprobar estado, eventos,
+   logs, espacio del volumen y puerto de escucha. No recrearlo.
+2. En Settings → Networking, verificar que el TCP proxy apunte al puerto real de
+   PostgreSQL y comparar host/puerto actuales con los locales.
+3. Configurar el web con PGHOST privado según la tabla. Ambos servicios deben estar
+   en el mismo proyecto **y entorno**. No usar ese dominio desde la laptop.
+4. Desde una shell **dentro del contenedor web** ejecutar `npm run db:check`.
+   Debe mostrar endpoint private, usuario app, SELECT 1 y validación de seguridad OK.
+   `railway run` corre localmente y no vuelve accesible el DNS privado en la laptop.
+5. Si el privado funciona y el público falla, el problema queda localizado al
+   camino público. Actualizar el proxy local solo con los valores reales del panel.
+
+No se puede certificar la causa interna del proxy sin acceso al panel/logs del
+servicio. No se cambió la URL local a un dominio privado inaccesible desde Windows.
+
+La red privada Railway cifra transporte mediante WireGuard. DB_SSL=false selecciona
+el protocolo PostgreSQL sin TLS nativo en ese túnel; no desactiva validación de un
+certificado. Si el endpoint real soporta/requiere TLS, usar DB_SSL=true y, si procede,
+DB_SSL_CA con su CA confiable. No usar rejectUnauthorized=false. Se normalizan los
+parámetros sslmode para evitar que pg reemplace silenciosamente las opciones TLS.
+Para usar el proxy público verificar primero su configuración de cifrado real;
+no asumir que un proxy TCP añade TLS al servidor PostgreSQL.
+
+## Arranque, pool y seguridad
+
+El servicio escucha `0.0.0.0:$PORT`; Railway proporciona PORT. Local por defecto 5000.
+Valida SELECT 1, privilegios del login/membresías/propiedad y runtime_schema_ready.
+Nunca usa postgres como alternativa, ni ejecuta initLegacySchema o migraciones.
+Se conserva SET LOCAL por transacción y el wrapper que separa negocio_id.
+No se alteraron SQL de RLS/FORCE RLS, roles ni datos de producción.
+
+Tres intentos de validación, solo ante fallos transitorios, con esperas de 1 y 2 s.
+Credenciales inválidas, permisos o esquema incorrecto fallan sin repetir.
+Nunca se reintentan ventas, cobros ni otras escrituras. El pool descarta sockets
+inactivos con errores sin producir un evento error sin listener. Las solicitudes
+posteriores pueden abrir conexiones nuevas después de una caída temporal.
+Railway limita reinicios por fallo a tres; no se programa reinicio infinito.
+
+Valores por defecto: pool 10, conexión 5 s, inactividad 30 s, sentencia 30 s,
+consulta 35 s, keepalive activo. Ajustes opcionales documentados en .env.example.
+Los códigos del diagnóstico no incluyen URL completa, contraseña ni mensaje remoto.
+
+`GET /healthz`: SELECT 1, HTTP 200 si responde; HTTP 503 si no. No expone secretos.
+No acepta tráfico hasta superar las validaciones iniciales. Railway verifica salud
+durante despliegue; configurar monitoreo externo para disponibilidad continua.
+SIGTERM/SIGINT drenan HTTP y cierran pool; límite 10 s, drenaje Railway 15 s.
+Se confía en un salto de proxy para HTTPS/cookies e IP del limitador; mantener un
+solo ingreso Railway y comprobar cabeceras si se añade otro CDN/proxy.
+Limitadores en memoria: mantener una réplica o diseñar almacenamiento compartido.
+
+## Fotografías, evidencias y documentos
+
+Antes: backend/uploads. Ahora UPLOAD_DIR configurable y el mismo directorio se usa
+para cargas, entrega autenticada y logos de impresión. Se mantienen /uploads y
+/api/archivos, el registro archivos, el control por negocio y las cookies privadas.
+No se agregó express.static sobre uploads ni se hicieron públicos los documentos.
+
+Crear un volumen **del servicio web** y montarlo en `/data/uploads`; el volumen del
+servicio PostgreSQL no conserva archivos del web. railway.json exige este montaje
+y una sola réplica.
+Si UPLOAD_DIR está ausente se usa RAILWAY_VOLUME_MOUNT_PATH cuando Railway lo inyecta.
+Un volumen vacío no copia archivos anteriores automáticamente. Antes de cambiar
+UPLOAD_DIR, respaldar origen y destino,
+inventariar nombres/tamaños y hashes SHA-256 y copiar todos los archivos sin borrar
+el origen ni sobrescribir nombres en conflicto. Verificar hashes en destino y
+acceso autenticado/denegado por negocio antes de retirar el almacenamiento anterior.
+La copia real requiere acceso al almacenamiento de origen y autorización si hay
+riesgo; no se ejecutó en esta sesión. No modificar URLs guardadas en PostgreSQL.
+
+Los despliegues con volumen pueden tener breve indisponibilidad al reemplazarse.
+Configurar respaldos del volumen y de PostgreSQL, con copia externa y restauración
+verificada en un entorno separado. Cloudflare R2 es alternativa para varias réplicas,
+pero requiere un adaptador autenticado y migración verificada conservando URLs;
+no se implementó un cambio parcial que exponga evidencias.
+
+## Pruebas y aceptación antes de abrir producción
+
+```sh
+npm run railway:build
+npm test
+npm run test:browser
+npm run db:check
+npm start
 ```
-node -e "const {pool,initDB}=require('./backend/config/db');initDB().then(()=>pool.query('SELECT current_user,session_user')).then(r=>console.log(r.rows)).catch(e=>{console.error(e.message);process.exitCode=1}).finally(()=>pool.end())"
-```
 
-El resultado debe mostrar sistema_gestor_app en ambos campos. initDB además rechaza
-login/membresías privilegiadas, propiedad de tablas protegidas y esquema incompleto.
-Si el comando falla, no desplegar el servidor con postgres como alternativa.
+Los tests HTTP de Railway usan Express real con pool simulado: no certifican la
+base productiva. Las pruebas RLS usan PostgreSQL embebido PGlite con datos desechables.
+El registro de resultados de esta preparación está en RAILWAY_VALIDATION.md en raíz.
 
-En una conexión SQL usando **la URL app**, no la administrativa:
+En Railway: comprobar /, /healthz, bundles /dist y /vendor, login/logout, roles y
+permisos; comparar accesos de dos negocios a clientes, órdenes, seguimiento por token,
+evidencias, inventario, POS, caja, reportes y configuración. No crear ventas/pruebas
+con datos reales sin autorización y respaldo verificado. Validar stock por sucursal
+y separación de Super Admin con cuentas y esquema reales: este cambio no añade
+esas capacidades ni certifica que ya existan. No aplicar migraciones para corregir
+un problema de red. Si falta esquema, revisar un plan administrativo independiente
+con respaldo verificado y autorización explícita; no ejecutar db:bootstrap.
 
-```sql
-SELECT current_user, session_user;
-SELECT rolname, rolsuper, rolbypassrls, rolcreatedb, rolcreaterole
-FROM pg_roles WHERE rolname IN ('sistema_gestor_app','sistema_gestor_tenant');
-SELECT parent.rolname AS membership
-FROM pg_auth_members m
-JOIN pg_roles child ON child.oid=m.member
-JOIN pg_roles parent ON parent.oid=m.roleid
-WHERE child.rolname='sistema_gestor_app';
-SELECT c.relname,pg_get_userbyid(c.relowner) AS owner,
-       c.relrowsecurity,c.relforcerowsecurity
-FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity;
-RESET ROLE;
-SELECT current_user,session_user;
-BEGIN;
-SET ROLE postgres; -- Debe fallar; no ejecutar como administrador.
-ROLLBACK;
-```
+Tickets/etiquetas: los bundles y pruebas se conservan. Railway Linux no puede usar
+la impresora Windows conectada al backend; configurar QZ Tray en la PC del operador,
+diálogo del navegador o transporte Android. La impresión física requiere prueba allí.
+SMTP debe configurarse y probarse con un destinatario autorizado; no se envió correo.
 
-Membresía esperada: solo sistema_gestor_tenant; los flags administrativos deben ser
-false y ninguna tabla protegida debe pertenecer al runtime. RESET ROLE conserva app.
-Comparar también los conteos/datos de producción con el respaldo y probar login,
-órdenes y caja antes de reabrir los escritores. Los 168/168 anteriores validaron
-el entorno local, no sustituyen una validación del despliegue Railway.
+## GitHub y despliegue
 
-`railway run` ejecuta en la máquina local, no dentro de Railway. No usar directamente
-URLs *.railway.internal desde la laptop: para ese caso se necesita una URL pública
-administrativa por TCP proxy y una URL pública app hacia el mismo endpoint, sin
-alterar las URLs privadas permanentes del backend. El job interno evita esa diferencia.
+Revisar `git diff` y `git status --short`; no incluir .env, uploads, logs ni backups.
+Crear una rama, agregar explícitamente los archivos de esta entrega, commit y push.
+En Railway conectar esa rama al servicio web del proyecto y entorno de la base
+existente; raíz `/`, Railpack, Build y Start indicados, sin pre-deploy administrativo.
+Configurar variables y volumen antes de desplegar; generar dominio HTTPS, completar
+PUBLIC_APP_URL/FRONTEND_URL y volver a desplegar si cambian. Si /healthz no pasa,
+revisar logs y db:check, sin reemplazar credenciales app por administrativas.
 
-Fuentes oficiales consultadas:
-- https://docs.railway.com/variables
-- https://docs.railway.com/databases/postgresql
-- https://docs.railway.com/networking/private-networking
-- https://docs.railway.com/cli/run
-- https://docs.railway.com/volumes/backups
+Fuentes oficiales:
+- https://docs.railway.com/networking/private-networking/how-it-works
+- https://docs.railway.com/deployments/healthchecks
+- https://docs.railway.com/volumes
+- https://railway.com/railway.schema.json
+- https://node-postgres.com/features/ssl

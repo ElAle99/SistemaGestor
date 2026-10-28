@@ -1,8 +1,9 @@
 ﻿require('./config/env');
 if (process.env.NODE_ENV === 'production') {
-  if (!process.env.DATABASE_URL?.trim()) throw new Error('DATABASE_URL de runtime es obligatorio en producción.');
+  const hasUrl = !!process.env.DATABASE_URL?.trim();
+  if (!hasUrl && !['PGHOST', 'PGPORT', 'PGUSER', 'PGPASSWORD', 'PGDATABASE'].every(key => process.env[key]?.trim())) throw new Error('DATABASE_URL de runtime es obligatorio en producción, o un conjunto PG* completo.');
   if (!process.env.JWT_SECRET?.trim()) throw new Error('JWT_SECRET es obligatorio en producción.');
-  try {
+  if (hasUrl) try {
     const url = new URL(process.env.DATABASE_URL);
     if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname || !url.username || !url.password) throw new Error();
   } catch { throw new Error('DATABASE_URL de runtime no es una URL PostgreSQL válida. Revisa el secreto sin publicarlo.'); }
@@ -11,11 +12,27 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { initDB, pool } = require('./config/db');
+const { retryStartup, handlePoolErrors, installShutdown, safeCode, isTransient } = require('./config/dbLifecycle');
+handlePoolErrors(pool);
 
 const app = express();
+// Railway terminates HTTPS at its ingress; trust only the nearest proxy.
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
 const PORT = process.env.PORT || 5000;
+const devPreview = process.env.NODE_ENV !== 'production' && process.argv?.includes('--dev-preview');
+let databaseReady = false;
 const frontendPath = path.join(__dirname, '..', 'frontend');
-app.get('/healthz', (req, res) => res.json({ status: 'ok' }));
+app.get('/healthz', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  if (!databaseReady) return res.status(503).json({ status: 'unavailable' });
+  try {
+    await pool.query('SELECT 1');
+    return res.json({ status: 'ok' });
+  } catch {
+    return res.status(503).json({ status: 'unavailable' });
+  }
+});
 
 const localOrigins = [
   'http://localhost:3000',
@@ -114,6 +131,11 @@ app.get('/', (req, res) => {
 
 // Rutas
 app.use('/api/setup', require('./routes/setup'));
+app.use('/api', (req, res, next) => {
+  if (databaseReady) return next();
+  res.set('Cache-Control', 'no-store');
+  return res.status(503).json({ error: 'Base de datos no disponible. Restablece la conexión y reinicia el servidor.' });
+});
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/clientes', require('./routes/clientes'));
@@ -133,6 +155,7 @@ app.use('/api/eventos', require('./routes/eventos'));
 app.use('/api/uploads', require('./routes/uploads'));
 app.use('/api/archivos', require('./routes/privateFiles'));
 app.use('/api/garantias', require('./routes/garantias'));
+app.use('/api', (req, res) => res.status(404).json({ error: 'Ruta API no encontrada.' }));
 
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api') || !req.accepts('html')) return next();
@@ -148,18 +171,30 @@ app.use((error,req,res,next)=>{
 async function start() {
   try {
     if (!process.env.JWT_SECRET?.trim()) throw new Error('JWT_SECRET es obligatorio.');
-    await initDB();
-    console.log('Base de datos inicializada correctamente');
-    return app.listen(PORT, '0.0.0.0', () => console.log(`Servidor corriendo en puerto ${PORT}`));
+    try {
+      await retryStartup(async () => { await pool.query('SELECT 1'); await initDB(); });
+      databaseReady = true;
+      console.log('Conexión y seguridad PostgreSQL verificadas; no se ejecutaron migraciones.');
+    } catch (error) {
+      if (!devPreview || !isTransient(error)) throw error;
+      console.error('Vista previa local: PostgreSQL no disponible; API desactivada. Corrige la conexión y escribe rs en nodemon para reiniciar.', safeCode(error));
+    }
+    return await new Promise((resolve, reject) => {
+      const server = app.listen(PORT, devPreview ? '127.0.0.1' : '0.0.0.0', () => {
+        console.log(`Servidor corriendo en http://localhost:${PORT}`);
+        resolve(server);
+      });
+      server.once('error', reject);
+    });
   } catch (error) {
-    console.error('No se pudo iniciar el servidor. Verifica JWT_SECRET, DATABASE_URL de runtime y las migraciones administrativas.', error.code || error.name);
+    console.error('No se pudo iniciar el servidor. Revisa conexión, credencial restringida y esquema; ejecuta npm run db:check.', safeCode(error));
     await pool.end();
     throw error;
   }
 }
 
 if (require.main === module) {
-  start().catch(() => { process.exitCode = 1; });
+  start().then(server => installShutdown(server, pool)).catch(() => { process.exitCode = 1; });
 }
 
 module.exports = { app, start };
