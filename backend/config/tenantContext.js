@@ -1,5 +1,7 @@
 const { AsyncLocalStorage } = require('node:async_hooks');
 const context = new AsyncLocalStorage();
+const atomic = new AsyncLocalStorage();
+const withAtomicClient = (client, callback) => atomic.run(client, callback);
 const validTenant = value => Number.isSafeInteger(Number(value)) && Number(value) > 0 ? String(value) : null;
 function withTenant(value, callback) {
   const negocioId = validTenant(value);
@@ -13,6 +15,14 @@ const currentTenant = () => context.getStore()?.negocioId || null;
 function createTenantPool(nativePool) {
   const api = {
     async connect() {
+      const shared = atomic.getStore();
+      if (shared) return {
+        query(sql,...params) {
+          if (typeof sql==='string' && /^(BEGIN|COMMIT|ROLLBACK)\b/i.test(sql.trim())) return Promise.resolve({rows:[],rowCount:0});
+          return shared.query(sql,...params);
+        },
+        release() {}
+      };
       const client = await nativePool.connect();
       const release = client.release.bind(client);
       const tenant = currentTenant() || '';
@@ -49,6 +59,8 @@ function createTenantPool(nativePool) {
       return wrapper;
     },
     async query(...args) {
+      const shared=atomic.getStore();
+      if(shared)return shared.query(...args);
       const client = await api.connect();
       try { const result = await client.query(...args); await client.query('COMMIT'); return result; }
       catch (error) {
@@ -63,4 +75,4 @@ function createTenantPool(nativePool) {
   };
   return api;
 }
-module.exports = { withTenant, withSystemContext, currentTenant, validTenant, createTenantPool };
+module.exports = { withAtomicClient, withTenant, withSystemContext, currentTenant, validTenant, createTenantPool };

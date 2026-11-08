@@ -9,8 +9,10 @@
     "build": "node scripts/check-syntax.js",
     "migrate:tenancy": "node scripts/migrate-tenancy.js",
     "migrate:security": "node scripts/harden-tenancy.js",
+    "db:android:check": "node scripts/migrate-android-offline.js --check",
+    "db:android:apply": "node scripts/migrate-android-offline.js --apply",
     "backup": "node scripts/backup-db.js",
-    "test": "node --test tests/*.test.js",
+    "test": "node --test tests/*.test.js tests/android-sync-integration.test.mjs",
     "db:preflight": "node scripts/check-migration-capabilities.js",
     "db:bootstrap": "node scripts/bootstrap-empty.js"
   },

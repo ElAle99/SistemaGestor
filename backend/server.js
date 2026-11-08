@@ -137,6 +137,7 @@ app.use('/api', (req, res, next) => {
   return res.status(503).json({ error: 'Base de datos no disponible. Restablece la conexión y reinicia el servidor.' });
 });
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/android', require('./routes/android'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/clientes', require('./routes/clientes'));
 app.use('/api/ordenes', require('./routes/ordenes'));
