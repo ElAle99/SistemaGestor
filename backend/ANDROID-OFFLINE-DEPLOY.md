@@ -1,87 +1,58 @@
-﻿# Despliegue controlado: Android Offline v1
+# Publicacion controlada: Android Offline bigint v2
 
-## Integracion local preparada
+## Estado auditado
 
-Repositorio de destino: `ElAle99/SistemaGestor`, rama `sistema-final-99`.
-Base: `6f3367073cab542529703f02fba0f154899b221c`, commit publicado en Render segun confirmacion del responsable. Las referencias locales `sistema-final-99` y `sistemagestor/sistema-final-99` coinciden con esa base; no se consulto Render ni se actualizo el remoto.
+Rama local `codex/offline-release-integration`, basada en `sistema-final-99` / `6f3367073cab542529703f02fba0f154899b221c`. El commit `51edf765` integra la extension inicial; el siguiente commit local incorpora bigint v2, validadores y sus pruebas. Para publicar en una base 6f33670 se necesita la rama completa, incluidos AMBOS commits, o un squash equivalente. No aplicar solamente el ultimo commit sobre 6f33670: depende de la extension inicial.
 
-Fuente: `bf64b7d9a16330a2d06bf86353ad62c62b7a9c7f`, rama `codex/allfix-offline-integration`, descendiente directo de la base. Integracion preparada en `codex/offline-release-integration`, en un worktree separado. Los 11 archivos del parche pertenecen exclusivamente al backend, su migracion, pruebas y documentacion; no hubo conflictos de aplicacion. No se incorporan los scripts locales de credenciales/staging ni archivos no versionados del checkout fuente.
+El responsable confirma que GitHub y Render continuan en `ElAle99/SistemaGestor`, rama `sistema-final-99`, commit `6f33670`, con auto-deploy activado. Tambien confirma que la migracion bigint se aplico dos veces en `allfix-staging-offline` y que el validador real finalizo `VALIDACION COMPLETA OK`, incluidas sesiones, permisos, RLS y limpieza. Esta auditoria usa esa evidencia aportada; no vuelve a conectar staging ni produccion ni consulta secretos de Render.
 
-El responsable confirma que el parche supero la validacion completa contra Neon Staging en `allfix-staging-offline`. Esa ejecucion es evidencia aportada por el responsable: esta preparacion no vuelve a conectar staging ni produccion. Los resultados locales de esta rama se registran en el commit de integracion y en la entrega al responsable.
+La evidencia y comandos especificos estan en [bigint v2](ANDROID-OFFLINE-BIGINT.md) y [validacion funcional](scripts/ANDROID-STAGING-VALIDATION.md). Los scripts versionados contienen solo codigo y metadatos no secretos del destino staging; solicitan credenciales ocultas en memoria. No se incluyen los archivos privados, bases, backups, logs, bundles ni parches de trabajo locales.
 
-Validacion de esta rama con Node 22.23.4: `npm run build` aprobado (tres bundles y 85 archivos JavaScript); `npm test` aprobado (38 pruebas de impresion/compartir y 138 de backend, 176 en total, sin fallos ni omisiones). Se retiraron las variables de conexion heredadas del proceso de pruebas; el checkout no contiene `.env`. No se ejecutaron migraciones externas ni se contacto la APK. El codigo de los diez archivos restantes coincide exactamente con `bf64b7d`; solo este documento se actualiza respecto de la fuente.
+## Comportamiento y feature flag
 
-Archivos afectados, todos dentro de `backend/`:
+- Se montan las rutas `/api/android/capabilities`, `/orders`, `/operations`, `/session`, `/refresh`, `/logout`; protocolo 1.
+- Solo estan habilitadas si `ANDROID_OFFLINE_ENABLED` vale exactamente `true`. Sin variable, o con otro valor, todas responden 501 antes de consultar las tablas offline. La prueba HTTP del servidor verifica este estado por defecto. El validador solo activa la variable en su propio proceso local y restaura el entorno PowerShell.
+- `withAtomicClient` limita el cliente compartido a la transaccion offline. La escritura de negocio y el recibo persistente son atomicos; reintentos por UUID son idempotentes y los conflictos preservan cambios web.
+- Se reutilizan recepcion, asignacion de folio, estado y eliminacion existentes. No hay cobros, anticipos, ventas ni aprendizaje de catalogo offline. El borrado exige permisos y ausencia de vinculos financieros.
+- Las sesiones refresh usan hash en DB, rotacion, caducidad absoluta y revocacion por familia/session_version. Se conserva el JWT_SECRET actual; no se guarda en APK ni en Git.
+- Web, Android, impresion, caja/POS, dependencias y lockfiles permanecen iguales a 6f33670. El arbol original con trabajo local se conserva intacto.
 
-- `ANDROID-OFFLINE-DEPLOY.md`
-- `config/tenantContext.js`
-- `db/android-offline.sql`
-- `db/androidMigration.js`
-- `package.json`
-- `routes/android.js`
-- `scripts/migrate-android-offline.js`
-- `server.js`
-- `services/androidSyncProtocol.js`
-- `tests/android-offline.test.js`
-- `tests/android-sync-integration.test.mjs`
+## Render: compatibilidad revisada
 
-Los archivos web, Android, impresion, caja/POS, dependencias y lockfiles permanecen iguales a la rama de destino. El checkout original conserva sus modificaciones locales; no se integra trabajo no confirmado como parte de este parche.
+El servidor conserva PORT, escucha 0.0.0.0 en produccion, ofrece `/healthz` con SELECT de disponibilidad y drena conexiones ante SIGTERM. `npm start` solo inicia Express: no ejecuta seeds, migraciones ni DDL. Las herramientas de staging no son importadas por el servidor.
 
-## Alcance del backend
+Se mantiene Node 22 (`>=22.12.0 <23`); `.node-version` fija 22.23.3. La auditoria local usa 22.23.4, dentro del mismo rango. El build desde la raiz genera los tres bundles actuales y valida sintaxis. Comandos efectivos compatibles con los manifests:
 
-- Rutas `/api/android/capabilities`, `/orders`, `/operations`, `/session`, `/refresh`, `/logout`; protocolo 1. Solo se habilitan cuando `ANDROID_OFFLINE_ENABLED` vale exactamente `true`. No se configura ni activa esa variable en esta integracion.
-- Recibo persistente por UUID en la misma transaccion que la escritura, reintentos idempotentes y bloqueo de fila/version para conflictos con ediciones web. Reutiliza `allocate_order_folio` y los servicios existentes de recepcion, estado y eliminacion.
-- Edicion offline limitada a campos descriptivos; sin cobros, anticipos, caja, ventas ni aprendizaje de catalogo offline. Borrado sujeto a permisos y vinculos financieros.
-- Refresh de tipo separado, hash en DB, rotacion, limite absoluto de 30 dias y revocacion por familia/session_version; acceso de 8 horas con el `JWT_SECRET` existente. Respuestas `Cache-Control: no-store`.
-- `withAtomicClient` comparte exclusivamente el cliente de la operacion offline con servicios anidados; las operaciones web conservan el comportamiento anterior fuera de ese contexto.
-- El arranque del backend no importa ni ejecuta migraciones.
-
-## Migracion manual, pendiente de autorizacion
-
-`backend/db/android-offline.sql` corresponde a `20261107_android_offline_v1`: dos tablas nuevas (`android_sync_receipts`, `android_refresh_sessions`), ENABLE/FORCE RLS, politicas tenant y dos indices. El CLI aplica grants minimos al rol runtime existente. No altera las tablas de negocio ni sus politicas, no crea roles ni cambia passwords.
-
-Con credenciales inyectadas temporalmente en un entorno administrativo autorizado:
-
-- `MIGRATION_DATABASE_URL`: conexion administrativa directa al destino aprobado.
-- `ANDROID_RUNTIME_ROLE`: nombre del login runtime actual, sin SUPERUSER ni BYPASSRLS.
-- TLS con verificacion de certificados. Nunca guardar credenciales en Git, APK o logs.
-
-Desde `backend`, solo cuando se autorice expresamente el destino:
-
-```powershell
-npm run db:android:check
-npm run db:android:apply
+```text
+Build: npm ci --include=dev && npm --prefix backend ci --include=dev && npm run build
+Start: npm start
+Health: /healthz
 ```
 
-`check` es de lectura y verifica capacidades existentes y EXECUTE del runtime. `apply` utiliza una transaccion y bloqueo de migracion; un error revierte todo. La repetibilidad ya forma parte de la evidencia previa de pruebas. No ejecutar migraciones antiguas de tenancy/RLS como atajo ni agregar `apply` a build/start/pre-deploy. No basta ejecutar el SQL suelto: faltarian el preflight y los grants del CLI.
+El manifest actual NO define `render:build`, aunque el documento historico RENDER_PRODUCTION.md menciona ese alias. No configurarlo sin crearlo/revisarlo. Antes de publicar, contrastar el Build Command efectivo del servicio con el comando anterior; esta auditoria no modifica la configuracion remota ni los manifests para resolver una discrepancia documental previa. El script existente `railway:build` ejecuta la misma secuencia de build, sin migraciones.
 
-## Validacion local reproducible
+El estado local no certifica un despliegue Linux en Render ni su configuracion privada. Referencias oficiales revisadas: [deploys](https://render.com/docs/deploys), [health checks](https://render.com/docs/health-checks).
 
-Usar Node 22 (`>=22.12.0 <23`) y dependencias del lockfile. En un checkout con dependencias instaladas:
+## Migracion manual
 
-```powershell
-npm run build
-npm test
-```
+Version `20261108_android_offline_bigint_v2`. El esquema crea ambas tablas con negocio_id bigint. La actualizacion v1 convierte integer a bigint sin borrar filas, con ACCESS EXCLUSIVE y reconstruccion de la politica original dentro de una unica transaccion; mantiene ENABLE/FORCE RLS, PK, indices y ACL. El CLI valida tipos y funciones antes de aplicar y exige bigint antes de COMMIT. Grants minimos: SELECT/INSERT en recibos; SELECT/INSERT/UPDATE en sesiones; sin DELETE ni grants a PUBLIC. No se crean roles ni se modifican tablas de negocio.
 
-El build genera los tres bundles existentes de catalogo, impresion y compartir, y comprueba sintaxis. `npm test` ejecuta regresiones de impresion/compartir y la suite backend, incluida la integracion HTTP offline. Estas pruebas emplean PGlite o adaptadores aislados; no equivalen por si solas a la validacion real de staging ya confirmada por el responsable. Dejar sin definir `ALLFIX_TEST_POSTGRES_URL` para este recorrido local.
+`--check` es de lectura y muestra tipos y bigintReady. `--apply` solo se ejecuta con autorizacion para el destino exacto. Nunca agregarlo a start, build ni pre-deploy. Las credenciales administrativas se inyectan temporalmente, con TLS verificado, y se retiran al terminar; nunca van al runtime de Render.
 
-La integracion HTTP cubre idempotencia, perdida de respuesta, rollback, edicion, estados, conflictos, aislamiento, restricciones financieras, borrado y replay, caducidad/rotacion/reutilizacion/logout/revocacion de sesiones. Las pruebas de migracion usan adaptadores aislados; no migran produccion.
+## Validacion final local
 
-## Pasos pendientes antes de publicar y desplegar
+`npm run build`: tres bundles y 87 archivos JavaScript. `npm test`: 191 pruebas, 38 de impresion/compartir y 153 backend, sin fallos ni omisiones. Incluye instalacion limpia, conversion poblada y doble apply en PostgreSQL embebido, preservacion de recibos/sesiones/PK/indices/politicas/ACL, rollback, tenants > int32, CRUD, concurrencia, idempotencia, conflictos, sesiones, permisos y guardas/limpieza del validador. La prueba HTTP adicional verifica que las seis rutas permanecen deshabilitadas con el flag ausente. Se valida tambien sintaxis de las herramientas PowerShell y CJS/MJS.
 
-1. Revisar el commit y el resultado de pruebas; confirmar nuevamente que el HEAD de `sistema-final-99` no cambio desde `6f33670`. Si cambio, integrar la diferencia y repetir las comprobaciones afectadas.
-2. Obtener autorizacion de publicacion. No hacer push/merge mientras un auto-deploy pueda publicar sin aprobacion. Esta preparacion solo crea un commit local; no crea PR ni publica GitHub.
-3. Antes de cualquier migracion de produccion, aprobar destino exacto, backup/punto de recuperacion y plan de recuperacion. Ejecutar el CLI manualmente solo tras autorizacion; retirar despues la credencial administrativa. Nunca inyectarla al runtime de Render.
-4. Publicar e integrar exclusivamente el commit revisado en la rama vinculada; mantener la extension deshabilitada durante el primer despliegue autorizado. Conservar `DATABASE_URL`, `JWT_SECRET`, `FRONTEND_URL` y los origenes CORS actuales.
-5. Verificar login web, ordenes, impresion y caja/POS. Confirmar `https://localhost` dentro de `ALLOWED_ORIGINS` sin eliminar origenes existentes; cualquier cambio en Render necesita autorizacion separada.
-6. Habilitar `ANDROID_OFFLINE_ENABLED` y desplegar solo despues de autorizacion expresa. Verificar capabilities autenticado (200 con protocolo 1 y refresh), anonimo (401 cuando habilitado) y preflight CORS. No imprimir tokens.
-7. Las pruebas con APK, datos persistentes y operaciones pendientes son una etapa posterior que requiere autorizacion; esta preparacion no conecta la APK ni toca su cola. Conservar sus datos y resolver conflictos de forma explicita.
+La suite local usa adaptadores y PostgreSQL embebido; la evidencia funcional real de staging es independiente y fue confirmada por el responsable. No se ejecutaron migraciones remotas ni operaciones de APK durante esta auditoria.
 
-Deshabilitada, la extension responde 501; faltas de esquema/servicio 503, sesion invalida 401, permisos 403, conflictos 409 y restricciones funcionales 422.
+## Pendiente antes de publicar
 
-## Recuperacion y limites
+1. Confirmar nuevamente el SHA remoto y revisar el nuevo commit local junto con 51edf765. Obtener autorizacion explicita para publicar la rama completa: auto-deploy puede desplegar al actualizar sistema-final-99.
+2. Repetir el preflight de produccion con v2, verificar destino/TLS, backup y ventana aprobada; aplicar manualmente solo cuando se autorice. El procedimiento local anterior fijado a 51edf765 no sirve para v2. Verificar tipos, politicas, indices y grants despues de aplicar, sin repetir apply en produccion solo como demostracion.
+3. Antes de la publicacion que pueda disparar Render, confirmar que el flag de produccion permanece ausente o false y que el Build Command es valido. Conservar DATABASE_URL y JWT_SECRET. Cualquier cambio remoto necesita autorizacion separada.
+4. Tras un despliegue autorizado, comprobar health, login, ordenes web, impresion y caja/POS. Verificar CORS para https://localhost sin retirar origenes existentes. No fabricar movimientos financieros en produccion.
+5. Autorizar por separado habilitacion offline y pruebas de APK; no tocar datos ni operaciones pendientes de la app instalada durante la preparacion.
 
-Si hay incidencias, deshabilitar la extension solo con autorizacion y conservar las tablas: eliminarlas destruiria recibos/sesiones y afectaria la idempotencia. No rebobinar secuencias ni restaurar toda la base como respuesta rutinaria: podria perder escrituras web posteriores. Si se revierte el backend, hacerlo al SHA anterior revisado, tambien con autorizacion.
+Riesgos conocidos: conversion integer a bigint requiere una ventana de locks (5 s de espera, 60 s por sentencia); los IDs siguen sujetos al limite de enteros seguros de JavaScript; el snapshot consulta detalles por orden y debe medirse con volumen grande. La perdida de respuesta de refresh puede requerir login conservando la cola. Ninguno de estos puntos autoriza migracion, publicacion o activacion.
 
-El snapshot consulta detalles por orden; medir su rendimiento con volumen representativo. La perdida de respuesta al rotar refresh puede revocar la familia al reintentar y requerir login; conservar la cola. La revocacion remota no se conoce sin red; no se promete sesion offline indefinida. Bluetooth e intercambio fisico de archivos requieren dispositivo real.
+Recuperacion: conservar recibos/sesiones y no rebobinar secuencias. Deshabilitar el flag o volver al SHA anterior solo con autorizacion. Un rollback de codigo no revierte la migracion ni las escrituras web; no restaurar toda la base rutinariamente.

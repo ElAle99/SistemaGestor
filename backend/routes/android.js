@@ -40,7 +40,7 @@ router.post('/operations',authMiddleware,async(req,res)=>{
   if(!uuid(op.operationId))throw fail(400,'Operación inválida.');
   const result=await transaction(async db=>withAtomicClient(db,async()=>{
    // One tenant lane serializes retries and offline mutations; web UPDATEs also acquire row locks.
-   await db.query('SELECT pg_advisory_xact_lock($1::bigint)',[Number(req.user.negocio_id)]);
+   await db.query('SELECT pg_advisory_xact_lock($1::bigint)',[String(req.user.negocio_id)]);
    const digest=version(op);
    const previous=(await db.query('SELECT request_hash,result FROM android_sync_receipts WHERE negocio_id=app_tenant_id() AND usuario_id=$1 AND operation_id=$2',[req.user.id,op.operationId])).rows[0];
    if(previous){if(previous.request_hash!==digest)throw fail(409,'La operación ya existe con otro contenido.');return previous.result;}

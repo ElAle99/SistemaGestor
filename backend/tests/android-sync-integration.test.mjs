@@ -20,16 +20,16 @@ test('local HTTP: atomic idempotency, response loss, conflict, tenant isolation 
  }
  const db=real?{exec:sql=>admin.query(sql),query:(...args)=>admin.query(...args),close:async()=>{await runtimeNative.end();await admin.end();}}:new PGlite();
  await db.exec(`
- CREATE FUNCTION app_tenant_id() RETURNS integer LANGUAGE sql AS $$ SELECT nullif(current_setting('app.negocio_id',true),'')::integer $$;
- CREATE TABLE users_test(id int primary key,negocio_id int,session_version int default 1,activo boolean default true,rol text default 'Administrador');
- INSERT INTO users_test(id,negocio_id) VALUES(1,1),(2,2);
+ CREATE FUNCTION app_tenant_id() RETURNS bigint LANGUAGE sql AS $$ SELECT nullif(current_setting('app.negocio_id',true),'')::bigint $$;
+ CREATE TABLE users_test(id int primary key,negocio_id bigint,session_version int default 1,activo boolean default true,rol text default 'Administrador');
+ INSERT INTO users_test(id,negocio_id) VALUES(1,3000000001),(2,3000000002);
  CREATE FUNCTION auth_user_by_id(integer) RETURNS jsonb LANGUAGE sql AS $$
   SELECT jsonb_build_object('id',id,'negocio_id',negocio_id,'session_version',session_version,'activo',activo,'rol',rol,'username','prueba','nombre','Prueba') FROM users_test WHERE id=$1 $$;
  CREATE FUNCTION allocate_order_folio(integer) RETURNS text LANGUAGE sql AS $$ SELECT 'TEST'::text $$;
- CREATE TABLE ordenes_servicio(id serial primary key,negocio_id integer default app_tenant_id(),modelo text,estado text default 'Recibido');
- CREATE TABLE caja_movimientos(negocio_id int,referencia_tipo text,referencia_id int);
- CREATE TABLE ventas_detalle(negocio_id int,orden_id int);
- CREATE TABLE orden_refacciones(negocio_id int,orden_id int);
+ CREATE TABLE ordenes_servicio(id serial primary key,negocio_id bigint default app_tenant_id(),modelo text,estado text default 'Recibido');
+ CREATE TABLE caja_movimientos(negocio_id bigint,referencia_tipo text,referencia_id int);
+ CREATE TABLE ventas_detalle(negocio_id bigint,orden_id int);
+ CREATE TABLE orden_refacciones(negocio_id bigint,orden_id int);
  `);
  await db.exec(readFileSync(new URL('../db/android-offline.sql',import.meta.url),'utf8'));
  if(real){
@@ -116,7 +116,7 @@ test('local HTTP: atomic idempotency, response loss, conflict, tenant isolation 
   const target=snapshot.body.orders.find(item=>item.order.id!==id);
   const status=await request('/operations',{operationId:crypto.randomUUID(),kind:'status',orderId:target.order.id,baseVersion:target.version,data:{estado:'En reparación'}});
   assert.equal(status.status,200);assert.equal(status.body.order.status,'En reparación');
-  await db.query("INSERT INTO caja_movimientos VALUES(1,'orden',$1)",[target.order.id]);
+  await db.query("INSERT INTO caja_movimientos VALUES(3000000001,'orden',$1)",[target.order.id]);
   const deletion={operationId:crypto.randomUUID(),kind:'delete',orderId:target.order.id,baseVersion:status.body.version};
   assert.equal((await request('/operations',deletion)).status,422,'Financial references prohibit automatic deletion');
   await db.query('DELETE FROM caja_movimientos WHERE referencia_id=$1',[target.order.id]);
@@ -171,10 +171,10 @@ test('local HTTP: atomic idempotency, response loss, conflict, tenant isolation 
    console.log('PASS real PostgreSQL: concurrent refresh reuse revokes the entire family');
    const rls=await runtimeNative.connect();
    try{
-    await rls.query('BEGIN');await rls.query("SELECT set_config('app.negocio_id','2',true)");
+    await rls.query('BEGIN');await rls.query("SELECT set_config('app.negocio_id','3000000002',true)");
     assert.equal((await rls.query('SELECT * FROM android_sync_receipts')).rows.length,0);
     assert.equal((await rls.query('SELECT * FROM ordenes_servicio')).rows.length,0);
-    await assert.rejects(()=>rls.query("INSERT INTO ordenes_servicio(negocio_id,modelo) VALUES(1,'Forbidden cross business')"),e=>e.code==='42501');
+    await assert.rejects(()=>rls.query("INSERT INTO ordenes_servicio(negocio_id,modelo) VALUES(3000000001,'Forbidden cross business')"),e=>e.code==='42501');
    }finally{await rls.query('ROLLBACK');rls.release();}
    console.log('PASS real PostgreSQL: runtime RLS rejects cross-tenant reads and inserts');
   }

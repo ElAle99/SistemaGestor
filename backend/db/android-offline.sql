@@ -1,8 +1,9 @@
--- Migration 20261107_android_offline_v1. Run only after explicit operator approval.
+-- Base schema for 20261108_android_offline_bigint_v2; CLI also upgrades v1 tables.
+-- Run only after explicit operator approval.
 -- Repeatable; the CLI wraps all DDL and grants in a single transaction.
 -- No ALTER/DML against existing business tables or existing tenant policies.
 CREATE TABLE IF NOT EXISTS public.android_sync_receipts (
- negocio_id integer NOT NULL DEFAULT app_tenant_id(),
+ negocio_id bigint NOT NULL DEFAULT app_tenant_id(),
  usuario_id integer NOT NULL,
  operation_id uuid NOT NULL,
  request_hash text NOT NULL,
@@ -19,7 +20,7 @@ DO $$ BEGIN
  END IF;
 END $$;
 CREATE TABLE IF NOT EXISTS public.android_refresh_sessions (
- negocio_id integer NOT NULL DEFAULT app_tenant_id(),
+ negocio_id bigint NOT NULL DEFAULT app_tenant_id(),
  usuario_id integer NOT NULL,
  token_hash text NOT NULL,
  family uuid NOT NULL,
