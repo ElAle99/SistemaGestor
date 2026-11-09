@@ -6,6 +6,7 @@ test('real Express serves frontend, bundles and protected APIs; health recovers 
   process.env.PORT = '0';
   process.env.JWT_SECRET = 'http-fixture-only';
   process.env.DATABASE_URL = 'postgresql://sistema_gestor_app:fixture@localhost/fixture';
+  delete process.env.ANDROID_OFFLINE_ENABLED;
   let unavailable = false;
   const dbPath = require.resolve('../config/db');
   require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true, exports: {
@@ -25,6 +26,15 @@ test('real Express serves frontend, bundles and protected APIs; health recovers 
       assert.match(response.headers.get('content-type'), /javascript/);
     }
     assert.equal((await fetch(origin + '/healthz')).status, 200);
+    // Publishing the routes cannot enable offline implicitly or access new tables.
+    for (const route of ['capabilities','orders','operations','session','refresh','logout']) {
+      const response=await fetch(origin+'/api/android/'+route,{
+        method:['capabilities','orders'].includes(route)?'GET':'POST',
+        headers:{'Content-Type':'application/json'},
+        ...(['capabilities','orders'].includes(route)?{}:{body:'{}'})
+      });
+      assert.equal(response.status,501,route+' must remain disabled by default');
+    }
     for (const route of ['users', 'clientes', 'ordenes', 'inventario', 'pos/ventas', 'caja/activa', 'reportes/ingresos', 'configuracion/negocio', 'garantias', 'dashboard/stats']) {
       const response = await fetch(`${origin}/api/${route}`);
       assert.equal(response.status, 401, route);
