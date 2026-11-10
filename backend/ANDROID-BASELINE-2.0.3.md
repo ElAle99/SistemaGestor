@@ -18,6 +18,7 @@ Sin `orderLookup:true`, la nueva APK conserva compatibilidad con el backend publ
 - Interfaz real generada: almacenamiento vacío, snapshot completo retenido, eliminaciones desde lista y detalle sin esperar ese snapshot, indicador hasta confirmación HTTP, estadísticas inmediatas, prevención de resurrección por respuesta antigua y persistencia al recargar. Comparación de conflictos y UI Administrador/Técnico de 320–1280 px aprobadas con fixtures locales.
 - Consulta individual de solo lectura de la orden copiada a Staging: HTTP 200, 2.356 ms, 4.984 bytes, versión de 64 caracteres. El DTO real convertido conserva `id:number`, `negocio_id:string` y la versión exacta. No se exportan datos personales.
 - El validador `android/scripts/validate-online-staging.cjs`, del proyecto Android de trabajo, permite `ALLFIX_TEST_BACKEND_DIR` para usar esta rama. Rechaza destinos distintos de Staging y recibe conexiones por stdin protegido; crea exclusivamente fixtures sintéticos en negocios propios y verifica su limpieza.
+- Ejecución completa contra Neon Staging: **VALIDACION COMPLETA OK**, fixtures `offline-test-fb06c19db7084855`, limpieza verificada. Incluyó instalación limpia/DTO real, lookup 503, eliminación online/offline, reinicio/reconexión, replay tras respuesta perdida, cola antigua, conflictos/versiones, HTTP 500, sesiones, RLS y carrera aplicar/cancelar. Dos ejecuciones anteriores detectaron defectos de aislamiento/expectativas del validador, se limpiaron y no se contaron como aprobadas.
 
 ## Límites y publicación
 
