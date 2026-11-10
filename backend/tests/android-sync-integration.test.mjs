@@ -91,6 +91,15 @@ test('local HTTP: atomic idempotency, response loss, conflict, tenant isolation 
  try{
   const op={operationId:'11111111-1111-4111-8111-111111111111',kind:'create',data:{model:'Prueba'}};
   const a=await request('/operations',op);assert.equal(a.status,200,JSON.stringify(diagnostics));
+  assert.equal((await request('/capabilities')).body.orderLookup,true);
+  const lookup=await request('/orders/'+a.body.orderId);
+  assert.equal(lookup.status,200);assert.equal(lookup.body.version,a.body.version);assert.equal(lookup.body.order.id,a.body.orderId);
+  assert.match(lookup.body.version,/^[a-f0-9]{64}$/);assert.equal(lookup.cache,'no-store');
+  const missing=await request('/orders/'+a.body.orderId,undefined,2);assert.equal(missing.status,404);assert.equal(missing.body.code,'ANDROID_ORDER_NOT_FOUND');
+  assert.equal((await request('/orders/invalid')).status,400);
+  assert.equal((await request('/orders/0')).status,400);
+  const listOriginal=orderService.getAllOrdenes;orderService.getAllOrdenes=async()=>{throw Error('Unrelated list failure');};
+  try{assert.equal((await request('/orders/'+a.body.orderId)).status,200);assert.equal((await request('/orders')).status,500);}finally{orderService.getAllOrdenes=listOriginal;}
   const replay=await request('/operations',op);assert.equal(replay.body.orderId,a.body.orderId);assert.equal(creations,1);
   assert.equal((await request('/operations',{...op,data:{model:'distinto'}})).status,409);
   assert.equal(a.cache,'no-store');
