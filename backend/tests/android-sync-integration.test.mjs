@@ -178,6 +178,36 @@ test('local HTTP: atomic idempotency, response loss, conflict, tenant isolation 
    }finally{await rls.query('ROLLBACK');rls.release();}
    console.log('PASS real PostgreSQL: runtime RLS rejects cross-tenant reads and inserts');
   }
+  // Replay queue entries from the actual installed 1.0 model, without rewriting UUIDs,
+  // base versions or wire shapes when the backend advertises the additive capability.
+  const legacyPath=new URL('./fixtures/allfix-installed-1.0/',import.meta.url);
+  const legacyBytes=readFileSync(new URL('offline-model.js',legacyPath));
+  const legacyManifest=JSON.parse(readFileSync(new URL('manifest.json',legacyPath),'utf8'));
+  assert.equal(crypto.createHash('sha256').update(legacyBytes).digest('hex'),legacyManifest.files['offline-model.js']);
+  const legacyContext={};vm.runInNewContext(legacyBytes.toString('utf8'),legacyContext);
+  const legacy=legacyContext.AllfixOfflineModel,user={id:1,negocio_id:'3000000001',rol:'Administrador'};
+  let pending=legacy.apply(legacy.fresh(),[],{kind:'create',data:{model:'Installed APK queue'}},user,crypto.randomUUID());
+  for(const change of [{kind:'update',data:{model:'Legacy edited offline'}},{kind:'status',data:{estado:'En reparación'}},{kind:'delete',data:{}}])pending=legacy.apply(pending.state,pending.queue,{...change,orderId:-1},user,crypto.randomUUID());
+  while(pending.queue.length){
+   const old=pending.queue[0],wire={operationId:old.operationId,kind:old.kind,orderId:old.orderId,data:old.data,baseVersion:old.baseVersion};
+   const applied=await request('/operations',wire);assert.equal(applied.status,200);
+   assert.deepEqual((await request('/operations',wire)).body,applied.body,'Legacy operation retries retain the exact receipt');
+   pending=legacy.acknowledge(pending.state,pending.queue,old,applied.body);
+  }
+  assert.equal(Object.keys(pending.state.orders).length,0);
+  const remaining=(await request('/orders')).body.orders[0];
+  const missingBase=legacy.fresh();missingBase.orders[remaining.order.id]=remaining.order;
+  const unresolved=legacy.apply(missingBase,[],{kind:'delete',orderId:remaining.order.id},user,crypto.randomUUID());
+  const original=unresolved.queue[0],wire={operationId:original.operationId,kind:original.kind,orderId:original.orderId,data:original.data,baseVersion:original.baseVersion};
+  assert.equal((await request('/operations',wire)).status,409);
+  assert.equal((await db.query('SELECT count(*)::int n FROM android_sync_receipts WHERE operation_id=$1',[wire.operationId])).rows[0].n,0);
+  assert.equal(unresolved.queue.length,1);assert.equal(unresolved.state.orders[original.localId]._pendingDelete,true);
+  const clientContext={};vm.runInNewContext(require('../scripts/validate-android-sync-staging.cjs').clientFixture('offline-model.js'),clientContext);
+  const current=clientContext.AllfixOfflineModel;
+  assert.equal(current.nextOperation(unresolved.queue).operationId,original.operationId);
+  const merged=current.merge(unresolved.state,unresolved.queue,[remaining]);
+  assert.equal(merged.orders[original.localId]._pendingDelete,true,'Upgraded APK never discards legacy pending deletion');
+  console.log('PASS installed APK 1.0 queue: create/edit/status/delete replay and missing-version preservation with APK 2.0.1 model');
   const second=await request('/session',{});
   await db.query('UPDATE users_test SET session_version=session_version+1 WHERE id=1');
   assert.equal((await request('/refresh',{refreshToken:second.body.refreshToken})).status,401,'Password/session revocation prevents renewal');

@@ -27,7 +27,7 @@ test('real Express serves frontend, bundles and protected APIs; health recovers 
     }
     assert.equal((await fetch(origin + '/healthz')).status, 200);
     // Publishing the routes cannot enable offline implicitly or access new tables.
-    for (const route of ['capabilities','orders','operations','session','refresh','logout']) {
+    for (const route of ['capabilities','orders','operations','operations/cancel','session','refresh','logout']) {
       const response=await fetch(origin+'/api/android/'+route,{
         method:['capabilities','orders'].includes(route)?'GET':'POST',
         headers:{'Content-Type':'application/json'},

@@ -23,7 +23,7 @@ function errorResponse(res,error){
  return res.status(error.statusCode || (error.code==='42P01'?503:500)).json({error:error.statusCode?error.message:'No se pudo completar la operación Android.'});
 }
 router.get('/capabilities',authMiddleware,async(req,res)=>{
- try{await pool.query('SELECT 1 FROM android_sync_receipts LIMIT 0');await pool.query('SELECT 1 FROM android_refresh_sessions LIMIT 0');res.json({protocol:1,refresh:true});}catch(e){errorResponse(res,e);}
+ try{await pool.query('SELECT 1 FROM android_sync_receipts LIMIT 0');await pool.query('SELECT 1 FROM android_refresh_sessions LIMIT 0');res.json({protocol:1,refresh:true,cancellation:true});}catch(e){errorResponse(res,e);}
 });
 router.get('/orders',authMiddleware,async(req,res)=>{
  try{
@@ -82,6 +82,23 @@ router.post('/operations',authMiddleware,async(req,res)=>{
    return outcome;
   }));
   res.json(result);
+ }catch(e){errorResponse(res,e);}
+});
+// Cancellation shares the exact idempotency lane with apply: even an in-flight request
+// can never delete an order after its cancellation has been confirmed.
+router.post('/operations/cancel',authMiddleware,async(req,res)=>{
+ try{
+  const op=req.body;
+  if(!op || !uuid(op.operationId) || !['create','update','status','delete'].includes(op.kind))throw fail(400,'Operación inválida.');
+  const result=await transaction(async db=>withAtomicClient(db,async()=>{
+   await db.query('SELECT pg_advisory_xact_lock($1::bigint)',[String(req.user.negocio_id)]);
+   const digest=version(op);
+   const previous=(await db.query('SELECT request_hash,result FROM android_sync_receipts WHERE negocio_id=app_tenant_id() AND usuario_id=$1 AND operation_id=$2',[req.user.id,op.operationId])).rows[0];
+   if(previous){if(previous.request_hash!==digest)throw fail(409,'La operación ya existe con otro contenido.');return previous.result;}
+   const outcome={operationId:op.operationId,orderId:Number(op.orderId),cancelled:true,deleted:false};
+   await db.query('INSERT INTO android_sync_receipts(usuario_id,operation_id,request_hash,result) VALUES($1,$2,$3,$4::jsonb)',[req.user.id,op.operationId,digest,JSON.stringify(outcome)]);
+   return outcome;
+  }));res.json(result);
  }catch(e){errorResponse(res,e);}
 });
 async function mint(db,user,family,expires){
