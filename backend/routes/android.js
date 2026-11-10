@@ -23,7 +23,16 @@ function errorResponse(res,error){
  return res.status(error.statusCode || (error.code==='42P01'?503:500)).json({error:error.statusCode?error.message:'No se pudo completar la operación Android.'});
 }
 router.get('/capabilities',authMiddleware,async(req,res)=>{
- try{await pool.query('SELECT 1 FROM android_sync_receipts LIMIT 0');await pool.query('SELECT 1 FROM android_refresh_sessions LIMIT 0');res.json({protocol:1,refresh:true,cancellation:true});}catch(e){errorResponse(res,e);}
+ try{await pool.query('SELECT 1 FROM android_sync_receipts LIMIT 0');await pool.query('SELECT 1 FROM android_refresh_sessions LIMIT 0');res.json({protocol:1,refresh:true,cancellation:true,orderLookup:true});}catch(e){errorResponse(res,e);}
+});
+router.get('/orders/:id',authMiddleware,async(req,res)=>{
+ try{
+  const id=Number(req.params.id);
+  if(!Number.isSafeInteger(id) || id<=0)throw fail(400,'Identificador de orden inválido.');
+  const order=await orders.getOrdenById(id);
+  if(!order)return res.status(404).json({code:'ANDROID_ORDER_NOT_FOUND',error:'La orden no existe.'});
+  res.json({order,version:version(order)});
+ }catch(error){errorResponse(res,error);}
 });
 router.get('/orders',authMiddleware,async(req,res)=>{
  try{
