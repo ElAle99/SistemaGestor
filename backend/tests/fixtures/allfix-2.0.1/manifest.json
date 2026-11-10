@@ -1,0 +1,11 @@
+{
+  "versionName": "2.0.1",
+  "versionCode": 2,
+  "applicationId": "mx.allfix.gestor",
+  "apkSha256": "0beeda38a904194b94078594758b01c2109afc80377aba25c732c986202d6bfb",
+  "certificateSha256": "ad64544cf77f88fead783ed5c774a0cd3a3db632382c00eafe162ac2428aa31c",
+  "files": {
+    "offline-model.js": "9452c7ed8fd3aa1035882b269262e894a828cacc6e787f21030f0099456fbfdb",
+    "offline.js": "993aed2fa2f4ec9b79f4a08b379a9a164bc01d6bcbe1e73d123871954640aa0b"
+  }
+}

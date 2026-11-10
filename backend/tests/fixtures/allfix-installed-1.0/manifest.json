@@ -1,0 +1,8 @@
+{
+  "versionCode": 1,
+  "applicationId": "mx.allfix.gestor",
+  "apkSha256": "b32090e6b37cd5675f0c496117d1f1fad3b9b681f7643f4703dede10f3620081",
+  "files": {
+    "offline-model.js": "a584cf8b57c0f6edbb6ba5f66d26bd169b1d9ff80018d03f493c7b998e29ec2a"
+  }
+}

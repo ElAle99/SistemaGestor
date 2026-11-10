@@ -1761,10 +1761,13 @@ async function returnOrdenRefaccionesStock(ordenId, usuarioId = 1, db = pool) {
 
 async function deleteOrdenInTransaction(id, usuarioId = 1, db = pool) {
   const orderRes = await db.query(
-    'SELECT id FROM ordenes_servicio WHERE negocio_id = app_tenant_id() AND id = $1 FOR UPDATE',
+    'SELECT id,folio,estado FROM ordenes_servicio WHERE negocio_id = app_tenant_id() AND id = $1 FOR UPDATE',
     [id]
   );
   if (orderRes.rows.length === 0) return false;
+
+  await db.query('INSERT INTO auditoria_ordenes(orden_id,usuario_id,accion,detalle) VALUES($1,$2,$3,$4::jsonb)',
+    [id,usuarioId,'eliminar',JSON.stringify({folio:orderRes.rows[0].folio,estado:orderRes.rows[0].estado})]);
 
   await returnOrdenRefaccionesStock(id, usuarioId, db);
   await db.query('UPDATE ventas_detalle SET orden_id = NULL WHERE negocio_id=app_tenant_id() AND orden_id = $1', [id]);
