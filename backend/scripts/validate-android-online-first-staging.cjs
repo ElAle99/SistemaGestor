@@ -42,7 +42,7 @@ function diagnostic(error) {
   return safeCause;
 }
 const fixtures = [];
-const tables = ['android_sync_receipts','android_refresh_sessions','historial_estados','auditoria_ordenes','ordenes_servicio','clientes','usuarios','orden_identidades','entidad_identidades','negocio_logos','archivos','configuracion_sistema','configuracion','order_folio_counters'];
+const tables = ['caja_movimientos','caja_sesiones','cajas','android_sync_receipts','android_refresh_sessions','historial_estados','auditoria_ordenes','ordenes_servicio','clientes','usuarios','orden_identidades','entidad_identidades','negocio_logos','archivos','configuracion_sistema','configuracion','order_folio_counters'];
 async function main() {
   // Credentials arrive over a non-echoed stdin pipe, never command arguments or files.
   const input=await new Promise((resolve,reject)=>{
@@ -225,6 +225,41 @@ async function main() {
   const late=await req('/operations/cancel',deletion);
   assert.equal(late.body.deleted,true);assert.notEqual(late.body.cancelled,true);
   report('PASS cancelacion atomica, replay y confirmacion de eliminacion ya aplicada');
+  stage='creacion avanzada y compatibilidad web';
+  const cash=await request('/api/caja/abrir',{monto_inicial:0},a.token);
+  assert.ok([200,201].includes(cash.status),'Synthetic cash register open');
+  const advanced={...online,kind:'create-full',operationId:crypto.randomUUID(),
+    data:{...online.data,clientName:marker+'-full',model:marker+'-full',costo_estimado:150,anticipo:40,metodo_pago_anticipo:'Efectivo'}};
+  const advancedRetries=await Promise.all([op(advanced),op(advanced),op(advanced)]);
+  for(const result of advancedRetries)assert.equal(result.status,200);
+  const full=advancedRetries[0].body;
+  assert.ok(full.order.folio);
+  assert.equal(new Set(advancedRetries.map(r=>r.body.orderId)).size,1);
+  assert.deepEqual((await req('/receipts/'+advanced.operationId)).body,full);
+  assert.equal((await req('/receipts/'+advanced.operationId,undefined,b)).status,404);
+  assert.equal((await op({...advanced,data:{...advanced.data,anticipo:50}})).status,409);
+  const publicDetail=await request('/api/ordenes/'+full.orderId,undefined,a.token);
+  assert.equal(publicDetail.status,200);
+  assert.equal(publicDetail.body.folio,full.order.folio);
+  assert.equal(Number(publicDetail.body.anticipo),40);
+  const movements=await admin.query("SELECT count(*)::int AS n FROM caja_movimientos WHERE negocio_id=$1 AND referencia_tipo='orden' AND referencia_id=$2",[a.id,full.orderId]);
+  assert.equal(movements.rows[0].n,1);
+  const quickAdvance={...online,operationId:crypto.randomUUID(),
+    data:{...online.data,clientName:marker+'-quick-cash',costo_estimado:150,anticipo:30}};
+  const quickCash=await op(quickAdvance);
+  assert.equal(quickCash.status,200);
+  assert.equal((await op(quickAdvance)).body.orderId,quickCash.body.orderId);
+  const quickCashMovements=await admin.query("SELECT count(*)::int AS n FROM caja_movimientos WHERE negocio_id=$1 AND referencia_tipo='orden' AND referencia_id=$2",[a.id,quickCash.body.orderId]);
+  assert.equal(quickCashMovements.rows[0].n,1);
+  const web=await request('/api/ordenes/rapida',{...create.data,clientName:marker+'-web'},a.token);
+  assert.equal(web.status,201);
+  assert.ok(web.body.folio);
+  const compatible=await op({...create,operationId:crypto.randomUUID(),data:{...create.data,clientName:marker+'-legacy'}});
+  assert.equal(compatible.status,200);
+  assert.ok(compatible.body.version);
+  assert.ok(compatible.body.order.folio);
+  report('PASS editor completo y recepcion rapida con anticipo unico, recibos, web y APK anteriores');
+
 }
 async function cleanup() {
   if (!fixtures.length) return;
