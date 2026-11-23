@@ -23,7 +23,18 @@ function errorResponse(res,error){
  return res.status(error.statusCode || (error.code==='42P01'?503:500)).json({error:error.statusCode?error.message:'No se pudo completar la operación Android.'});
 }
 router.get('/capabilities',authMiddleware,async(req,res)=>{
- try{await pool.query('SELECT 1 FROM android_sync_receipts LIMIT 0');await pool.query('SELECT 1 FROM android_refresh_sessions LIMIT 0');res.json({protocol:1,refresh:true,cancellation:true,orderLookup:true});}catch(e){errorResponse(res,e);}
+ try{await pool.query('SELECT 1 FROM android_sync_receipts LIMIT 0');await pool.query('SELECT 1 FROM android_refresh_sessions LIMIT 0');res.json({protocol:1,refresh:true,cancellation:true,orderLookup:true,onlineCreate:true,receiptLookup:true});}catch(e){errorResponse(res,e);}
+});
+router.get('/receipts/:id',authMiddleware,async(req,res)=>{
+ try{
+  if(!uuid(req.params.id))throw fail(400,'Identificador de recibo inválido.');
+  const row=(await pool.query(
+   'SELECT result FROM android_sync_receipts WHERE negocio_id=app_tenant_id() AND usuario_id=$1 AND operation_id=$2',
+   [req.user.id,req.params.id])).rows[0];
+  if(!row)return res.status(404).json({error:'No se encontró el recibo para esta sesión.'});
+  const {operationId,orderId,deleted,cancelled,order}=row.result;
+  res.json({operationId,orderId,deleted,cancelled,order:order?{id:order.id,negocio_id:order.negocio_id,folio:order.folio}:undefined});
+ }catch(error){errorResponse(res,error);}
 });
 router.get('/orders/:id',authMiddleware,async(req,res)=>{
  try{
@@ -53,6 +64,20 @@ router.post('/operations',authMiddleware,async(req,res)=>{
    const digest=version(op);
    const previous=(await db.query('SELECT request_hash,result FROM android_sync_receipts WHERE negocio_id=app_tenant_id() AND usuario_id=$1 AND operation_id=$2',[req.user.id,op.operationId])).rows[0];
    if(previous){if(previous.request_hash!==digest)throw fail(409,'La operación ya existe con otro contenido.');return previous.result;}
+   const onlineCreate=op.flow==='online-first' && ['create','create-full'].includes(op.kind);
+   if(!onlineCreate && process.env.ANDROID_RETIRE_LEGACY_WRITES==='true')throw fail(426,'Actualiza Allfix Gestor para enviar operaciones nuevas.');
+   if(onlineCreate){
+    if(!['Administrador','Recepcionista'].includes(req.user.rol))throw fail(403,'No puedes registrar órdenes.');
+    if(!op.data || typeof op.data!=='object' || Array.isArray(op.data))throw fail(400,'Datos de orden inválidos.');
+    const created=op.kind==='create-full'
+     ? await orders.createOrden({...op.data,usuario_creador_id:req.user.id})
+     : await createQuickOrder(op.data,req.user.id,req.user.negocio_id);
+    const order={id:created.id,negocio_id:req.user.negocio_id,folio:created.folio};
+    if(!order.id || !order.folio)throw fail(500,'No se pudo verificar el folio oficial.');
+    const outcome={operationId:op.operationId,orderId:order.id,order,deleted:false};
+    await db.query('INSERT INTO android_sync_receipts(usuario_id,operation_id,request_hash,result) VALUES($1,$2,$3,$4::jsonb)',[req.user.id,op.operationId,digest,JSON.stringify(outcome)]);
+    return outcome;
+   }
    let current=null;
    if(op.kind!=='create'){
     if(!Number.isSafeInteger(Number(op.orderId)) || Number(op.orderId)<=0)throw fail(400,'Orden inválida.');

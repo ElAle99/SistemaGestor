@@ -63,9 +63,9 @@ test('local HTTP: atomic idempotency, response loss, conflict, tenant isolation 
    throw Error('Unexpected auth dependency '+name);
   }
  });
- const module={exports:{}},diagnostics=[];
+ const module={exports:{}},diagnostics=[],routeEnv={ANDROID_OFFLINE_ENABLED:"true",JWT_SECRET:"test-only-offline-key"};
  vm.runInNewContext(readFileSync(new URL('../routes/android.js',import.meta.url),'utf8').replace('function errorResponse(res,error){','function errorResponse(res,error){ diagnostics.push({code:error.code,message:error.message});'),{diagnostics,
-  module,process:{env:{ANDROID_OFFLINE_ENABLED:'true',JWT_SECRET:'test-only-offline-key'}},console,
+  module,process:{env:routeEnv},console,
   require(name){
    if(name==='express')return express;
    if(name==='jsonwebtoken')return jwt;
@@ -76,7 +76,7 @@ test('local HTTP: atomic idempotency, response loss, conflict, tenant isolation 
    if(name==='../services/quickOrderService')return {createQuickOrder:async data=>{
     creations++;const c=await pool.connect();await c.query('BEGIN');
     const row=(await c.query('INSERT INTO ordenes_servicio(modelo) VALUES($1) RETURNING id',[data.model])).rows[0];if(failAfterWrite)throw Error('Injected local transaction failure');await c.query('COMMIT');c.release();
-    return orderService.getOrdenById(row.id);
+    return {...await orderService.getOrdenById(row.id),folio:"TEST-"+row.id};
    }};
    if(name==='../services/androidSyncProtocol')return require('../services/androidSyncProtocol');
    if(name==='../middleware/rateLimit')return {rateLimit:()=> (req,res,next)=>next()};
@@ -220,5 +220,19 @@ test('local HTTP: atomic idempotency, response loss, conflict, tenant isolation 
   const second=await request('/session',{});
   await db.query('UPDATE users_test SET session_version=session_version+1 WHERE id=1');
   assert.equal((await request('/refresh',{refreshToken:second.body.refreshToken})).status,401,'Password/session revocation prevents renewal');
+  await db.query('UPDATE users_test SET session_version=1 WHERE id=1');
+  routeEnv.ANDROID_RETIRE_LEGACY_WRITES='true';
+  const upgrade={operationId:crypto.randomUUID(),kind:'create',flow:'online-first',data:{model:'Online',anticipo:1}};
+  assert.equal((await request('/operations',{...upgrade,flow:undefined})).status,426);
+  assert.equal((await request('/operations',op)).status,200,'A confirmed legacy receipt stays readable by replay');
+  const firstOnline=await request('/operations',upgrade);
+  assert.equal(firstOnline.status,200);
+  const recovered=await request('/receipts/'+upgrade.operationId);
+  assert.deepEqual(recovered.body,firstOnline.body);
+  assert.deepEqual(Object.keys(recovered.body.order).sort(),['folio','id','negocio_id']);
+  assert.equal((await request('/receipts/'+upgrade.operationId,undefined,2)).status,404);
+  assert.equal((await request('/operations',upgrade)).body.orderId,firstOnline.body.orderId);
+  assert.equal((await request('/operations',{...upgrade,data:{model:'Otro'}})).status,409);
+  assert.equal((await request('/receipts/invalid')).status,400);
  }finally{await new Promise(resolve=>server.close(resolve));await db.close();}
 });
